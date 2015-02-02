@@ -47,7 +47,7 @@ class JPrimitiveTypeImpl (clazz: JPrimitiveClass) extends JPrimitiveType {
 
   override def name: String = clazz.name
 
-  override def wrapperType: JObjectType = clazz.wrapperClass.flatMap(JTypePool.getObjectType(_, Nil)).get
+  override def wrapperType: JValueType = clazz.wrapperClass.flatMap(_.objectType(Nil)).get
 
   override def isAssignableTo(that: JValueType): Boolean = ???
 

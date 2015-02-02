@@ -1,4 +1,4 @@
-package phenan.prj
+package phenan.prj.config
 
 import java.io._
 import java.util.jar.JarFile
@@ -6,21 +6,21 @@ import java.util.jar.JarFile
 import phenan.util._
 
 import scala.util.Try
-import scalaz._
-import Scalaz._
+import scalaz.Scalaz._
 
-trait JClassPath {
-  def find (name: String): Option[InputStream]
+trait JSearchPath {
+  def findClassFile (name: String): Option[InputStream]
+  
   def close(): Unit
 }
 
-object JClassPath {
+object JSearchPath {
 
   /* Factory methods */
 
-  def get (implicit conf: JirConfig): Try[JClassPath] = for {
-    usrPath <- parsePath(conf.classPath)
-    sysPath <- systemPath(conf.javaHome)
+  private[config] def classPath (javaHome: String, classPath: String): Try[JSearchPath] = for {
+    usrPath <- parsePath(classPath)
+    sysPath <- systemPath(javaHome)
   } yield new Instance(usrPath :+ sysPath)
 
   /* helper method for getting JClassPath entries */
@@ -66,8 +66,8 @@ object JClassPath {
 
   /* Implementation of JClassPath */
 
-  private class Instance (paths: Stream[Entry]) extends JClassPath {
-    override def find(name: String): Option[InputStream] = paths.flatMap(_.find(name)).headOption
+  private class Instance (paths: Stream[Entry]) extends JSearchPath {
+    override def findClassFile(name: String): Option[InputStream] = paths.flatMap(_.find(name)).headOption
     override def close(): Unit = paths.foreach(_.close())
   }
 

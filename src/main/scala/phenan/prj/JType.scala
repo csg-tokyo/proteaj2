@@ -83,7 +83,7 @@ trait JObjectType extends JValueType {
 }
 
 trait JPrimitiveType extends JValueType {
-  def wrapperType: JObjectType
+  def wrapperType: JValueType
 
   def fields: Map[String, JField] = Map.empty
   def methods: Map[String, List[JMethod]] = Map.empty

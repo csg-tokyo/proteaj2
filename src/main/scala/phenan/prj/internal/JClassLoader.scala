@@ -1,13 +1,14 @@
 package phenan.prj.internal
 
 import phenan.prj._
+import phenan.prj.config._
 import phenan.prj.exception._
 
 import scala.util._
 
 import scalaz.Memo._
 
-class JClassLoader (implicit config: JirConfig) {
+class JClassLoader (jdc: JDeclarationCompiler, config: JConfig) {
   def load (name: String): Try[JClass] = {
     if (name.startsWith("[")) arrayDescriptor(name.tail)
     else loadClass(name)
@@ -18,26 +19,12 @@ class JClassLoader (implicit config: JirConfig) {
     else loadClass(name)
   }
 
-  private[internal] def loadClass (name: String): Try[JLoadedClass] = mutableHashMapMemo(getClass)(name)
-
   def arrayOf (clazz: JClass): JClass = mutableHashMapMemo(getArray)(clazz)
-  
+
   def arrayOf (clazz: JClass, dim: Int): JClass = {
     if (dim > 0) arrayOf(arrayOf(clazz), dim - 1)
     else clazz
   }
-
-  def methodDescriptor (desc: String): Try[(List[JClass], JClass)] = {
-    // "(" ParameterTypeDescriptors ")" ReturnTypeDescriptor
-    if (desc.startsWith("(") && desc.contains(")")) {
-      methodDescriptor(desc.take(desc.indexOf(')')).tail, desc.drop(desc.indexOf(')')).tail)
-    }
-    else Failure(InvalidClassFileException("invalid method descriptor : " + desc))
-  }
-
-  def fieldDescriptor (desc: String): Try[JClass] = typeDescriptor(desc).map(_._1)
-
-  /* primitive types */
 
   def boolean: JClass = primitiveBoolean
   def byte   : JClass = primitiveByte
@@ -48,6 +35,20 @@ class JClassLoader (implicit config: JirConfig) {
   def float  : JClass = primitiveFloat
   def double : JClass = primitiveDouble
   def void   : JClass = primitiveVoid
+
+  /* package private methods */
+
+  private[internal] def loadClass (name: String): Try[JClass] = mutableHashMapMemo(getClass)(name)
+
+  private[internal] def methodDescriptor (desc: String): Try[(List[JClass], JClass)] = {
+    // "(" ParameterTypeDescriptors ")" ReturnTypeDescriptor
+    if (desc.startsWith("(") && desc.contains(")")) {
+      methodDescriptor(desc.take(desc.indexOf(')')).tail, desc.drop(desc.indexOf(')')).tail)
+    }
+    else Failure(InvalidClassFileException("invalid method descriptor : " + desc))
+  }
+
+  private[internal] def fieldDescriptor (desc: String): Try[JClass] = typeDescriptor(desc).map(_._1)
 
   private[internal] lazy val primitiveBoolean: JPrimitiveClass = new JPrimitiveClass("boolean", "java/lang/Boolean", this)
   private[internal] lazy val primitiveByte   : JPrimitiveClass = new JPrimitiveClass("byte", "java/lang/Byte", this)
@@ -61,19 +62,17 @@ class JClassLoader (implicit config: JirConfig) {
 
   /* factory method for JClass ( without cache ) */
 
-  private def getClass (name: String): Try[JLoadedClass] = fromClassFile(name)
+  private def getClass (name: String): Try[JClass] = jdc.compile(name).orElse(fromClassFile(name))
 
   private def getArray (clazz: JClass): JClass = new JArrayClass(clazz, this)
 
   private def fromClassFile (name: String): Try[JLoadedClass] = findClassFile(name).map(cf => new JLoadedClass(cf, this))
 
-  private def findClassFile (name: String): Try[BClassFile] = classPath.flatMap { cp =>
-    cp.find(name).map(BClassFileParsers.fromStream) getOrElse {
+  private def findClassFile (name: String): Try[BClassFile] = {
+    config.classPath.findClassFile(name).map(BClassFileParsers.fromStream) getOrElse {
       Failure(ClassFileNotFoundException("not found : " + name))
     }
   }
-
-  private lazy val classPath = JClassPath.get
 
   /* helper methods for parsing descriptors */
 
