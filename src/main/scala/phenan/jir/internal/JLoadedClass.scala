@@ -2,6 +2,8 @@ package phenan.jir.internal
 
 import phenan.jir._
 
+import scala.util.Try
+
 class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader) extends JClass {
 
   import classFile.poolReader._
@@ -23,6 +25,10 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader) extends
   lazy val fields = classFile.fields.map(field => new JLoadedFieldDef(field, this))
 
   lazy val methods = classFile.methods.map(method => new JLoadedMethodDef(method, this))
+
+  def classType: JClassType = JTypePool.getClassType(this)
+
+  def objectType (typeArgs: List[JValueType]): Try[JValueType] = JTypePool.getObjectType(this, typeArgs)
 
   lazy val signature = attributes.signature.map(sig => parseClassSignature(readUTF(sig.signature)).get)
 
@@ -69,7 +75,7 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass) e
 
   override def returnClass  = descriptor._2
 
-  lazy val exceptions = exceptionNames.map(name => declaringClass.loader.loadClass(name).get)
+  lazy val exceptions: List[JClass] = exceptionNames.map(name => declaringClass.loader.loadClass(name).get)
 
   lazy val signature = attributes.signature.map(sig => parseMethodSignature(readUTF(sig.signature)))
 

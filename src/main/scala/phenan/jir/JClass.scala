@@ -1,5 +1,7 @@
 package phenan.jir
 
+import scala.util.Try
+
 trait JClass {
   def mod: JModifier
   def name: String
@@ -9,6 +11,9 @@ trait JClass {
   def outerClass: Option[JClass]
   def fields: List[JFieldDef]
   def methods: List[JMethodDef]
+
+  def classType: JClassType
+  def objectType (typeArgs: List[JValueType]): Try[JValueType]
 
   lazy val classInitializer = methods.find(_.isClassInitializer)
   lazy val constructors     = methods.filter(_.isConstructor)

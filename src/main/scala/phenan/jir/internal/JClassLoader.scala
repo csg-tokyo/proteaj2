@@ -18,7 +18,7 @@ class JClassLoader (implicit config: JirConfig) {
     else loadClass(name)
   }
 
-  def loadClass (name: String): Try[JClass] = mutableHashMapMemo(getClass)(name)
+  private[internal] def loadClass (name: String): Try[JLoadedClass] = mutableHashMapMemo(getClass)(name)
 
   def arrayOf (clazz: JClass): JClass = mutableHashMapMemo(getArray)(clazz)
   
@@ -39,21 +39,33 @@ class JClassLoader (implicit config: JirConfig) {
 
   /* primitive types */
 
-  lazy val primitiveBoolean: JClass = new JPrimitiveClass("boolean", "java/lang/Boolean", this)
-  lazy val primitiveByte   : JClass = new JPrimitiveClass("byte", "java/lang/Byte", this)
-  lazy val primitiveChar   : JClass = new JPrimitiveClass("char", "java/lang/Character", this)
-  lazy val primitiveShort  : JClass = new JPrimitiveClass("short", "java/lang/Short", this)
-  lazy val primitiveInt    : JClass = new JPrimitiveClass("int", "java/lang/Integer", this)
-  lazy val primitiveLong   : JClass = new JPrimitiveClass("long", "java/lang/Long", this)
-  lazy val primitiveFloat  : JClass = new JPrimitiveClass("float", "java/lang/Float", this)
-  lazy val primitiveDouble : JClass = new JPrimitiveClass("double", "java/lang/Double", this)
-  lazy val primitiveVoid   : JClass = new JPrimitiveClass("void", "java/lang/Void", this)
+  def boolean: JClass = primitiveBoolean
+  def byte   : JClass = primitiveByte
+  def char   : JClass = primitiveChar
+  def short  : JClass = primitiveShort
+  def int    : JClass = primitiveInt
+  def long   : JClass = primitiveLong
+  def float  : JClass = primitiveFloat
+  def double : JClass = primitiveDouble
+  def void   : JClass = primitiveVoid
+
+  private[internal] lazy val primitiveBoolean: JPrimitiveClass = new JPrimitiveClass("boolean", "java/lang/Boolean", this)
+  private[internal] lazy val primitiveByte   : JPrimitiveClass = new JPrimitiveClass("byte", "java/lang/Byte", this)
+  private[internal] lazy val primitiveChar   : JPrimitiveClass = new JPrimitiveClass("char", "java/lang/Character", this)
+  private[internal] lazy val primitiveShort  : JPrimitiveClass = new JPrimitiveClass("short", "java/lang/Short", this)
+  private[internal] lazy val primitiveInt    : JPrimitiveClass = new JPrimitiveClass("int", "java/lang/Integer", this)
+  private[internal] lazy val primitiveLong   : JPrimitiveClass = new JPrimitiveClass("long", "java/lang/Long", this)
+  private[internal] lazy val primitiveFloat  : JPrimitiveClass = new JPrimitiveClass("float", "java/lang/Float", this)
+  private[internal] lazy val primitiveDouble : JPrimitiveClass = new JPrimitiveClass("double", "java/lang/Double", this)
+  private[internal] lazy val primitiveVoid   : JPrimitiveClass = new JPrimitiveClass("void", "java/lang/Void", this)
 
   /* factory method for JClass ( without cache ) */
 
-  private def getClass (name: String): Try[JClass] = findClassFile(name).map(cf => new JLoadedClass(cf, this))
+  private def getClass (name: String): Try[JLoadedClass] = fromClassFile(name)
 
   private def getArray (clazz: JClass): JClass = new JArrayClass(clazz, this)
+
+  private def fromClassFile (name: String): Try[JLoadedClass] = findClassFile(name).map(cf => new JLoadedClass(cf, this))
 
   private def findClassFile (name: String): Try[BClassFile] = classPath.flatMap { cp =>
     cp.find(name).map(BClassFileParsers.fromStream) getOrElse {

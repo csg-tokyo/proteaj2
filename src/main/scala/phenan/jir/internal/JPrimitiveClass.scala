@@ -2,6 +2,9 @@ package phenan.jir.internal
 
 import phenan.jir._
 import JModifier._
+import phenan.jir.exception.InvalidTypeException
+
+import scala.util.{Failure, Success, Try}
 
 class JPrimitiveClass (val name: String, val wrapperName: String, val loader: JClassLoader) extends JClass {
   override def mod = JModifier(accPublic | accFinal)
@@ -15,5 +18,14 @@ class JPrimitiveClass (val name: String, val wrapperName: String, val loader: JC
   override def fields: List[JFieldDef] = Nil
   override def methods: List[JMethodDef] = Nil
 
-  lazy val wrapperClass = loader.loadClass(wrapperName)
+  private[internal] lazy val wrapperClass = loader.loadClass(wrapperName)
+
+  override def classType: JClassType = ???
+
+  override def objectType(typeArgs: List[JValueType]): Try[JValueType] = {
+    if (typeArgs.isEmpty) Success(primitiveType)
+    else Failure(InvalidTypeException("primitive type " + name + " does not take type arguments"))
+  }
+
+  lazy val primitiveType: JPrimitiveType = ???
 }
