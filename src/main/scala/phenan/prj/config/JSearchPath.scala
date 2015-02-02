@@ -10,6 +10,7 @@ import scalaz.Scalaz._
 
 trait JSearchPath {
   def findClassFile (name: String): Option[InputStream]
+  def findSourceFile (name: String): Option[Reader]
   
   def close(): Unit
 }
@@ -22,6 +23,8 @@ object JSearchPath {
     usrPath <- parsePath(classPath)
     sysPath <- systemPath(javaHome)
   } yield new Instance(usrPath :+ sysPath)
+
+  private[config] def sourcePath (sourcePath: String): Try[JSearchPath] = parsePath(sourcePath).map(path => new Instance(path))
 
   /* helper method for getting JClassPath entries */
 
@@ -67,7 +70,10 @@ object JSearchPath {
   /* Implementation of JClassPath */
 
   private class Instance (paths: Stream[Entry]) extends JSearchPath {
-    override def findClassFile(name: String): Option[InputStream] = paths.flatMap(_.find(name)).headOption
+    override def findClassFile(name: String): Option[InputStream] = paths.flatMap(_.find(name + ".class")).headOption
+    override def findSourceFile (name: String): Option[Reader] = {
+      paths.flatMap(path => path.find(name + ".pj") orElse path.find(name + ".java")).headOption.map(new InputStreamReader(_))
+    }
     override def close(): Unit = paths.foreach(_.close())
   }
 
@@ -80,14 +86,14 @@ object JSearchPath {
 
   private class DirPath private (dir: String) extends Entry {
     override def find(name: String): Option[InputStream] = {
-      Option(new File(dir + replaceSeparator(name) + ".class")).filter(_.canRead).map(file => new FileInputStream(file))
+      Option(new File(dir + replaceSeparator(name))).filter(_.canRead).map(file => new FileInputStream(file))
     }
     override def close(): Unit = ()
   }
 
   private class JarPath private (jar: JarFile) extends Entry {
     override def find(name: String): Option[InputStream] = {
-      Option(jar.getJarEntry(name + ".class")).map(jar.getInputStream)
+      Option(jar.getJarEntry(name)).map(jar.getInputStream)
     }
     override def close(): Unit = jar.close()
   }
@@ -107,6 +113,6 @@ object JSearchPath {
 
   private object JarDirPath {
     def apply (path: String): Try[JarDirPath] = jarPaths(path).map(new JarDirPath(_))
-    def jarPaths (path: String): Try[Stream[JarPath]] = new File(path).list(JarFilePattern).toStream.map(JarPath(_)).sequence
+    def jarPaths (path: String): Try[Stream[JarPath]] = new File(path).list(JarFilePattern).toStream.traverse(JarPath(_))
   }
 }

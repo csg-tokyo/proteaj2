@@ -2,13 +2,11 @@ package phenan.prj.internal
 
 import phenan.prj._
 
-class JLoadedObjectType (clazz: JLoadedClass, arguments: Map[String, JValueType]) extends JObjectType {
+class JLoadedObjectType (val erase: JLoadedClass, val typeArguments: Map[String, JValueType]) extends JObjectType {
   override def name: String = {
-    if (arguments.isEmpty) clazz.name
-    else clazz.name + arguments.map(kv => kv._1 + "=" + kv._2.name).mkString("<", ",", ">")
+    if (typeArguments.isEmpty) erase.name
+    else erase.name + typeArguments.map(kv => kv._1 + "=" + kv._2.name).mkString("<", ",", ">")
   }
-
-  override def erase: JClass = ???
 
   override def constructors: List[JConstructor] = ???
 
@@ -21,11 +19,6 @@ class JLoadedObjectType (clazz: JLoadedClass, arguments: Map[String, JValueType]
   override def declaredMethods: List[JMethod] = ???
 
   override def isAssignableTo(that: JValueType): Boolean = ???
-
-  // member class is not supported
-  override def isMatchedTo(that: JObjectType): Boolean = {
-    ???
-  }
 
   override def array: JArrayType = JTypePool.arrayOf(this)
 }
@@ -47,7 +40,7 @@ class JPrimitiveTypeImpl (clazz: JPrimitiveClass) extends JPrimitiveType {
 
   override def name: String = clazz.name
 
-  override def wrapperType: JValueType = clazz.wrapperClass.flatMap(_.objectType(Nil)).get
+  override def wrapperType: JValueType = clazz.wrapperClass.objectType(Nil).get
 
   override def isAssignableTo(that: JValueType): Boolean = ???
 

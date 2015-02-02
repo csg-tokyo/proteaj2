@@ -40,8 +40,8 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader) extends
   private def innerInfo =
     attributes.innerClasses.toList.flatMap(_.classes.filter(info => info.outerClassInfo == classFile.thisClass && info.innerName != 0))
 
-  private def loadClassOption (ref: Int): Option[JClass] = readClassNameOption(ref).map(cls => loader.load(cls).get)
-  private def loadClass (ref: Int): JClass = loader.load(readClassName(ref)).get
+  private def loadClassOption (ref: Int): Option[JClass] = readClassNameOption(ref).map(cls => loader.loadClass(cls).get)
+  private def loadClass (ref: Int): JClass = loader.loadClass(readClassName(ref)).get
 }
 
 class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass) extends JFieldDef {
@@ -54,7 +54,7 @@ class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass) exte
 
   lazy val name = readUTF(field.name)
 
-  lazy val fieldClass = declaringClass.loader.fieldDescriptor(readUTF(field.desc)).get
+  lazy val fieldType = declaringClass.loader.fieldDescriptor(readUTF(field.desc)).get
 
   lazy val signature = attributes.signature.map(sig => parseFieldSignature(readUTF(sig.signature)).get)
 
@@ -71,9 +71,9 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass) e
 
   lazy val name = readUTF(method.name)
 
-  override def paramClasses = descriptor._1
+  override def paramTypes = descriptor._1
 
-  override def returnClass  = descriptor._2
+  override def returnType = descriptor._2
 
   lazy val exceptions: List[JClass] = exceptionNames.map(name => declaringClass.loader.loadClass(name).get)
 

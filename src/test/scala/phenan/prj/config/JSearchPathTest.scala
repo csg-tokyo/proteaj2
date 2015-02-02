@@ -1,7 +1,6 @@
-package phenan.prj
+package phenan.prj.config
 
 import org.scalatest._
-import phenan.prj.config._
 
 class JSearchPathTest extends FunSuite with Matchers {
   test("標準ライブラリが読める") {
@@ -17,5 +16,12 @@ class JSearchPathTest extends FunSuite with Matchers {
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes"
 
     config.make.classPath.findClassFile("phenan/prj/config/JSearchPath") shouldBe a [Some[_]]
+  }
+
+  test("ソースパスにあるjavaファイルが読める") {
+    val config = new JConfigBuilder
+    config.sourcePath = "/Users/ichikawa/workspaces/Idea/proteaj/src"
+
+    config.make.sourcePath.findSourceFile("proteaj/Compiler") shouldBe a [Some[_]]
   }
 }

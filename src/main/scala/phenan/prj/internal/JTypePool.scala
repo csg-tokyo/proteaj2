@@ -9,9 +9,13 @@ import scalaz.Memo._
 
 object JTypePool {
 
-  def arrayOf (component: JValueType): JArrayType = mutableHashMapMemo(getArrayType)(component)
-  def getClassType (clazz: JLoadedClass): JClassType = mutableHashMapMemo(getLoadedClassType)(clazz)
-  def getObjectType (clazz: JLoadedClass, typeArgs: List[JValueType]): Try[JObjectType] = mutableHashMapMemo(getLoadedObjectType)(clazz -> typeArgs)
+  val arrayOf: JValueType => JArrayType = mutableHashMapMemo(getArrayType)
+  val getClassType: JLoadedClass => JClassType = mutableHashMapMemo(getLoadedClassType)
+  val getObjectType: (JLoadedClass, List[JValueType]) => Try[JObjectType] = Function.untupled(mutableHashMapMemo(getLoadedObjectType))
+
+  private def fromClassTypeSignature (sig: ClassTypeSignature): Try[JObjectType] = {
+    ???
+  }
 
   private def getArrayType (component: JValueType): JArrayType = new JArrayTypeImpl(component)
 
@@ -86,14 +90,14 @@ object JTypePool {
   }
 
   private def primSig2JPrimType (p: PrimitiveTypeSignature, loader: JClassLoader): JPrimitiveType = p match {
-    case ByteTypeSignature   => loader.primitiveByte.primitiveType
-    case CharTypeSignature   => loader.primitiveChar.primitiveType
-    case DoubleTypeSignature => loader.primitiveDouble.primitiveType
-    case FloatTypeSignature  => loader.primitiveFloat.primitiveType
-    case IntTypeSignature    => loader.primitiveInt.primitiveType
-    case LongTypeSignature   => loader.primitiveLong.primitiveType
-    case ShortTypeSignature  => loader.primitiveShort.primitiveType
-    case BoolTypeSignature   => loader.primitiveBoolean.primitiveType
-    case VoidTypeSignature   => loader.primitiveVoid.primitiveType
+    case ByteTypeSignature   => loader.byte.primitiveType
+    case CharTypeSignature   => loader.char.primitiveType
+    case DoubleTypeSignature => loader.double.primitiveType
+    case FloatTypeSignature  => loader.float.primitiveType
+    case IntTypeSignature    => loader.int.primitiveType
+    case LongTypeSignature   => loader.long.primitiveType
+    case ShortTypeSignature  => loader.short.primitiveType
+    case BoolTypeSignature   => loader.boolean.primitiveType
+    case VoidTypeSignature   => loader.void.primitiveType
   }
 }

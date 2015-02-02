@@ -2,9 +2,12 @@ package phenan.prj
 
 import scala.util.Try
 
-trait JClass {
-  def mod: JModifier
+sealed trait JErasedType {
   def name: String
+}
+
+trait JClass extends JErasedType {
+  def mod: JModifier
   def superClass: Option[JClass]
   def interfaces: List[JClass]
   def innerClasses: Map[String, JClass]
@@ -23,10 +26,19 @@ trait JClass {
   lazy val staticFields     = fields.filter(_.isStatic)
 }
 
+trait JPrimitiveClass extends JErasedType {
+  def primitiveType: JPrimitiveType
+  def wrapperClass: JClass
+}
+
+trait JArrayClass extends JErasedType {
+  def component: JErasedType
+}
+
 trait JFieldDef {
   def mod: JModifier
   def name: String
-  def fieldClass: JClass
+  def fieldType: JErasedType
   def declaringClass: JClass
 
   def isStatic: Boolean = mod.check(JModifier.accStatic)
@@ -35,8 +47,8 @@ trait JFieldDef {
 trait JMethodDef {
   def mod: JModifier
   def name: String
-  def returnClass: JClass
-  def paramClasses: List[JClass]
+  def returnType: JErasedType
+  def paramTypes: List[JErasedType]
   def exceptions: List[JClass]
   def declaringClass: JClass
 

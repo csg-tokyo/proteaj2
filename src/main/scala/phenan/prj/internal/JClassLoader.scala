@@ -9,38 +9,38 @@ import scala.util._
 import scalaz.Memo._
 
 class JClassLoader (jdc: JDeclarationCompiler, config: JConfig) {
-  def load (name: String): Try[JClass] = {
+  def load (name: String): Try[JErasedType] = {
     if (name.startsWith("[")) arrayDescriptor(name.tail)
     else loadClass(name)
   }
 
-  def load (name: String, dim: Int): Try[JClass] = {
+  def load (name: String, dim: Int): Try[JErasedType] = {
     if (dim > 0) loadClass(name).map(clazz => arrayOf(clazz, dim))
     else loadClass(name)
   }
 
-  def arrayOf (clazz: JClass): JClass = mutableHashMapMemo(getArray)(clazz)
+  val arrayOf : JErasedType => JArrayClass = mutableHashMapMemo(getArray)
 
-  def arrayOf (clazz: JClass, dim: Int): JClass = {
+  def arrayOf (clazz: JErasedType, dim: Int): JErasedType = {
     if (dim > 0) arrayOf(arrayOf(clazz), dim - 1)
     else clazz
   }
 
-  def boolean: JClass = primitiveBoolean
-  def byte   : JClass = primitiveByte
-  def char   : JClass = primitiveChar
-  def short  : JClass = primitiveShort
-  def int    : JClass = primitiveInt
-  def long   : JClass = primitiveLong
-  def float  : JClass = primitiveFloat
-  def double : JClass = primitiveDouble
-  def void   : JClass = primitiveVoid
+  lazy val boolean: JPrimitiveClass = new JPrimitiveClassImpl("boolean", "java/lang/Boolean", this)
+  lazy val byte   : JPrimitiveClass = new JPrimitiveClassImpl("byte", "java/lang/Byte", this)
+  lazy val char   : JPrimitiveClass = new JPrimitiveClassImpl("char", "java/lang/Character", this)
+  lazy val short  : JPrimitiveClass = new JPrimitiveClassImpl("short", "java/lang/Short", this)
+  lazy val int    : JPrimitiveClass = new JPrimitiveClassImpl("int", "java/lang/Integer", this)
+  lazy val long   : JPrimitiveClass = new JPrimitiveClassImpl("long", "java/lang/Long", this)
+  lazy val float  : JPrimitiveClass = new JPrimitiveClassImpl("float", "java/lang/Float", this)
+  lazy val double : JPrimitiveClass = new JPrimitiveClassImpl("double", "java/lang/Double", this)
+  lazy val void   : JPrimitiveClass = new JPrimitiveClassImpl("void", "java/lang/Void", this)
 
   /* package private methods */
 
-  private[internal] def loadClass (name: String): Try[JClass] = mutableHashMapMemo(getClass)(name)
+  private[internal] val loadClass: String => Try[JClass] = mutableHashMapMemo(getClass)
 
-  private[internal] def methodDescriptor (desc: String): Try[(List[JClass], JClass)] = {
+  private[internal] def methodDescriptor (desc: String): Try[(List[JErasedType], JErasedType)] = {
     // "(" ParameterTypeDescriptors ")" ReturnTypeDescriptor
     if (desc.startsWith("(") && desc.contains(")")) {
       methodDescriptor(desc.take(desc.indexOf(')')).tail, desc.drop(desc.indexOf(')')).tail)
@@ -48,23 +48,14 @@ class JClassLoader (jdc: JDeclarationCompiler, config: JConfig) {
     else Failure(InvalidClassFileException("invalid method descriptor : " + desc))
   }
 
-  private[internal] def fieldDescriptor (desc: String): Try[JClass] = typeDescriptor(desc).map(_._1)
+  private[internal] def fieldDescriptor (desc: String): Try[JErasedType] = typeDescriptor(desc).map(_._1)
 
-  private[internal] lazy val primitiveBoolean: JPrimitiveClass = new JPrimitiveClass("boolean", "java/lang/Boolean", this)
-  private[internal] lazy val primitiveByte   : JPrimitiveClass = new JPrimitiveClass("byte", "java/lang/Byte", this)
-  private[internal] lazy val primitiveChar   : JPrimitiveClass = new JPrimitiveClass("char", "java/lang/Character", this)
-  private[internal] lazy val primitiveShort  : JPrimitiveClass = new JPrimitiveClass("short", "java/lang/Short", this)
-  private[internal] lazy val primitiveInt    : JPrimitiveClass = new JPrimitiveClass("int", "java/lang/Integer", this)
-  private[internal] lazy val primitiveLong   : JPrimitiveClass = new JPrimitiveClass("long", "java/lang/Long", this)
-  private[internal] lazy val primitiveFloat  : JPrimitiveClass = new JPrimitiveClass("float", "java/lang/Float", this)
-  private[internal] lazy val primitiveDouble : JPrimitiveClass = new JPrimitiveClass("double", "java/lang/Double", this)
-  private[internal] lazy val primitiveVoid   : JPrimitiveClass = new JPrimitiveClass("void", "java/lang/Void", this)
 
   /* factory method for JClass ( without cache ) */
 
   private def getClass (name: String): Try[JClass] = jdc.compile(name).orElse(fromClassFile(name))
 
-  private def getArray (clazz: JClass): JClass = new JArrayClass(clazz, this)
+  private def getArray (clazz: JErasedType): JArrayClass = new JArrayClassImpl(clazz, this)
 
   private def fromClassFile (name: String): Try[JLoadedClass] = findClassFile(name).map(cf => new JLoadedClass(cf, this))
 
@@ -77,20 +68,20 @@ class JClassLoader (jdc: JDeclarationCompiler, config: JConfig) {
   /* helper methods for parsing descriptors */
 
   // desc does not include the first '['
-  private def arrayDescriptor (desc: String): Try[JClass] = arrayDescriptor(desc, 1).map(_._1)
+  private def arrayDescriptor (desc: String): Try[JErasedType] = arrayDescriptor(desc, 1).map(_._1)
 
-  private def methodDescriptor (params: String, returnType: String): Try[(List[JClass], JClass)] = for {
+  private def methodDescriptor (params: String, returnType: String): Try[(List[JErasedType], JErasedType)] = for {
     ps  <- parameterDescriptors(params, Nil)
     ret <- returnTypeDescriptor(returnType)
   } yield (ps, ret)
 
-  private def returnTypeDescriptor (desc: String): Try[JClass] = {
-    if (desc.startsWith("V")) Success(primitiveVoid)
+  private def returnTypeDescriptor (desc: String): Try[JErasedType] = {
+    if (desc.startsWith("V")) Success(void)
     else fieldDescriptor(desc)
   }
 
   // desc does not include '(' and ')'
-  private def parameterDescriptors (desc: String, params: List[JClass]): Try[List[JClass]] = {
+  private def parameterDescriptors (desc: String, params: List[JErasedType]): Try[List[JErasedType]] = {
     if (desc.isEmpty) Success(params)
     else typeDescriptor(desc) match {
       case Success((cls, rest)) => parameterDescriptors(rest, params :+ cls)
@@ -98,24 +89,24 @@ class JClassLoader (jdc: JDeclarationCompiler, config: JConfig) {
     }
   }
 
-  private def arrayDescriptor (desc: String, dim: Int): Try[(JClass, String)] = {
+  private def arrayDescriptor (desc: String, dim: Int): Try[(JErasedType, String)] = {
     if (desc.isEmpty) Failure(InvalidClassFileException("invalid type descriptor : empty type descriptor"))
     else if (desc.head == '[') arrayDescriptor(desc.tail, dim + 1)
     else typeDescriptor(desc).map { case (component, rest) => (arrayOf(component, dim), rest) }
   }
 
-  private def typeDescriptor (desc: String): Try[(JClass, String)] = {
+  private def typeDescriptor (desc: String): Try[(JErasedType, String)] = {
     if (desc.isEmpty) Failure(InvalidClassFileException("invalid type descriptor : empty type descriptor"))
     else desc.head match {
-      case 'B' => Success((primitiveByte, desc.tail))
-      case 'C' => Success((primitiveChar, desc.tail))
-      case 'D' => Success((primitiveDouble, desc.tail))
-      case 'F' => Success((primitiveFloat, desc.tail))
-      case 'I' => Success((primitiveInt, desc.tail))
-      case 'J' => Success((primitiveLong, desc.tail))
+      case 'B' => Success((byte, desc.tail))
+      case 'C' => Success((char, desc.tail))
+      case 'D' => Success((double, desc.tail))
+      case 'F' => Success((float, desc.tail))
+      case 'I' => Success((int, desc.tail))
+      case 'J' => Success((long, desc.tail))
       case 'L' => objectDescriptor(desc.tail)
-      case 'S' => Success((primitiveShort, desc.tail))
-      case 'Z' => Success((primitiveBoolean, desc.tail))
+      case 'S' => Success((short, desc.tail))
+      case 'Z' => Success((boolean, desc.tail))
       case '[' => arrayDescriptor(desc.tail, 1)
       case h   => Failure(InvalidClassFileException("invalid method descriptor : " + h))
     }

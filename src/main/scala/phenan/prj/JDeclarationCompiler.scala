@@ -2,8 +2,8 @@ package phenan.prj
 
 import phenan.prj.config._
 
-import scala.util.Try
+import scala.util._
 
-class JDeclarationCompiler (implicit config: JConfig) {
-  def compile (name: String): Try[JClass] = ???
+class JDeclarationCompiler (config: JConfig) {
+  def compile (name: String): Try[JClass] = Failure(new RuntimeException(""))
 }

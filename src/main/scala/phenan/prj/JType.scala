@@ -21,6 +21,8 @@ sealed trait JValueType extends JType {
 trait JObjectType extends JValueType {
   def erase: JClass
 
+  def typeArguments: Map[String, JValueType]
+
   def superType: Option[JObjectType]
   def interfaceTypes: List[JObjectType]
 
@@ -46,13 +48,13 @@ trait JObjectType extends JValueType {
     isMatchedTo(that) || superType.exists(_.isSubtypeOf(that)) || interfaceTypes.exists(_.isSubtypeOf(that))
   }
 
-  def isMatchedTo (that: JObjectType): Boolean /*= {
+  def isMatchedTo (that: JObjectType): Boolean = {
     if (this.erase == that.erase) that match {
-      case that: JObjectType => matchTypeArgs(that.typeArgs)
+      case that: JObjectType => matchTypeArgs(that.typeArguments)
       case _                 => false
     }
     else false
-  }*/
+  }
 
   /* helper methods for collecting non-private inherited members */
 
@@ -75,11 +77,13 @@ trait JObjectType extends JValueType {
     }
   }
 
-  /*private def matchTypeArgs (args: List[JType]): Boolean = typeArgs.zip(args).forall {
-    case (t1, t2) if t1 == t2    => true
-    case (t1, t2: JWildcardType) => t2.includes(t1)
-    case _                       => false
-  }*/
+  private def matchTypeArgs (args: Map[String, JValueType]): Boolean = typeArguments.forall { case (key, value) =>
+    args.get(key) match {
+      case Some(arg) if value == arg => true
+      case Some(arg: JWildcardType)  => arg.includes(value)
+      case _                         => false
+    }
+  }
 }
 
 trait JPrimitiveType extends JValueType {
