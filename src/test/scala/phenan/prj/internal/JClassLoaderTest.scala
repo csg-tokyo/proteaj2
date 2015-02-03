@@ -3,13 +3,13 @@ package phenan.prj.internal
 import org.scalatest._
 
 import phenan.prj._
-import phenan.prj.config.JConfig
+import phenan.prj.state._
 
 import scala.util._
 
 class JClassLoaderTest extends FunSuite with Matchers {
-  val config = JConfig.default
-  val loader = new JClassLoader(new JDeclarationCompiler(config), config)
+  val state  = JConfig().configure.get
+  val loader = new JClassLoader(new JDeclarationCompiler, state)
 
   test ("String 型をロード") {
     val clazz = loader.load("java/lang/String")
@@ -25,7 +25,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     o shouldBe a [Success[_]]
     os shouldBe a [Success[_]]
     oss shouldBe a [Success[_]]
-    
+
     loader.arrayOf(o.get) shouldBe os.get
     loader.arrayOf(os.get) shouldBe oss.get
   }

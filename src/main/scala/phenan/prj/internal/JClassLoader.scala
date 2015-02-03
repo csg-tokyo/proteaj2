@@ -1,14 +1,14 @@
 package phenan.prj.internal
 
 import phenan.prj._
-import phenan.prj.config._
+import phenan.prj.state._
 import phenan.prj.exception._
 
 import scala.util._
 
 import scalaz.Memo._
 
-class JClassLoader (jdc: JDeclarationCompiler, config: JConfig) {
+class JClassLoader (jdc: JDeclarationCompiler, state: JState) {
   def load (name: String): Try[JErasedType] = {
     if (name.startsWith("[")) arrayDescriptor(name.tail)
     else loadClass(name)
@@ -53,17 +53,13 @@ class JClassLoader (jdc: JDeclarationCompiler, config: JConfig) {
 
   /* factory method for JClass ( without cache ) */
 
-  private def getClass (name: String): Try[JClass] = jdc.compile(name).orElse(fromClassFile(name))
+  private def getClass (name: String): Try[JClass] = state.searchPath.find(name) match {
+    case Some(cf: FoundClassFile)  => BClassFileParsers.fromStream(cf.in).map(new JLoadedClass(_, this))
+    case Some(sf: FoundSourceFile) => jdc.compile(sf.in)
+    case None => Failure(ClassFileNotFoundException("not found : " + name))
+  }
 
   private def getArray (clazz: JErasedType): JArrayClass = new JArrayClassImpl(clazz, this)
-
-  private def fromClassFile (name: String): Try[JLoadedClass] = findClassFile(name).map(cf => new JLoadedClass(cf, this))
-
-  private def findClassFile (name: String): Try[BClassFile] = {
-    config.classPath.findClassFile(name).map(BClassFileParsers.fromStream) getOrElse {
-      Failure(ClassFileNotFoundException("not found : " + name))
-    }
-  }
 
   /* helper methods for parsing descriptors */
 

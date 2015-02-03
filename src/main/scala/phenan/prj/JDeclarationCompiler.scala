@@ -1,9 +1,9 @@
 package phenan.prj
 
-import phenan.prj.config._
+import java.io.Reader
 
 import scala.util._
 
-class JDeclarationCompiler (config: JConfig) {
-  def compile (name: String): Try[JClass] = Failure(new RuntimeException(""))
+class JDeclarationCompiler {
+  def compile (in: Reader): Try[JClass] = Failure(new RuntimeException(""))
 }
