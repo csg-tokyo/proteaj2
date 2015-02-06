@@ -1,6 +1,10 @@
 package phenan.prj.internal
 
-class BAttributeParsers (classFile: BClassFile) {
+import com.typesafe.scalalogging._
+
+import scala.util._
+
+class BAttributeParsers (classFile: BClassFile) extends LazyLogging {
   import classFile.poolReader._
   import BAttributeParsers._
 
@@ -9,8 +13,8 @@ class BAttributeParsers (classFile: BClassFile) {
     var signatureAttribute: Option[SignatureAttribute] = None
 
     for (attr <- attributes) readAs[BUtf8Value](attr.tag).value match {
-      case "InnerClasses" => innerClassesAttribute = Some(parse(attr.data)(innerClasses).get)
-      case "Signature"    => signatureAttribute = Some(parse(attr.data)(signature).get)
+      case "InnerClasses" => innerClassesAttribute = parseAttr(attr)(innerClasses)
+      case "Signature"    => signatureAttribute = parseAttr(attr)(signature)
       case _ =>
     }
 
@@ -21,7 +25,7 @@ class BAttributeParsers (classFile: BClassFile) {
     var signatureAttribute: Option[SignatureAttribute] = None
 
     for (attr <- attributes) readAs[BUtf8Value](attr.tag).value match {
-      case "Signature"    => signatureAttribute = Some(parse(attr.data)(signature).get)
+      case "Signature"    => signatureAttribute = parseAttr(attr)(signature)
       case _ =>
     }
 
@@ -33,12 +37,21 @@ class BAttributeParsers (classFile: BClassFile) {
     var exceptionsAttribute: Option[ExceptionsAttribute] = None
 
     for (attr <- attributes) readAs[BUtf8Value](attr.tag).value match {
-      case "Signature"    => signatureAttribute = Some(parse(attr.data)(signature).get)
-      case "Exceptions"   => exceptionsAttribute = Some(parse(attr.data)(exceptions).get)
+      case "Signature"    => signatureAttribute = parseAttr(attr)(signature)
+      case "Exceptions"   => exceptionsAttribute = parseAttr(attr)(exceptions)
       case _ =>
     }
 
     MethodAttributes(signatureAttribute, exceptionsAttribute)
+  }
+
+  private def parseAttr [T] (attr: BAttributeInfo)(parser: ByteParser[T]): Option[T] = {
+    parse(attr.data)(parser) match {
+      case Success(result) => Some(result)
+      case Failure(e)      =>
+        logger.error("broken class file : cannot parse attribute", e)
+        None
+    }
   }
 }
 

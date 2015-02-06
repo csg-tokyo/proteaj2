@@ -87,8 +87,6 @@ trait JObjectType extends JValueType {
 }
 
 trait JPrimitiveType extends JValueType {
-  def wrapperType: JValueType
-
   def fields: Map[String, JField] = Map.empty
   def methods: Map[String, List[JMethod]] = Map.empty
 
@@ -97,13 +95,12 @@ trait JPrimitiveType extends JValueType {
 
 trait JArrayType extends JValueType {
   def componentType: JValueType
-  def superType: JObjectType
-  def interfaceTypes: List[JObjectType]
+  def superTypes: List[JObjectType]
 
   def isSubtypeOf (that: JValueType): Boolean = that match {
     case _ if this == that   => true
     case that: JArrayType    => componentType.isSubtypeOf(that.componentType)
-    case that: JObjectType   => superType.isSubtypeOf(that) || interfaceTypes.exists(_.isSubtypeOf(that))
+    case that: JObjectType   => superTypes.exists(_.isSubtypeOf(that))
     case that: JWildcardType => that.lowerBound.exists(lb => isSubtypeOf(lb))
     case _                   => false
   }

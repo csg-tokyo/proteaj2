@@ -9,10 +9,8 @@ import scala.util._
 
 class JArrayClassImpl (val component: JErasedType, val loader: JClassLoader) extends JArrayClass {
   lazy val name = component.name + "[]"
-
-//  lazy val fields: List[JFieldDef] = List(new JArrayFieldDef(this))
-//  lazy val methods: List[JMethodDef] = List(new JArrayMethodDef(this))
 }
+
 /*
 class JArrayFieldDef (val declaringClass: JArrayClass) extends JFieldDef {
   override def mod = JModifier(accPublic | accFinal)

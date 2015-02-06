@@ -7,6 +7,6 @@ import phenan.prj.exception.InvalidTypeException
 import scala.util.{Failure, Success, Try}
 
 class JPrimitiveClassImpl (val name: String, val wrapperName: String, val loader: JClassLoader) extends JPrimitiveClass {
-  lazy val wrapperClass = loader.loadClass(wrapperName).get
+  lazy val wrapperClass = loader.loadClassOption(wrapperName)
   lazy val primitiveType: JPrimitiveType = ???
 }

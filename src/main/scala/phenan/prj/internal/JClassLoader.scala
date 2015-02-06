@@ -1,5 +1,7 @@
 package phenan.prj.internal
 
+import com.typesafe.scalalogging._
+
 import phenan.prj._
 import phenan.prj.state._
 import phenan.prj.exception._
@@ -8,55 +10,77 @@ import scala.util._
 
 import scalaz.Memo._
 
-class JClassLoader (jdc: JDeclarationCompiler, state: JState) {
-  def load (name: String): Try[JErasedType] = {
+class JClassLoader (jdc: JDeclarationCompiler, state: JState) extends LazyLogging {
+  def load(name: String): Try[JErasedType] = {
     if (name.startsWith("[")) arrayDescriptor(name.tail)
     else loadClass(name)
   }
 
-  def load (name: String, dim: Int): Try[JErasedType] = {
+  def load(name: String, dim: Int): Try[JErasedType] = {
     if (dim > 0) loadClass(name).map(clazz => arrayOf(clazz, dim))
     else loadClass(name)
   }
 
-  val arrayOf : JErasedType => JArrayClass = mutableHashMapMemo(getArray)
+  val arrayOf: JErasedType => JArrayClass = mutableHashMapMemo(getArray)
 
-  def arrayOf (clazz: JErasedType, dim: Int): JErasedType = {
+  def arrayOf(clazz: JErasedType, dim: Int): JErasedType = {
     if (dim > 0) arrayOf(arrayOf(clazz), dim - 1)
     else clazz
   }
 
   lazy val boolean: JPrimitiveClass = new JPrimitiveClassImpl("boolean", "java/lang/Boolean", this)
-  lazy val byte   : JPrimitiveClass = new JPrimitiveClassImpl("byte", "java/lang/Byte", this)
-  lazy val char   : JPrimitiveClass = new JPrimitiveClassImpl("char", "java/lang/Character", this)
-  lazy val short  : JPrimitiveClass = new JPrimitiveClassImpl("short", "java/lang/Short", this)
-  lazy val int    : JPrimitiveClass = new JPrimitiveClassImpl("int", "java/lang/Integer", this)
-  lazy val long   : JPrimitiveClass = new JPrimitiveClassImpl("long", "java/lang/Long", this)
-  lazy val float  : JPrimitiveClass = new JPrimitiveClassImpl("float", "java/lang/Float", this)
-  lazy val double : JPrimitiveClass = new JPrimitiveClassImpl("double", "java/lang/Double", this)
-  lazy val void   : JPrimitiveClass = new JPrimitiveClassImpl("void", "java/lang/Void", this)
+  lazy val byte: JPrimitiveClass = new JPrimitiveClassImpl("byte", "java/lang/Byte", this)
+  lazy val char: JPrimitiveClass = new JPrimitiveClassImpl("char", "java/lang/Character", this)
+  lazy val short: JPrimitiveClass = new JPrimitiveClassImpl("short", "java/lang/Short", this)
+  lazy val int: JPrimitiveClass = new JPrimitiveClassImpl("int", "java/lang/Integer", this)
+  lazy val long: JPrimitiveClass = new JPrimitiveClassImpl("long", "java/lang/Long", this)
+  lazy val float: JPrimitiveClass = new JPrimitiveClassImpl("float", "java/lang/Float", this)
+  lazy val double: JPrimitiveClass = new JPrimitiveClassImpl("double", "java/lang/Double", this)
+  lazy val void: JPrimitiveClass = new JPrimitiveClassImpl("void", "java/lang/Void", this)
 
   /* package private methods */
+  private[internal] def loadClassOption (name: String): Option[JClass] = {
+    loadClass(name) match {
+      case Success(clazz) => Some(clazz)
+      case Failure(e)     =>
+        logger.error("fail to load class " + name, e)
+        None
+    }
+  }
 
   private[internal] val loadClass: String => Try[JClass] = mutableHashMapMemo(getClass)
 
-  private[internal] def methodDescriptor (desc: String): Try[(List[JErasedType], JErasedType)] = {
+  private[internal] def methodDescriptor(desc: String): Option[(List[JErasedType], JErasedType)] = {
     // "(" ParameterTypeDescriptors ")" ReturnTypeDescriptor
     if (desc.startsWith("(") && desc.contains(")")) {
-      methodDescriptor(desc.take(desc.indexOf(')')).tail, desc.drop(desc.indexOf(')')).tail)
+      methodDescriptor(desc.take(desc.indexOf(')')).tail, desc.drop(desc.indexOf(')')).tail) match {
+        case Success(result) => Some(result)
+        case Failure(e)      =>
+          logger.error("invalid method descriptor : " + desc, e)
+          None
+      }
     }
-    else Failure(InvalidClassFileException("invalid method descriptor : " + desc))
+    else {
+      logger.error("invalid method descriptor : " + desc)
+      None
+    }
   }
 
-  private[internal] def fieldDescriptor (desc: String): Try[JErasedType] = typeDescriptor(desc).map(_._1)
-
+  private[internal] def fieldDescriptor(desc: String): Option[JErasedType] = typeDescriptor(desc).map(_._1) match {
+    case Success(result) => Some(result)
+    case Failure(e)      =>
+      logger.error("invalid field descriptor : " + desc, e)
+      None
+  }
 
   /* factory method for JClass ( without cache ) */
 
-  private def getClass (name: String): Try[JClass] = state.searchPath.find(name) match {
-    case Some(cf: FoundClassFile)  => BClassFileParsers.fromStream(cf.in).map(new JLoadedClass(_, this))
-    case Some(sf: FoundSourceFile) => jdc.compile(sf.in)
-    case None => Failure(ClassFileNotFoundException("not found : " + name))
+  private def getClass(name: String): Try[JClass] = {
+    jdc.findCompiledClass(name).map(Success(_)) getOrElse state.searchPath.find(name) match {
+      case Some(cf: FoundClassFile)  => BClassFileParsers.fromStream(cf.in).map(new JLoadedClass(_, this))
+      case Some(sf: FoundSourceFile) => jdc.compile(sf.in)
+      case None => Failure(ClassFileNotFoundException("not found : " + name))
+    }
   }
 
   private def getArray (clazz: JErasedType): JArrayClass = new JArrayClassImpl(clazz, this)
@@ -73,7 +97,7 @@ class JClassLoader (jdc: JDeclarationCompiler, state: JState) {
 
   private def returnTypeDescriptor (desc: String): Try[JErasedType] = {
     if (desc.startsWith("V")) Success(void)
-    else fieldDescriptor(desc)
+    else typeDescriptor(desc).map(_._1)
   }
 
   // desc does not include '(' and ')'

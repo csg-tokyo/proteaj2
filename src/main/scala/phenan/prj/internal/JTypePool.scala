@@ -1,39 +1,81 @@
 package phenan.prj.internal
 
-import phenan.prj._
-import phenan.prj.exception._
+import com.typesafe.scalalogging._
 
-import scala.util._
+import phenan.prj._
 
 import scalaz.Memo._
 
-object JTypePool {
+object JTypePool extends LazyLogging {
 
-  val arrayOf: JValueType => JArrayType = mutableHashMapMemo(getArrayType)
+  val arrayOf: JValueType with JType_Internal => JArrayType = mutableHashMapMemo(getArrayType)
   val getClassType: JLoadedClass => JClassType = mutableHashMapMemo(getLoadedClassType)
-  val getObjectType: (JLoadedClass, List[JValueType]) => Try[JObjectType] = Function.untupled(mutableHashMapMemo(getLoadedObjectType))
+  val getObjectType: (JLoadedClass, List[JValueType]) => Option[JObjectType] = Function.untupled(mutableHashMapMemo(getLoadedObjectType))
 
-  private def fromClassTypeSignature (sig: ClassTypeSignature): Try[JObjectType] = {
-    ???
+  val superTypesOfArray: JClassLoader => List[JObjectType] = mutableHashMapMemo(getSuperTypesOfArray)
+
+  def fromTypeSignature (sig: TypeSignature, env: Map[String, JValueType], loader: JClassLoader): Option[JValueType] = sig match {
+    case cts: ClassTypeSignature       => fromClassTypeSignature(cts, env, loader)
+
+    case TypeVariableSignature(name)   => env.get(name)
+    case ArrayTypeSignature(component) => fromTypeSignature(component, env, loader).map(_.array)
+    case p: PrimitiveTypeSignature     => Some(fromPrimitiveSignature(p, loader))
   }
 
-  private def getArrayType (component: JValueType): JArrayType = new JArrayTypeImpl(component)
+  def fromClassTypeSignature (sig: ClassTypeSignature, env: Map[String, JValueType], loader: JClassLoader): Option[JObjectType] = sig match {
+    case SimpleClassTypeSignature(className, typeArgs) => for {
+      clazz <- loader.loadClassOption(className)
+      args  <- fromTypeArguments(typeArgs, env, loader)
+      jType <- clazz.objectType(args)
+    } yield jType
+    case MemberClassTypeSignature(outer, name, typeArgs) => ???    // not supported yet
+  }
+
+  def fromPrimitiveSignature (p: PrimitiveTypeSignature, loader: JClassLoader): JPrimitiveType = p match {
+    case ByteTypeSignature   => loader.byte.primitiveType
+    case CharTypeSignature   => loader.char.primitiveType
+    case DoubleTypeSignature => loader.double.primitiveType
+    case FloatTypeSignature  => loader.float.primitiveType
+    case IntTypeSignature    => loader.int.primitiveType
+    case LongTypeSignature   => loader.long.primitiveType
+    case ShortTypeSignature  => loader.short.primitiveType
+    case BoolTypeSignature   => loader.boolean.primitiveType
+    case VoidTypeSignature   => loader.void.primitiveType
+  }
+
+  def fromTypeArguments (args: List[TypeArgument], env: Map[String, JValueType], loader: JClassLoader): Option[List[JValueType]] = {
+    import scalaz.Scalaz._
+    args.traverse(arg => argSig2JType(arg, env, loader))
+  }
+
+  private def getArrayType (component: JValueType with JType_Internal): JArrayType = new JArrayTypeImpl(component)
 
   private def getLoadedClassType (clazz: JLoadedClass): JClassType = new JLoadedClassType(clazz)
 
-  private def getLoadedObjectType (classAndArgs: (JLoadedClass, List[JValueType])): Try[JObjectType] = {
+  private def getLoadedObjectType (classAndArgs: (JLoadedClass, List[JValueType])): Option[JObjectType] = {
     val clazz = classAndArgs._1
     val args  = classAndArgs._2
 
     clazz.signature match {
       case Some(sig) =>
         val map = sig.typeParams.map(_.name).zip(args).toMap
-        if (validTypeArgs(sig.typeParams, args, map, clazz.loader)) Success(new JLoadedObjectType(clazz, map))
-        else Failure(InvalidTypeException("invalid type arguments of class " + clazz.name + " : " + args.map(_.name).mkString("<", ",", ">")))
-
+        if (validTypeArgs(sig.typeParams, args, map, clazz.loader)) Some(new JLoadedObjectType(clazz, map))
+        else {
+          logger.error("invalid type arguments of class " + clazz.name + " : " + args.map(_.name).mkString("<", ",", ">"))
+          None
+        }
       case None =>
-        if (args.isEmpty) Success(new JLoadedObjectType(clazz, Map.empty))
-        else Failure(InvalidTypeException("invalid type arguments of class " + clazz.name + " : " + args.map(_.name).mkString("<", ",", ">")))
+        if (args.isEmpty) Some(new JLoadedObjectType(clazz, Map.empty))
+        else {
+          logger.error("invalid type arguments of class " + clazz.name + " : " + args.map(_.name).mkString("<", ",", ">"))
+          None
+        }
+    }
+  }
+
+  private def getSuperTypesOfArray (loader: JClassLoader): List[JObjectType] = {
+    List("java/lang/Object", "java/io/Serializable", "java/lang/Cloneable").flatMap { name =>
+      loader.loadClassOption(name).flatMap(_.objectType(Nil))
     }
   }
 
@@ -48,56 +90,22 @@ object JTypePool {
   }
 
   private def withinBound (bound: TypeSignature, arg: JValueType, env: Map[String, JValueType], loader: JClassLoader): Boolean = {
-    arg.isSubtypeOf(typeSig2JType(bound, env, loader).get)
+    arg.isSubtypeOf(fromTypeSignature(bound, env, loader).get)
   }
 
-  private def typeSig2JType (sig: TypeSignature, env: Map[String, JValueType], loader: JClassLoader): Try[JValueType] = sig match {
-    case SimpleClassTypeSignature(className, typeArgs) => for {
-      clazz <- loader.loadClass(className)
-      args  <- typeArgs2JTypes(typeArgs, env, loader)
-      jType <- clazz.objectType(args)
-    } yield jType
-    case MemberClassTypeSignature(outer, name, typeArgs) => ???    // not supported yet
-
-    case TypeVariableSignature(name)   => env.get(name) match {
-      case Some(t) => Success(t)
-      case None    => Failure(InvalidTypeException("type parameter " + name + " is not bound"))
-    }
-    case ArrayTypeSignature(component) => typeSig2JType(component, env, loader).map(_.array)
-    case p: PrimitiveTypeSignature     => Success(primSig2JPrimType(p, loader))
-  }
-
-  private def typeArgs2JTypes (args: List[TypeArgument], env: Map[String, JValueType], loader: JClassLoader): Try[List[JValueType]] = {
-    import scalaz.Scalaz._
-    import phenan.util._
-    args.traverse(arg => argSig2JType(arg, env, loader))
-  }
-
-  private def argSig2JType (arg: TypeArgument, env: Map[String, JValueType], loader: JClassLoader): Try[JValueType] = arg match {
+  private def argSig2JType (arg: TypeArgument, env: Map[String, JValueType], loader: JClassLoader): Option[JValueType] = arg match {
     case FixedTypeArgument(sig)          =>
-      typeSig2JType(sig, env, loader)
+      fromTypeSignature(sig, env, loader)
     case UpperBoundWildcardArgument(sig) =>
-      typeSig2JType(sig, env, loader).map(bound => new JWildcardTypeImpl(bound, None))
+      fromTypeSignature(sig, env, loader).map(bound => new JWildcardTypeImpl(bound, None, loader))
     case LowerBoundWildcardArgument(sig) => for {
-      objectClass <- loader.loadClass("java/lang/Object")
+      objectClass <- loader.loadClassOption("java/lang/Object")
       upperBound  <- objectClass.objectType(Nil)
-      lowerBound  <- typeSig2JType(sig, env, loader)
-    } yield new JWildcardTypeImpl(upperBound, Some(lowerBound))
+      lowerBound  <- fromTypeSignature(sig, env, loader)
+    } yield new JWildcardTypeImpl(upperBound, Some(lowerBound), loader)
     case UnboundWildcardArgument         => for {
-      objectClass <- loader.loadClass("java/lang/Object")
+      objectClass <- loader.loadClassOption("java/lang/Object")
       upperBound  <- objectClass.objectType(Nil)
-    } yield new JWildcardTypeImpl(upperBound, None)
-  }
-
-  private def primSig2JPrimType (p: PrimitiveTypeSignature, loader: JClassLoader): JPrimitiveType = p match {
-    case ByteTypeSignature   => loader.byte.primitiveType
-    case CharTypeSignature   => loader.char.primitiveType
-    case DoubleTypeSignature => loader.double.primitiveType
-    case FloatTypeSignature  => loader.float.primitiveType
-    case IntTypeSignature    => loader.int.primitiveType
-    case LongTypeSignature   => loader.long.primitiveType
-    case ShortTypeSignature  => loader.short.primitiveType
-    case BoolTypeSignature   => loader.boolean.primitiveType
-    case VoidTypeSignature   => loader.void.primitiveType
+    } yield new JWildcardTypeImpl(upperBound, None, loader)
   }
 }

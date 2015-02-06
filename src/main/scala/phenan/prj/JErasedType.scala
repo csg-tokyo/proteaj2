@@ -1,7 +1,5 @@
 package phenan.prj
 
-import scala.util.Try
-
 sealed trait JErasedType {
   def name: String
 }
@@ -16,7 +14,7 @@ trait JClass extends JErasedType {
   def methods: List[JMethodDef]
 
   def classType: JClassType
-  def objectType (typeArgs: List[JValueType]): Try[JValueType]
+  def objectType (typeArgs: List[JValueType]): Option[JObjectType]
 
   lazy val classInitializer = methods.find(_.isClassInitializer)
   lazy val constructors     = methods.filter(_.isConstructor)
@@ -28,7 +26,6 @@ trait JClass extends JErasedType {
 
 trait JPrimitiveClass extends JErasedType {
   def primitiveType: JPrimitiveType
-  def wrapperClass: JClass
 }
 
 trait JArrayClass extends JErasedType {

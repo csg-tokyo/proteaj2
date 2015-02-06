@@ -16,21 +16,25 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader) extends
 
   lazy val superClass = loadClassOption(classFile.superClass)
 
-  lazy val interfaces = classFile.interfaces.map(loadClass)
+  lazy val interfaces = classFile.interfaces.flatMap(loadClassOption)
 
-  lazy val innerClasses = innerInfo.map(info => readUTF(info.innerName) -> loadClass(info.innerClassInfo)).toMap
+  lazy val innerClasses = innerInfo.flatMap(info => loadClassOption(info.innerClassInfo).map(readUTF(info.innerName) -> _)).toMap
 
-  lazy val outerClass = outerInfo.map(info => loadClass(info.outerClassInfo))
+  lazy val outerClass = outerInfo.flatMap(info => loadClassOption(info.outerClassInfo))
 
-  lazy val fields = classFile.fields.map(field => new JLoadedFieldDef(field, this))
+  lazy val fields = classFile.fields.flatMap { field =>
+    loader.fieldDescriptor(readUTF(field.desc)).map(new JLoadedFieldDef(field, this, _))
+  }
 
-  lazy val methods = classFile.methods.map(method => new JLoadedMethodDef(method, this))
+  lazy val methods = classFile.methods.flatMap { method =>
+    loader.methodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
+  }
 
   def classType: JClassType = JTypePool.getClassType(this)
 
-  def objectType (typeArgs: List[JValueType]): Try[JValueType] = JTypePool.getObjectType(this, typeArgs)
+  def objectType (typeArgs: List[JValueType]): Option[JObjectType] = JTypePool.getObjectType(this, typeArgs)
 
-  lazy val signature = attributes.signature.map(sig => parseClassSignature(readUTF(sig.signature)).get)
+  lazy val signature = attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature)))
 
   private lazy val attributes = parseClassAttributes(classFile.attributes)
 
@@ -40,11 +44,10 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader) extends
   private def innerInfo =
     attributes.innerClasses.toList.flatMap(_.classes.filter(info => info.outerClassInfo == classFile.thisClass && info.innerName != 0))
 
-  private def loadClassOption (ref: Int): Option[JClass] = readClassNameOption(ref).map(cls => loader.loadClass(cls).get)
-  private def loadClass (ref: Int): JClass = loader.loadClass(readClassName(ref)).get
+  private def loadClassOption (ref: Int): Option[JClass] = readClassNameOption(ref).flatMap(cls => loader.loadClassOption(cls))
 }
 
-class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass) extends JFieldDef {
+class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val fieldType: JErasedType) extends JFieldDef {
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._
@@ -54,14 +57,12 @@ class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass) exte
 
   lazy val name = readUTF(field.name)
 
-  lazy val fieldType = declaringClass.loader.fieldDescriptor(readUTF(field.desc)).get
-
-  lazy val signature = attributes.signature.map(sig => parseFieldSignature(readUTF(sig.signature)).get)
+  lazy val signature = attributes.signature.flatMap(sig => parseFieldSignature(readUTF(sig.signature)))
 
   private lazy val attributes = parseFieldAttribute(field.attributes)
 }
 
-class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass) extends JMethodDef {
+class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, val descriptor: (List[JErasedType], JErasedType)) extends JMethodDef {
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._
@@ -75,12 +76,11 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass) e
 
   override def returnType = descriptor._2
 
-  lazy val exceptions: List[JClass] = exceptionNames.map(name => declaringClass.loader.loadClass(name).get)
+  lazy val exceptions: List[JClass] = exceptionNames.flatMap(name => declaringClass.loader.loadClassOption(name))
 
-  lazy val signature = attributes.signature.map(sig => parseMethodSignature(readUTF(sig.signature)))
+  lazy val signature = attributes.signature.flatMap(sig => parseMethodSignature(readUTF(sig.signature)))
 
   private def exceptionNames = attributes.exceptions.toList.flatMap(attr => attr.exceptions.map(readClassName))
 
   private lazy val attributes = parseMethodAttribute(method.attributes)
-  private lazy val descriptor = declaringClass.loader.methodDescriptor(readUTF(method.desc)).get
 }
