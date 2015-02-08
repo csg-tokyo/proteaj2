@@ -3,8 +3,9 @@ package phenan.prj.internal
 import java.io._
 
 import phenan.prj.exception._
+import phenan.prj.state.JState
 
-object BClassFileParsers extends ByteParsers {
+class BClassFileParsers (implicit state: JState) extends ByteParsers {
 
   def fromFile (file: File) = parse(file)(classFile)
   def fromFileName (file: String) = parseFile(file)(classFile)

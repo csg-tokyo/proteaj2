@@ -1,17 +1,21 @@
 package phenan.prj
 
-import scala.util.Try
-
-trait JMethod extends JMember {
+trait JGenMethod extends JMember {
   def name: String
 
-  def overrides (method: JMethod): Boolean
+  def returnType: JValueType
+  def parameterTypes: List[JValueType]
+  def exceptionTypes: List[JObjectType]
 
-  def bind (typeArgs: List[JValueType]): Try[JParameterizedMethod]
-  def infer (returnType: JValueType): Try[JParameterizedMethod]
-  def infer (argTypes: List[JValueType]): Try[JParameterizedMethod]
+  def overrides (that: JGenMethod): Boolean = {
+    this.name == that.name && this.returnType <:< that.returnType && this.parameterTypes == that.parameterTypes
+  }
+
+  def bind (typeArgs: List[JValueType]): Option[JMethod]
+  def infer (returnType: JValueType): Option[JMethod]
+  def infer (argTypes: List[JValueType]): Option[JMethod]
 }
 
-trait JParameterizedMethod {
+trait JMethod {
 
 }

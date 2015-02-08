@@ -1,7 +1,5 @@
 package phenan.prj.internal
 
-import com.typesafe.scalalogging._
-
 import phenan.prj._
 import phenan.prj.state._
 import phenan.prj.exception._
@@ -10,7 +8,7 @@ import scala.util._
 
 import scalaz.Memo._
 
-class JClassLoader (jdc: JDeclarationCompiler, state: JState) extends LazyLogging {
+class JClassLoader (jdc: JCompiler)(implicit state: JState) {
   def load(name: String): Try[JErasedType] = {
     if (name.startsWith("[")) arrayDescriptor(name.tail)
     else loadClass(name)
@@ -43,7 +41,7 @@ class JClassLoader (jdc: JDeclarationCompiler, state: JState) extends LazyLoggin
     loadClass(name) match {
       case Success(clazz) => Some(clazz)
       case Failure(e)     =>
-        logger.error("fail to load class " + name, e)
+        state.error("fail to load class " + name, e)
         None
     }
   }
@@ -56,12 +54,12 @@ class JClassLoader (jdc: JDeclarationCompiler, state: JState) extends LazyLoggin
       methodDescriptor(desc.take(desc.indexOf(')')).tail, desc.drop(desc.indexOf(')')).tail) match {
         case Success(result) => Some(result)
         case Failure(e)      =>
-          logger.error("invalid method descriptor : " + desc, e)
+          state.error("invalid method descriptor : " + desc, e)
           None
       }
     }
     else {
-      logger.error("invalid method descriptor : " + desc)
+      state.error("invalid method descriptor : " + desc)
       None
     }
   }
@@ -69,19 +67,21 @@ class JClassLoader (jdc: JDeclarationCompiler, state: JState) extends LazyLoggin
   private[internal] def fieldDescriptor(desc: String): Option[JErasedType] = typeDescriptor(desc).map(_._1) match {
     case Success(result) => Some(result)
     case Failure(e)      =>
-      logger.error("invalid field descriptor : " + desc, e)
+      state.error("invalid field descriptor : " + desc, e)
       None
   }
 
   /* factory method for JClass ( without cache ) */
 
   private def getClass(name: String): Try[JClass] = {
-    jdc.findCompiledClass(name).map(Success(_)) getOrElse state.searchPath.find(name) match {
-      case Some(cf: FoundClassFile)  => BClassFileParsers.fromStream(cf.in).map(new JLoadedClass(_, this))
+    jdc.findCompiling(name).map(Success(_)) getOrElse state.searchPath.find(name) match {
+      case Some(cf: FoundClassFile)  => classFileParser.fromStream(cf.in).map(new JLoadedClass(_, this))
       case Some(sf: FoundSourceFile) => jdc.compile(sf.in)
       case None => Failure(ClassFileNotFoundException("not found : " + name))
     }
   }
+
+  private val classFileParser = new BClassFileParsers()
 
   private def getArray (clazz: JErasedType): JArrayClass = new JArrayClassImpl(clazz, this)
 

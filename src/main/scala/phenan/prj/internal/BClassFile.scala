@@ -1,8 +1,10 @@
 package phenan.prj.internal
 
+import phenan.prj.state.JState
+
 case class BClassFile (minor: Int, major: Int, pool: BConstantPool, mod: Int,
   thisClass: Int, superClass: Int, interfaces: List[Int],
-  fields: List[BField], methods: List[BMethod], attributes: List[BAttributeInfo] )
+  fields: List[BField], methods: List[BMethod], attributes: List[BAttributeInfo] )(implicit state: JState)
 {
   lazy val poolReader = new BConstantPoolReader(pool)
   lazy val attrParser = new BAttributeParsers(this)

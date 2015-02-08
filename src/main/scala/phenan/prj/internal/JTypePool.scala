@@ -1,22 +1,35 @@
 package phenan.prj.internal
 
-import com.typesafe.scalalogging._
-
 import phenan.prj._
+import phenan.prj.state.JState
 
 import scalaz.Memo._
 
-object JTypePool extends LazyLogging {
-
+class JTypePool private (state: JState) {
   val arrayOf: JValueType with JType_Internal => JArrayType = mutableHashMapMemo(getArrayType)
   val getClassType: JLoadedClass => JClassType = mutableHashMapMemo(getLoadedClassType)
   val getObjectType: (JLoadedClass, List[JValueType]) => Option[JObjectType] = Function.untupled(mutableHashMapMemo(getLoadedObjectType))
 
   val superTypesOfArray: JClassLoader => List[JObjectType] = mutableHashMapMemo(getSuperTypesOfArray)
 
+  def toJValueType (t: JErasedType): Option[JValueType] = t match {
+    case c : JClass          => c.objectType(Nil)
+    case p : JPrimitiveClass => Some(p.primitiveType)
+    case a : JArrayClass     => toJValueType(a.component).map(_.array)
+  }
+
+  def rawTypeArguments (typeParams: List[FormalTypeParameter], env: Map[String, JValueType], loader: JClassLoader): Map[String, JValueType] = {
+    typeParams.foldLeft(env) { (e, param) =>
+      param.classBound.orElse(param.interfaceBounds.headOption).flatMap(fromTypeSignature(_, e, loader)).
+        orElse(loader.loadClassOption("java/lang/Object").flatMap(_.objectType(Nil))).map(t => e + (param.name -> t)).getOrElse {
+        state.error("cannot load object type")
+        e
+      }
+    }
+  }
+
   def fromTypeSignature (sig: TypeSignature, env: Map[String, JValueType], loader: JClassLoader): Option[JValueType] = sig match {
     case cts: ClassTypeSignature       => fromClassTypeSignature(cts, env, loader)
-
     case TypeVariableSignature(name)   => env.get(name)
     case ArrayTypeSignature(component) => fromTypeSignature(component, env, loader).map(_.array)
     case p: PrimitiveTypeSignature     => Some(fromPrimitiveSignature(p, loader))
@@ -61,13 +74,13 @@ object JTypePool extends LazyLogging {
         val map = sig.typeParams.map(_.name).zip(args).toMap
         if (validTypeArgs(sig.typeParams, args, map, clazz.loader)) Some(new JLoadedObjectType(clazz, map))
         else {
-          logger.error("invalid type arguments of class " + clazz.name + " : " + args.map(_.name).mkString("<", ",", ">"))
+          state.error("invalid type arguments of class " + clazz.name + " : " + args.map(_.name).mkString("<", ",", ">"))
           None
         }
       case None =>
         if (args.isEmpty) Some(new JLoadedObjectType(clazz, Map.empty))
         else {
-          logger.error("invalid type arguments of class " + clazz.name + " : " + args.map(_.name).mkString("<", ",", ">"))
+          state.error("invalid type arguments of class " + clazz.name + " : " + args.map(_.name).mkString("<", ",", ">"))
           None
         }
     }
@@ -108,4 +121,13 @@ object JTypePool extends LazyLogging {
       upperBound  <- objectClass.objectType(Nil)
     } yield new JWildcardTypeImpl(upperBound, None, loader)
   }
+
+  private implicit def st: JState = state
 }
+
+object JTypePool {
+  def get (implicit state: JState): JTypePool = pools(state)
+  private val pools: JState => JTypePool = mutableHashMapMemo(state => new JTypePool(state))
+}
+
+

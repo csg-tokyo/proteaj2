@@ -1,10 +1,10 @@
 package phenan.prj.internal
 
-import com.typesafe.scalalogging._
+import phenan.prj.state.JState
 
 import scala.util._
 
-class BAttributeParsers (classFile: BClassFile) extends LazyLogging {
+class BAttributeParsers (classFile: BClassFile)(implicit state: JState) {
   import classFile.poolReader._
   import BAttributeParsers._
 
@@ -49,7 +49,7 @@ class BAttributeParsers (classFile: BClassFile) extends LazyLogging {
     parse(attr.data)(parser) match {
       case Success(result) => Some(result)
       case Failure(e)      =>
-        logger.error("broken class file : cannot parse attribute", e)
+        state.error("broken class file : cannot parse attribute", e)
         None
     }
   }

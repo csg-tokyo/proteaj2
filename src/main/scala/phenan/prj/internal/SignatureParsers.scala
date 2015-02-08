@@ -1,26 +1,23 @@
 package phenan.prj.internal
 
-import com.typesafe.scalalogging._
-
-import phenan.prj.exception.InvalidClassFileException
+import phenan.prj.state.JState
 
 import scala.util.parsing.combinator.PackratParsers
 import scala.util.parsing.input.CharSequenceReader
 
-object SignatureParsers extends PackratParsers with LazyLogging {
+object SignatureParsers extends PackratParsers {
   override type Elem = Char
 
-  def parseClassSignature (sig: String): Option[ClassSignature] = parse(sig, "class signature", classSignature)
+  def parseClassSignature (sig: String)(implicit state: JState): Option[ClassSignature] = parse(sig, "class signature", classSignature)
 
-  def parseFieldSignature (sig: String): Option[TypeSignature] = parse(sig, "field signature", fieldType)
+  def parseFieldSignature (sig: String)(implicit state: JState): Option[TypeSignature] = parse(sig, "field signature", fieldType)
 
-  def parseMethodSignature (sig: String): Option[MethodSignature] = parse(sig, "method signature", methodSignature)
+  def parseMethodSignature (sig: String)(implicit state: JState): Option[MethodSignature] = parse(sig, "method signature", methodSignature)
 
-  private def parse[T] (sig: String, kind: String, parser: Parser[T]): Option[T] = parser(new PackratReader[Char](new CharSequenceReader(sig))) match {
+  private def parse[T] (sig: String, kind: String, parser: Parser[T])(implicit state: JState): Option[T] = parser(new PackratReader[Char](new CharSequenceReader(sig))) match {
     case Success(ret, _)   => Some(ret)
     case NoSuccess(msg, _) =>
-      val e = InvalidClassFileException("fail to parse " + kind + " : " + sig + "\n" + msg)
-      logger.error("broken class file", e)
+      state.error("fail to parse " + kind + " : " + sig + "\n" + msg)
       None
   }
 

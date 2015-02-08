@@ -11,6 +11,6 @@ object JResolver {
 
 }
 
-class JRootResolver (jdc: JDeclarationCompiler, state: JState) extends JResolver {
-  private val loader = new JClassLoader(jdc, state)
+class JRootResolver (jdc: JCompiler)(implicit state: JState) extends JResolver {
+  private val loader = new JClassLoader(jdc)
 }

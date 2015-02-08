@@ -1,10 +1,9 @@
 package phenan.prj.internal
 
 import phenan.prj._
+import phenan.prj.state.JState
 
-import scala.util.Try
-
-class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader) extends JClass {
+class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader)(implicit state: JState) extends JClass {
 
   import classFile.poolReader._
   import classFile.attrParser._
@@ -30,9 +29,9 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader) extends
     loader.methodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
   }
 
-  def classType: JClassType = JTypePool.getClassType(this)
+  def classType: JClassType = JTypePool.get.getClassType(this)
 
-  def objectType (typeArgs: List[JValueType]): Option[JObjectType] = JTypePool.getObjectType(this, typeArgs)
+  def objectType (typeArgs: List[JValueType]): Option[JObjectType] = JTypePool.get.getObjectType(this, typeArgs)
 
   lazy val signature = attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature)))
 
@@ -47,7 +46,7 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader) extends
   private def loadClassOption (ref: Int): Option[JClass] = readClassNameOption(ref).flatMap(cls => loader.loadClassOption(cls))
 }
 
-class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val fieldType: JErasedType) extends JFieldDef {
+class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val fieldType: JErasedType)(implicit state: JState) extends JFieldDef {
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._
@@ -62,7 +61,7 @@ class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val 
   private lazy val attributes = parseFieldAttribute(field.attributes)
 }
 
-class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, val descriptor: (List[JErasedType], JErasedType)) extends JMethodDef {
+class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, val descriptor: (List[JErasedType], JErasedType))(implicit state: JState) extends JMethodDef {
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._

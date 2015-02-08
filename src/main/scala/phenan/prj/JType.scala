@@ -2,7 +2,7 @@ package phenan.prj
 
 sealed trait JType {
   def fields: Map[String, JField]
-  def methods: Map[String, List[JMethod]]
+  def methods: Map[String, List[JGenMethod]]
 }
 
 trait JClassType extends JType
@@ -27,15 +27,15 @@ trait JObjectType extends JValueType {
   def interfaceTypes: List[JObjectType]
 
   def declaredFields: List[JField]
-  def declaredMethods: List[JMethod]
+  def declaredMethods: List[JGenMethod]
 
   def constructors: List[JConstructor]
 
   lazy val privateFields: Map[String, JField] = declaredFields.filter(_.isPrivate).map(f => f.name -> f).toMap
-  lazy val privateMethods: Map[String, List[JMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
+  lazy val privateMethods: Map[String, List[JGenMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
 
   lazy val fields: Map[String, JField] = nonPrivateFieldList.map(f => f.name -> f).toMap
-  lazy val methods: Map[String, List[JMethod]] = nonPrivateMethodList.groupBy(_.name).mapValues(filterOutOverriddenMethod)
+  lazy val methods: Map[String, List[JGenMethod]] = nonPrivateMethodList.groupBy(_.name).mapValues(filterOutOverriddenMethod)
 
   def isSubtypeOf (that: JValueType): Boolean = that match {
     case _ if this == that   => true
@@ -64,14 +64,14 @@ trait JObjectType extends JValueType {
       declaredFields.filterNot(_.isPrivate)
   }
 
-  private def nonPrivateMethodList: List[JMethod] = {
+  private def nonPrivateMethodList: List[JGenMethod] = {
     interfaceTypes.map(_.nonPrivateMethodList).reduceLeftOption(_ ++ _).getOrElse(Nil) ++
       superType.map(_.nonPrivateMethodList).getOrElse(Nil) ++
       declaredMethods.filterNot(_.isPrivate)
   }
 
-  private def filterOutOverriddenMethod (list: List[JMethod]): List[JMethod] = {
-    list.foldRight[List[JMethod]](Nil) { (m, ms) =>
+  private def filterOutOverriddenMethod (list: List[JGenMethod]): List[JGenMethod] = {
+    list.foldRight[List[JGenMethod]](Nil) { (m, ms) =>
       if (ms.exists(_.overrides(m))) ms
       else m :: ms
     }
@@ -88,7 +88,7 @@ trait JObjectType extends JValueType {
 
 trait JPrimitiveType extends JValueType {
   def fields: Map[String, JField] = Map.empty
-  def methods: Map[String, List[JMethod]] = Map.empty
+  def methods: Map[String, List[JGenMethod]] = Map.empty
 
   def isSubtypeOf (that: JValueType): Boolean = this == that
 }
