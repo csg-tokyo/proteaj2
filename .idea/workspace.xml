@@ -2,28 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="1a2bfb5f-48ff-4e99-a1e6-cdebd652ef95" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/DeclarationParser.scala" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JLoadedMethod.scala" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceToken.scala" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/JDeclarationCompiler.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/JCompiler.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BAttributeParsers.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BAttributeParsers.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BClassFile.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BClassFile.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BClassFileParsers.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BClassFileParsers.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BConstantPoolReader.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BConstantPoolReader.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JClassLoader.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JClassLoader.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/test/scala/phenan/prj/internal/JClassLoaderTest.scala" afterPath="$PROJECT_DIR$/src/test/scala/phenan/prj/internal/JClassLoaderTest.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JClassTypes.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JClassTypes.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JLoadedClass.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JLoadedClass.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/JMember.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/JMember.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/JMethod.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/JMethod.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JPrimitiveClassImpl.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JPrimitiveClassImpl.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/JResolver.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/JResolver.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/state/JState.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/state/JState.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/JType.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/JType.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JTypePool.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JTypePool.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JValueTypes.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JValueTypes.scala" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/SignatureParsers.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/SignatureParsers.scala" />
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/SourceReaderTest.scala" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
     <ignored path="prj.iws" />
@@ -52,120 +32,47 @@
   </component>
   <component name="FileEditorManager">
     <leaf>
-      <file leaf-file-name="JClassLoader.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JClassLoader.scala">
+      <file leaf-file-name="SourceReader.scala" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="2190">
-              <caret line="10" column="36" selection-start-line="10" selection-start-column="36" selection-end-line="10" selection-end-column="36" />
+            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="2745">
+              <caret line="87" column="29" selection-start-line="87" selection-start-column="29" selection-end-line="87" selection-end-column="29" />
               <folding>
-                <element signature="e#29#48#0" expanded="true" />
+                <element signature="e#25#41#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="JArrayClassImpl.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JArrayClassImpl.scala">
+      <file leaf-file-name="SourceReaderTest.scala" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/test/scala/phenan/prj/decl/SourceReaderTest.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="420">
-              <caret line="9" column="6" selection-start-line="9" selection-start-column="6" selection-end-line="9" selection-end-column="6" />
+            <state vertical-scroll-proportion="0.71649486" vertical-offset="393" max-vertical-offset="975">
+              <caret line="54" column="3" selection-start-line="54" selection-start-column="3" selection-end-line="54" selection-end-column="3" />
+              <folding>
+                <element signature="e#25#41#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="SourceToken.scala" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceToken.scala">
+          <provider selected="true" editor-type-id="text-editor">
+            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="375">
+              <caret line="6" column="11" selection-start-line="6" selection-start-column="11" selection-end-line="6" selection-end-column="11" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="BAttributeParsers.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BAttributeParsers.scala">
+      <file leaf-file-name="JClassLoaderTest.scala" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/test/scala/phenan/prj/internal/JClassLoaderTest.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="1140">
-              <caret line="6" column="36" selection-start-line="6" selection-start-column="36" selection-end-line="6" selection-end-column="36" />
+            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="570">
+              <caret line="10" column="38" selection-start-line="10" selection-start-column="2" selection-end-line="10" selection-end-column="38" />
               <folding>
-                <element signature="e#29#59#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="BClassFileParsers.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BClassFileParsers.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="1305">
-              <caret line="25" column="20" selection-start-line="25" selection-start-column="10" selection-end-line="25" selection-end-column="20" />
-              <folding>
-                <element signature="e#29#45#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="BConstantPoolReader.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BConstantPoolReader.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="465">
-              <caret line="8" column="6" selection-start-line="8" selection-start-column="6" selection-end-line="8" selection-end-column="6" />
-              <folding>
-                <element signature="e#29#58#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="JValueTypes.scala" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JValueTypes.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="1.2088536" vertical-offset="0" max-vertical-offset="1305">
-              <caret line="71" column="138" selection-start-line="71" selection-start-column="138" selection-end-line="71" selection-end-column="138" />
-              <folding>
-                <element signature="e#29#48#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="JTypePool.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JTypePool.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="2085">
-              <caret line="7" column="41" selection-start-line="7" selection-start-column="41" selection-end-line="7" selection-end-column="41" />
-              <folding>
-                <element signature="e#29#48#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="JLoadedClass.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JLoadedClass.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="287" max-vertical-offset="1350">
-              <caret line="45" column="127" selection-start-line="45" selection-start-column="127" selection-end-line="45" selection-end-column="127" />
-              <folding>
-                <element signature="e#29#48#0" expanded="true" />
-                <element signature="e#198#227#0" expanded="true" />
-                <element signature="e#2059#2103#0" expanded="true" />
-                <element signature="e#2613#2657#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="ByteParsers.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/ByteParsers.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="645">
-              <caret line="35" column="6" selection-start-line="35" selection-start-column="6" selection-end-line="35" selection-end-column="6" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="JLoadedMethod.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JLoadedMethod.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="19" max-vertical-offset="900">
-              <caret line="16" column="0" selection-start-line="16" selection-start-column="0" selection-end-line="16" selection-end-column="0" />
-              <folding>
-                <element signature="e#29#48#0" expanded="true" />
+                <element signature="e#29#51#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -179,7 +86,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/src/main/scala/phenan/jir/internal/JClassLoader.scala" />
         <option value="$PROJECT_DIR$/src/test/scala/phenan/prj/JClassPathTest.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/JirConfig.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/DeclarationCompiler.scala" />
@@ -219,7 +125,6 @@
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/state/JState.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BAttributeParsers.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BConstantPoolReader.scala" />
-        <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BClassFileParsers.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BClassFile.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JClassLoader.scala" />
@@ -230,6 +135,8 @@
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JLoadedMethod.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JValueTypes.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JTypePool.scala" />
+        <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala" />
+        <option value="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/SourceReaderTest.scala" />
       </list>
     </option>
   </component>
@@ -537,6 +444,36 @@
             </PATH_ELEMENT>
             <PATH_ELEMENT>
               <option name="myItemId" value="internal" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="prj" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="prj" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="test" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="scala" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="prj" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="decl" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -1104,7 +1041,7 @@
       <recent name="phenan.prj.config" />
     </key>
   </component>
-  <component name="RunManager" selected="ScalaTest.JClassLoaderTest">
+  <component name="RunManager" selected="ScalaTest.SourceReaderTest">
     <configuration default="false" name="JSearchPathTest" type="ScalaTestRunConfiguration" factoryName="ScalaTest" temporary="true">
       <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea" />
       <extension name="scalaCoverage" />
@@ -1128,6 +1065,24 @@
       <extension name="scalaCoverage" />
       <module name="prj" />
       <setting name="path" value="phenan.prj.internal.JClassLoaderTest" />
+      <setting name="package" value="" />
+      <setting name="vmparams" value="" />
+      <setting name="params" value="" />
+      <setting name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <setting name="searchForTest" value="Across module dependencies" />
+      <setting name="testName" value="" />
+      <setting name="testKind" value="Class" />
+      <setting name="showProgressMessages" value="true" />
+      <envs />
+      <RunnerSettings RunnerId="Run" />
+      <ConfigurationWrapper RunnerId="Run" />
+      <method />
+    </configuration>
+    <configuration default="false" name="SourceReaderTest" type="ScalaTestRunConfiguration" factoryName="ScalaTest" temporary="true">
+      <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea" />
+      <extension name="scalaCoverage" />
+      <module name="prj" />
+      <setting name="path" value="phenan.prj.decl.SourceReaderTest" />
       <setting name="package" value="" />
       <setting name="vmparams" value="" />
       <setting name="params" value="" />
@@ -1301,14 +1256,16 @@
       <envs />
       <method />
     </configuration>
-    <list size="2">
+    <list size="3">
       <item index="0" class="java.lang.String" itemvalue="ScalaTest.JSearchPathTest" />
       <item index="1" class="java.lang.String" itemvalue="ScalaTest.JClassLoaderTest" />
+      <item index="2" class="java.lang.String" itemvalue="ScalaTest.SourceReaderTest" />
     </list>
     <recent_temporary>
-      <list size="2">
-        <item index="0" class="java.lang.String" itemvalue="ScalaTest.JClassLoaderTest" />
-        <item index="1" class="java.lang.String" itemvalue="ScalaTest.JSearchPathTest" />
+      <list size="3">
+        <item index="0" class="java.lang.String" itemvalue="ScalaTest.SourceReaderTest" />
+        <item index="1" class="java.lang.String" itemvalue="ScalaTest.JClassLoaderTest" />
+        <item index="2" class="java.lang.String" itemvalue="ScalaTest.JSearchPathTest" />
       </list>
     </recent_temporary>
     <configuration name="&lt;template&gt;" type="WebApp" default="true" selected="false">
@@ -1419,14 +1376,6 @@
     <option name="FILTER_TARGETS" value="false" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JPrimitiveClassImpl.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="75" max-vertical-offset="375">
-          <caret line="5" column="56" selection-start-line="5" selection-start-column="56" selection-end-line="5" selection-end-column="56" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JArrayClassImpl.scala">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0" vertical-offset="315" max-vertical-offset="585">
@@ -1634,14 +1583,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceToken.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="582">
-          <caret line="0" column="23" selection-start-line="0" selection-start-column="23" selection-end-line="0" selection-end-column="23" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/Signature.scala">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="705">
@@ -1674,29 +1615,11 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/test/scala/phenan/prj/internal/JClassLoaderTest.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="495">
-          <caret line="16" column="39" selection-start-line="16" selection-start-column="39" selection-end-line="16" selection-end-column="39" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/BClassFile.scala">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.15463917" vertical-offset="0" max-vertical-offset="615">
           <caret line="6" column="105" selection-start-line="6" selection-start-column="99" selection-end-line="6" selection-end-column="105" />
           <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="724" max-vertical-offset="1605">
-          <caret line="84" column="7" selection-start-line="84" selection-start-column="7" selection-end-line="84" selection-end-column="7" />
-          <folding>
-            <element signature="e#25#41#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -1775,7 +1698,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JLoadedMethod.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="19" max-vertical-offset="900">
+        <state vertical-scroll-proportion="0.2508513" vertical-offset="19" max-vertical-offset="900">
           <caret line="16" column="0" selection-start-line="16" selection-start-column="0" selection-end-line="16" selection-end-column="0" />
           <folding>
             <element signature="e#29#48#0" expanded="true" />
@@ -1803,11 +1726,23 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/ByteParsers.scala">
+    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JValueTypes.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="645">
-          <caret line="35" column="6" selection-start-line="35" selection-start-column="6" selection-end-line="35" selection-end-column="6" />
-          <folding />
+        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="1305">
+          <caret line="71" column="138" selection-start-line="71" selection-start-column="138" selection-end-line="71" selection-end-column="138" />
+          <folding>
+            <element signature="e#29#48#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JTypePool.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="2085">
+          <caret line="7" column="41" selection-start-line="7" selection-start-column="41" selection-end-line="7" selection-end-column="41" />
+          <folding>
+            <element signature="e#29#48#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -1824,22 +1759,48 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JTypePool.scala">
+    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/ByteParsers.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="2085">
-          <caret line="7" column="41" selection-start-line="7" selection-start-column="41" selection-end-line="7" selection-end-column="41" />
+        <state vertical-scroll-proportion="0.5618615" vertical-offset="0" max-vertical-offset="881">
+          <caret line="35" column="6" selection-start-line="35" selection-start-column="6" selection-end-line="35" selection-end-column="6" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceToken.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="375">
+          <caret line="6" column="11" selection-start-line="6" selection-start-column="11" selection-end-line="6" selection-end-column="11" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/test/scala/phenan/prj/internal/JClassLoaderTest.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="570">
+          <caret line="10" column="38" selection-start-line="10" selection-start-column="2" selection-end-line="10" selection-end-column="38" />
           <folding>
-            <element signature="e#29#48#0" expanded="true" />
+            <element signature="e#29#51#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/internal/JValueTypes.scala">
+    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="1.2088536" vertical-offset="0" max-vertical-offset="1305">
-          <caret line="71" column="138" selection-start-line="71" selection-start-column="138" selection-end-line="71" selection-end-column="138" />
+        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="2745">
+          <caret line="87" column="29" selection-start-line="87" selection-start-column="29" selection-end-line="87" selection-end-column="29" />
           <folding>
-            <element signature="e#29#48#0" expanded="true" />
+            <element signature="e#25#41#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/test/scala/phenan/prj/decl/SourceReaderTest.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.71649486" vertical-offset="393" max-vertical-offset="975">
+          <caret line="54" column="3" selection-start-line="54" selection-start-column="3" selection-end-line="54" selection-end-column="3" />
+          <folding>
+            <element signature="e#25#41#0" expanded="true" />
           </folding>
         </state>
       </provider>
