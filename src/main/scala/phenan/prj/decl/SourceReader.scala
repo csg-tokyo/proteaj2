@@ -1,163 +1,332 @@
 package phenan.prj.decl
 
 import java.io._
+import java.lang.{StringBuilder => SBuilder}
+import java.util.function.IntConsumer
+import phenan.prj.exception.ParseException
 import phenan.prj.state.JState
 
 import scala.util._
 
 import Character._
 
-class SourceReader private (in: Reader, private var lookAhead: Int)(implicit state: JState) {
-  def head: SourceToken = next
-  def nextToken: SourceToken = {
-    val n = next
-    next = readNext()
-    n
-  }
-  def nextBlock: Option[SourceBlock] = ???
+class SourceReader private (private val in: Reader, private var current: Int)(implicit state: JState) {
+  def head: SourceToken = look(0)
 
-  private def readNext(): SourceToken = try {
-    lookAhead match {
-      case -1                            => EndOfSource
-      case s if isJavaIdentifierStart(s) => readNextIdentifier(new StringBuilder + s.toChar)
-      case '\n' => line += 1; lookAhead = in.read(); readNext()
-      case w if isWhitespace(w) => lookAhead = in.read(); readNext()
-      case '\'' => readCharLiteral()
-      case '\"' => readStringLiteral()
-      case '/'  => in.read() match {
+  def look (n: Int): SourceToken = {
+    fetch(n)
+    look(n, queue)
+  }
+
+  def next: SourceToken = {
+    fetch(0)
+    discard(0)
+  }
+
+  def nextBlock: Try[String] = ???
+
+  def nextExpression: Try[String] = readUntilEndOfExpr(new SBuilder, 0)
+
+  def skipUntil (f: SourceToken => Boolean): SourceToken = {
+    while (! eof && ! f(head)) next
+    next
+  }
+
+  def skipBlock (p: Int): Unit = {
+    while (! eof && braces.nonEmpty && braces.head >= p) next
+    next
+  }
+
+  def position: Int = pos
+
+  def eof: Boolean = head.eof
+  
+
+
+  /* for look-ahead */
+
+  private def fetch (n: Int): Unit = {
+    if (nFetched <= n) readNext() match {
+      case Some(ws: Whitespaces) =>
+        queue = queue :+ ws
+        fetch(n)
+      case Some(token) =>
+        queue = queue :+ token
+        nFetched += 1
+        fetch(n)
+      case None => // do nothing
+    }
+  }
+
+  private def look (n: Int, q: List[SourceToken]): SourceToken = {
+    if (q.nonEmpty) q.head match {
+      case _: Whitespaces => look(n, q.tail)
+      case _ if n > 0 => look(n - 1, q.tail)
+      case token => token
+    }
+    else EndOfSource
+  }
+
+  private def discard (n: Int): SourceToken = {
+    if (queue.nonEmpty) queue.head match {
+      case EndOfSource => EndOfSource
+      case _: Whitespaces =>
+        queue = queue.tail
+        discard(n)
+      case _ if n > 0 =>
+        queue = queue.tail
+        nFetched -= 1
+        discard(n - 1)
+      case token =>
+        queue = queue.tail
+        nFetched -= 1
+        token
+    }
+    else EndOfSource
+  }
+
+  private def readUntilEndOfExpr (buf: SBuilder, pars: Int): Try[String] = {
+    if (queue.nonEmpty) queue.head match {
+      case SymbolToken('(', _) =>
+        queue = queue.tail
+        readUntilEndOfExpr(buf.appendCodePoint('('), pars + 1)
+      case SymbolToken(')', _) if pars > 0 =>
+        queue = queue.tail
+        readUntilEndOfExpr(buf.appendCodePoint(')'), pars - 1)
+      case SymbolToken(')' | ',' | ';', _) =>
+        Success(buf.toString)
+      case InvalidToken(_) =>
+        Failure(ParseException("invalid token"))
+      case token =>
+        queue = queue.tail
+        readUntilEndOfExpr(appendToken(buf, token), pars)
+    }
+    else readNext() match {
+      case Some(SymbolToken('(', _)) =>
+        readUntilEndOfExpr(buf.appendCodePoint('('), pars + 1)
+      case Some(SymbolToken(')', _)) if pars > 0 =>
+        readUntilEndOfExpr(buf.appendCodePoint(')'), pars - 1)
+      case Some(s @ SymbolToken(')' | ',' | ';', _)) =>
+        queue = queue :+ s
+        Success(buf.toString)
+      case Some(InvalidToken(_)) =>
+        Failure(ParseException("invalid token"))
+      case Some(token) =>
+        readUntilEndOfExpr(appendToken(buf, token), pars)
+      case None =>
+        Failure(ParseException("end of expression is not found"))
+    }
+  }
+
+  private def appendToken (buf: SBuilder, token: SourceToken): SBuilder = token match {
+    case IdentifierToken(id, _) => buf.append(id)
+    case CharLitToken(lit, _)   =>
+      buf.append('\'')
+      appendLitChar(buf, lit)
+      buf.append('\'')
+    case StringLitToken(lit, _) =>
+      buf.append('\"')
+      lit.codePoints().forEach(codePointAppender(buf))
+      buf.append('\"')
+    case SymbolToken(ch, _)     => buf.appendCodePoint(ch)
+    case Whitespaces(ws, _)     => buf.append(ws)
+    case _                      => buf.append("¿")
+  }
+
+  private def codePointAppender(buf: SBuilder) = new IntConsumer {
+    override def accept(value: Int): Unit = appendLitChar(buf, value)
+  }
+
+  private def appendLitChar (buf: SBuilder, codePoint: Int): SBuilder = codePoint match {
+    case '\b' => buf.append('\\').append('b')
+    case '\f' => buf.append('\\').append('f')
+    case '\n' => buf.append('\\').append('n')
+    case '\r' => buf.append('\\').append('r')
+    case '\t' => buf.append('\\').append('t')
+    case '\'' => buf.append('\\').append('\'')
+    case '\"' => buf.append('\\').append('\"')
+    case '\\' => buf.append('\\').append('\\')
+    case ch   => buf.appendCodePoint(ch)
+  }
+
+  private var nFetched: Int = 0
+  private var queue: List[SourceToken] = Nil
+
+  /* tokenization method */
+
+  private def readNext(): Option[SourceToken] = try {
+    current match {
+      case -1                            => None
+      case s if isJavaIdentifierStart(s) => Some(readIdentifier((new SBuilder).appendCodePoint(s)))
+      case w if isWhitespace(w) => Some(readWhitespaces(w))
+      case '\'' => Some(readCharLiteral())
+      case '\"' => Some(readStringLiteral())
+      case '/'  => read() match {
         case '/' => readLineComment(); readNext()
         case '*' => readBlockComment(); readNext()
-        case c   => lookAhead = c; SymbolToken('/')
+        case c   => Some(SymbolToken('/', line))
       }
-      case c => lookAhead = in.read(); SymbolToken(c.toChar)
+      case c => Some(readSymbol())
     }
-  } catch {
-    case e : IOException =>
-      lookAhead = -1
-      state.error("io error", e)
-      InvalidToken
+  } catch { case e : IOException =>
+    current = -1
+    state.error("io error", e)
+    None
   }
 
-  private def readNextIdentifier(buf: StringBuilder): IdentifierToken = {
-    lookAhead = in.read()
-    if (isJavaIdentifierPart(lookAhead)) readNextIdentifier(buf + lookAhead.toChar)
-    else IdentifierToken(buf.toString())
+  private def readIdentifier(buf: SBuilder): IdentifierToken = {
+    read()
+    if (isJavaIdentifierPart(current)) readIdentifier(buf.appendCodePoint(current))
+    else IdentifierToken(buf.toString, line)
+  }
+
+  private def readWhitespaces(w: Int): Whitespaces = {
+    if (w == '\n') line += 1
+    readWhitespaces((new SBuilder).appendCodePoint(w))
+  }
+
+  private def readWhitespaces(buf: SBuilder): Whitespaces = read() match {
+    case '\n' =>
+      line += 1
+      readWhitespaces(buf.appendCodePoint('\n'))
+    case w if isWhitespace(w) => readWhitespaces(buf.appendCodePoint(w))
+    case _ => Whitespaces(buf.toString, line)
   }
 
   private def readCharLiteral(): SourceToken = {
-    lookAhead = in.read()
-    if (lookAhead == -1 || lookAhead == '\n' || lookAhead == '\'') {
-      lookAhead = in.read()
+    read()
+    if (current == -1 || current == '\n' || current == '\'') {
+      read()
       state.error("invalid character literal")
-      InvalidToken
+      InvalidToken(line)
     }
     else {
-      val lit = lookAhead match {
+      val lit = current match {
         case '\\' => readEscapedChar()
-        case c    => lookAhead = in.read(); c.toChar.toString
+        case c    => read(); c
       }
 
-      if (lookAhead == '\'') {
-        lookAhead = in.read()
-        CharLitToken(lit)
+      if (current == '\'') {
+        read()
+        CharLitToken(lit, line)
       }
       else {
-        state.error("invalid character literal : expected single quote but found " + lookAhead)
-        InvalidToken
+        state.error("invalid character literal : expected single quote but found " + current)
+        InvalidToken(line)
       }
     }
   }
 
   private def readStringLiteral(): SourceToken = {
-    lookAhead = in.read()
-    readStringLiteral(new StringBuilder)
+    read()
+    readStringLiteral(new SBuilder)
   }
 
-  private def readStringLiteral(buf: StringBuilder): SourceToken = {
-    lookAhead match {
-      case '\"'      =>
-        lookAhead = in.read()
-        StringLitToken(buf.toString())
-      case '\n' | -1 =>
-        lookAhead = in.read()
-        state.error("invalid string literal")
-        InvalidToken
-      case '\\'      =>
-        readStringLiteral(buf.append(readEscapedChar()))
-      case ch        =>
-        lookAhead = in.read()
-        readStringLiteral(buf + ch.toChar)
-    }
+  private def readStringLiteral(buf: SBuilder): SourceToken = current match {
+    case '\"'      =>
+      read()
+      StringLitToken(buf.toString, line)
+    case '\n' | -1 =>
+      read()
+      state.error("invalid string literal")
+      InvalidToken(line)
+    case '\\'      =>
+      readStringLiteral(buf.appendCodePoint(readEscapedChar()))
+    case ch        =>
+      read()
+      readStringLiteral(buf.appendCodePoint(ch))
   }
 
-  private def readEscapedChar(): String = {
-    in.read() match {
-      case 'b'  => lookAhead = in.read(); "\\b"
-      case 'f'  => lookAhead = in.read(); "\\f"
-      case 'n'  => lookAhead = in.read(); "\\n"
-      case 'r'  => lookAhead = in.read(); "\\r"
-      case 't'  => lookAhead = in.read(); "\\t"
-      case 'u'  => readCharCode16(0, new StringBuilder + '\\' + 'u')
-      case '\'' => lookAhead = in.read(); "\\\'"
-      case '\"' => lookAhead = in.read(); "\\\""
-      case '\\' => lookAhead = in.read(); "\\\\"
-      case n if '0' <= n && n <= '7' => readCharCode8(n)
-      case n =>
-        state.error("invalid escape sequence")
-        ""
-    }
+  private def readEscapedChar(): Int = read() match {
+    case 'b'  => read(); '\b'
+    case 'f'  => read(); '\f'
+    case 'n'  => read(); '\n'
+    case 'r'  => read(); '\r'
+    case 't'  => read(); '\t'
+    case 'u'  => readCharCode16(0, 0)
+    case '\'' => read(); '\''
+    case '\"' => read(); '\"'
+    case '\\' => read(); '\\'
+    case n if '0' <= n && n <= '7' => readCharCode8(n)
+    case n =>
+      state.error("invalid escape sequence")
+      0
   }
 
-  private def readCharCode8(n: Int): String = {
-    val buf = new StringBuilder + '\\' + n.toChar
-    lookAhead = in.read()
-    if (! ('0' <= lookAhead && lookAhead <= '7')) buf.toString()
+  private def readCharCode8(n: Int): Int = {
+    val code1 = digit(n, 8)
+    read()
+    if (! ('0' <= current && current <= '7')) code1
     else {
-      buf.append(lookAhead.toChar)
-      lookAhead = in.read()
-      if (! ('0' <= lookAhead && lookAhead <= '7')) buf.toString()
+      val code2 = code1 * 8 + digit(current, 8)
+      read()
+      if (! ('0' <= current && current <= '7')) code2
       else {
-        buf.append(lookAhead.toChar)
-        lookAhead = in.read()
-        buf.toString()
+        val code3 = code2 * 8 + digit(current, 8)
+        read()
+
+        if (0 <= code3 && code3 <= 0x00ff) code3
+        else {
+          state.error("invalid octal char code")
+          code3
+        }
       }
     }
   }
 
-  private def readCharCode16(n: Int, buf: StringBuilder): String = {
-    lookAhead = in.read()
-    if (n > 4) buf.toString()
-    else if ('0' <= lookAhead && lookAhead <= '9' || 'a' <= lookAhead && lookAhead <= 'f' || 'A' <= lookAhead && lookAhead <= 'F') {
-      readCharCode16(n + 1, buf + lookAhead.toChar)
+  private def readCharCode16(n: Int, code: Int): Int = {
+    read()
+    if (n > 4) code
+    else if ('0' <= current && current <= '9' || 'a' <= current && current <= 'f' || 'A' <= current && current <= 'F') {
+      readCharCode16(n + 1, code * 16 + digit(current, 16))
     }
     else {
       state.error("invalid unicode escape")
-      ""
+      code
     }
   }
 
-  private def readLineComment(): Unit = {
-    in.read() match {
-      case '\n' => line += 1; lookAhead = in.read()
-      case -1   => lookAhead = in.read()
-      case _    => readLineComment()
-    }
+  private def readLineComment(): Unit = read() match {
+    case '\n' => line += 1; read()
+    case -1   => read()
+    case _    => readLineComment()
   }
 
-  private def readBlockComment(): Unit = {
-    in.read() match {
-      case '*'  => in.read() match {
-        case '/' => lookAhead = in.read()
-        case '\n' => line += 1; readBlockComment()
-        case _   => readBlockComment()
-      }
-      case '\n' => line += 1; readBlockComment()
-      case _    => readBlockComment()
-    }
+  private def readBlockComment(): Unit = read() match {
+    case '*'  => readBlockComment_Star()
+    case '\n' => line += 1; readBlockComment()
+    case -1   => current = -1; state.error("end of comment is not found")
+    case _    => readBlockComment()
   }
 
-  private var next: SourceToken = readNext()
-  private var line: Int = 0
+  private def readBlockComment_Star(): Unit = read() match {
+    case '*'  => readBlockComment_Star()
+    case '/'  => read()
+    case '\n' => line += 1; readBlockComment()
+    case -1   => current = -1; state.error("end of comment is not found")
+    case _    => readBlockComment()
+  }
+
+  private def readSymbol(): SymbolToken = {
+    val c = current
+
+    if (c == '{') braces = pos :: braces
+    else if (c == '}') braces = braces.tail
+
+    read()
+    SymbolToken(c, line)
+  }
+
+  private def read(): Int = {
+    current = in.read()
+    pos += 1
+    current
+  }
+
+  private var pos: Int = 0
+  private var line: Int = 1
+
+  private var braces: List[Int] = Nil
 }
 
 object SourceReader {

@@ -22,6 +22,9 @@ class JState private[state] (val searchPath: JSearchPath) {
     searchPath.close()
   }
 
+  def warns: Int = nWarns
+  def errors: Int = nErrors
+
   private var nErrors: Int = 0
   private var nWarns: Int = 0
   private lazy val logger = LoggerFactory.getLogger("pjc")
