@@ -30,7 +30,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
    */
   private def parseCompilationUnit: CompilationUnit = {
     val header  = parseHeader
-    val modules = parseListOfModuleDeclaration(Nil)
+    val modules = parseModuleDeclarations(Nil)
     CompilationUnit(header, modules)
   }
 
@@ -38,15 +38,15 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
    *  : # Option[PackageDeclaration] List[ImportDeclaration]
    */
   private def parseHeader: Header = {
-    val pack    = parseOptionalPackageDeclaration
-    val imports = parseListOfImportDeclaration(Nil)
+    val pack    = parsePackageDeclarationOpt
+    val imports = parseImportDeclarations(Nil)
     Header(pack, imports)
   }
 
   /* Option[PackageDeclaration]
    *  : # PackageDeclaration.?
    */
-  private def parseOptionalPackageDeclaration: Option[PackageDeclaration] = {
+  private def parsePackageDeclarationOpt: Option[PackageDeclaration] = {
     if (read("package")) parsePackageDeclaration match {
       case Success(pack) => Some(pack)
       case Failure(e)    =>
@@ -68,13 +68,13 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   /* List[ImportDeclaration]
    *  : # ImportDeclaration.*
    */
-  private def parseListOfImportDeclaration (imports: List[ImportDeclaration]): List[ImportDeclaration] = {
+  private def parseImportDeclarations (imports: List[ImportDeclaration]): List[ImportDeclaration] = {
     if (read("import")) parseImportDeclaration match {
-      case Success(d) => parseListOfImportDeclaration(imports :+ d)
+      case Success(d) => parseImportDeclarations(imports :+ d)
       case Failure(e) =>
         state.error("parse error : invalid import declaration", e)
         reader.skipUntil (_ is ';')
-        parseListOfImportDeclaration(imports)
+        parseImportDeclarations(imports)
     }
     else imports
   }
@@ -162,49 +162,192 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   /* List[ModuleDeclaration]
    *  : # ModuleDeclaration.*
    */
-  private def parseListOfModuleDeclaration (modules: List[ModuleDeclaration]):  List[ModuleDeclaration] = {
+  private def parseModuleDeclarations (modules: List[ModuleDeclaration]):  List[ModuleDeclaration] = {
     val pos = reader.position
     if (reader.eof) modules
     else parseModuleDeclaration match {
-      case Success(m) => parseListOfModuleDeclaration(modules :+ m)
+      case Success(m) => parseModuleDeclarations(modules :+ m)
       case Failure(e) =>
         state.error("parse error : invalid module declaration", e)
         reader.skipBlock(pos)
-        parseListOfModuleDeclaration(modules)
+        parseModuleDeclarations(modules)
     }
   }
 
   /* ModuleDeclaration
-   *  : ClassDeclaration
-   *  | InterfaceDeclaration
-   *  | DSLDeclaration
+   *  : ClassDeclaration         ; # List[ModuleModifier] "class" Identifier List[TypeParameter] ExtendsClass.? Interfaces.? ClassBody
+   *  | EnumDeclaration          ; # List[ModuleModifier] "enum" Identifier Interfaces.? EnumBody
+   *  | InterfaceDeclaration     ; # List[ModuleModifier] "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
+   *  | AnnotationDeclaration    ; # List[ModuleModifier] '@' "interface" Identifier AnnotationBody
+   *  | DSLDeclaration           ; # List[ModuleModifier] "dsl" Identifier DependsDSLs DSLBody
    */
   private def parseModuleDeclaration: Try[ModuleDeclaration] = {
     ???
   }
 
-  /* ClassModifier
-   *  : ( AnnotationModifier | AccessModifier | StaticModifier | FinalModifier | AbstractModifier | StrictFPModifier | PureModifier ).*
+  /* List[ModuleModifier]
+   *  : ( AnnotationModifier | PublicModifier | PrivateModifier | ProtectedModifier
+   *    | StaticModifier | FinalModifier | AbstractModifier | StrictFPModifier
+   *    | AutoCloseModifier | PropagateModifier | PureModifier ).*
    */
-  private def parseClassModifiers: Try[List[ClassModifier]] = ???
+  private def parseModuleModifiers: Try[List[ModuleModifier]] = parseModuleModifiers(Nil)
+
+  private def parseModuleModifiers (list: List[ModuleModifier]): Try[List[ModuleModifier]] = reader.head match {
+    case SymbolToken('@', _) =>
+      reader.next  // '@'
+      parseAnnotationModifier match {
+        case Success(ann) => parseModuleModifiers(list :+ ann)
+        case Failure(e) => Failure(e)
+      }
+    case IdentifierToken(id, _) if moduleModifiers.contains(id) =>
+      reader.next  // id
+      parseModuleModifiers(list :+ moduleModifiers(id))
+    case _ => Success(list)
+  }
+
+  private val moduleModifiers: Map[String, ModuleModifier] = Map(
+    "public" -> PublicModifier, "private" -> PrivateModifier, "protected" -> ProtectedModifier,
+    "static" -> StaticModifier, "final" -> FinalModifier, "abstract" -> AbstractModifier,
+    "strictfp" -> StrictFPModifier, "autoclose" -> AutoCloseModifier, "propagate" -> PropagateModifier, "pure" -> PureModifier
+  )
 
   /* AnnotationModifier
-   *  : FullAnnotation             ; '@' # QualifiedName '(' ( Identifier '=' AnnotationArgument ).*','*  ')'
-   *  | SingleElementAnnotation    ; '@' # QualifiedName '(' AnnotationArgument ')'
+   *  : FullAnnotation             ; '@' # QualifiedName '(' ( Identifier '=' Expression ).*','*  ')'
+   *  | SingleElementAnnotation    ; '@' # QualifiedName '(' Expression ')'
    *  | MarkerAnnotation           ; '@' # QualifiedName
    */
-  private def parseAnnotationModifier: Try[AnnotationModifier] = parseQualifiedName match {
-    case Success(name) =>
-      if (read('(')) {
-        ???
+  private def parseAnnotationModifier: Try[AnnotationModifier] = parseQualifiedName.flatMap { name =>
+    if (read('(')) reader.look(0) match {
+      case IdentifierToken(_, _) if reader.look(1) is '=' => parseFullAnnotation(name, Map.empty)
+      case _ => reader.nextExpression.flatMap { arg =>
+        if (read(')')) Success(SingleElementAnnotation(name, arg))
+        else Failure(parseError("')'"))
       }
-      else Success(MarkerAnnotation(name))
-    case Failure(e) => Failure(e)
+    }
+    else Success(MarkerAnnotation(name))
+  }
+
+  /* FullAnnotation
+   *  : '@' QualifiedName '(' ( # Identifier '=' Expression ).*','* ')'
+   */
+  private def parseFullAnnotation(name: QualifiedName, args: Map[String, String]): Try[FullAnnotation] = reader.next match {
+    case IdentifierToken(id, _) =>
+      if (read('=')) reader.nextExpression match {
+        case Success(arg) =>
+          if (read(',')) parseFullAnnotation(name, args + (id -> arg))
+          else if (read(')')) Success(FullAnnotation(name, args + (id -> arg)))
+          else Failure(parseError("',' or ')'"))
+        case Failure(e) => Failure(e)
+      }
+      else Failure(parseError("'='"))
+    case token => Failure(parseError("identifier", token))
+  }
+
+  /* List[TypeParameter]
+   *  : # ( '<' TypeParameter ( ',' TypeParameter ).* '>' ).?
+   */
+  private def parseTypeParameters: Try[List[TypeParameter]] = {
+    if (read('<')) parseTypeParameter.flatMap { param => parseTypeParameters(List(param)) }
+    else Success(Nil)
+  }
+
+  /* List[TypeParameter]
+   *  : # ( '<' TypeParameter # ( ',' TypeParameter ).* '>' ).?
+   */
+  private def parseTypeParameters (params: List[TypeParameter]): Try[List[TypeParameter]] = {
+    if (read(',')) parseTypeParameter match {
+      case Success(param) => parseTypeParameters(params :+ param)
+      case Failure(e)     => Failure(e)
+    }
+    else Success(params)
+  }
+
+  /* TypeParameter
+   *  : # Identifier ( "extends" ClassTypeName ( '&' ClassTypeName ).* ).?
+   */
+  private def parseTypeParameter: Try[TypeParameter] = parseIdentifier.flatMap { name =>
+    if (read("extends")) parseClassTypeName.flatMap { bound => parseTypeParameter(name, List(bound)) }
+    else Success(TypeParameter(name, Nil))
+  }
+
+  /* TypeParameter
+   *  : Identifier ( "extends" ClassTypeName # ( '&' ClassTypeName ).* ).?
+   */
+  private def parseTypeParameter (name: String, bounds: List[ClassTypeName]): Try[TypeParameter] = {
+    if (read('&')) parseClassTypeName match {
+      case Success(bound) => parseTypeParameter(name, bounds :+ bound)
+      case Failure(e)     => Failure(e)
+    }
+    else Success(TypeParameter(name, bounds))
+  }
+
+  /* TypeName
+   *  : # ClassTypeName ( '[' ']' ).*
+   */
+  private def parseTypeName: Try[TypeName] = parseClassTypeName.flatMap(parseTypeName)
+
+  /* TypeName
+   *  : ClassTypeName # ( '[' ']' ).*
+   */
+  private def parseTypeName (component: TypeName): Try[TypeName] = {
+    if (read('[')) {
+      if (read(']')) parseTypeName(ArrayTypeName(component))
+      else Failure(parseError("']'"))
+    }
+    else Success(component)
+  }
+
+  /* ClassTypeName
+   *  : # QualifiedName List[TypeArgument]
+   */
+  private def parseClassTypeName: Try[ClassTypeName] = for {
+    name <- parseQualifiedName
+    args <- parseTypeArguments
+  } yield ClassTypeName(name, args)
+
+  /* List[TypeArgument]
+   *  : # ( '<' TypeArgument ( ',' TypeArgument ) '>' ).?
+   */
+  private def parseTypeArguments: Try[List[TypeArgument]] = {
+    if (read('<')) parseTypeArgument.flatMap { arg => parseTypeArguments(List(arg)) }
+    else Success(Nil)
+  }
+
+  /* List[TypeArgument]
+   *  : ( '<' TypeArgument # ( ',' TypeArgument ) '>' ).?
+   */
+  private def parseTypeArguments (args: List[TypeArgument]): Try[List[TypeArgument]] = {
+    if (read(',')) parseTypeArgument match {
+      case Success(arg) => parseTypeArguments(args :+ arg)
+      case Failure(e)   => Failure(e)
+    }
+    else if (read('>')) Success(args)
+    else Failure(parseError("',' or '>'"))
+  }
+
+  /* TypeArgument
+   *  : # WildcardType
+   *  | # TypeName
+   */
+  private def parseTypeArgument: Try[TypeArgument] = {
+    if (read('?')) parseWildcardType
+    else parseTypeName
+  }
+
+  /* WildcardType
+   *  : '?' #
+   *  | '?' # "extends" TypeName
+   *  | '?' # "super" TypeName
+   */
+  private def parseWildcardType: Try[WildcardType] = {
+    if (read("extends")) parseTypeName.map(bound => WildcardType(Some(bound), None))
+    else if (read("super")) parseTypeName.map(bound => WildcardType(None, Some(bound)))
+    else Success(WildcardType(None, None))
   }
 
   /* QualifiedNameOrStar
-   *  : QualifiedName   ; # Identifier.*'.'*
-   *  | QualifiedStar   ; # Identifier.*'.'* '.' '*'
+   *  : QualifiedName   ; # Identifier ( '.' Identifier ).*
+   *  | QualifiedStar   ; # Identifier ( '.' Identifier ).* '.' '*'
    */
   private def parseQualifiedNameOrStar: Try[QualifiedNameOrStar] = reader.next match {
     case IdentifierToken(id, _) =>
@@ -227,7 +370,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* QualifiedName
-   *  : # Identifier.*'.'*
+   *  : # Identifier ( '.' Identifier ).*
    */
   private def parseQualifiedName: Try[QualifiedName] = reader.next match {
     case IdentifierToken(id, _) =>
@@ -245,6 +388,11 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
       case token                  => Failure(parseError("identifier", token))
     }
     else Success(QualifiedName(names))
+  }
+
+  private def parseIdentifier: Try[String] = reader.next match {
+    case IdentifierToken(id, _) => Success(id)
+    case token => Failure(parseError("identifier", token))
   }
 
   private def parseToken (sym: Char): Try[SymbolToken] = reader.next match {
@@ -307,40 +455,43 @@ case class DescendingDSLPrecedence (names: List[QualifiedName]) extends DSLPrece
 
 sealed trait ModuleDeclaration
 
+case class ClassDeclaration (modifiers: List[ModuleModifier], name: String) extends ModuleDeclaration
+
 sealed trait PrjModifier
 
-sealed trait ClassModifier extends PrjModifier
-sealed trait InterfaceModifier extends PrjModifier
-sealed trait DSLModifier extends PrjModifier
-sealed trait ContextModifier extends PrjModifier
-sealed trait FieldModifier extends PrjModifier
-sealed trait MethodModifier extends PrjModifier
-sealed trait OperatorModifier extends PrjModifier
+sealed trait ModuleModifier extends PrjModifier
+sealed trait MemberModifier extends PrjModifier
 
-case object PublicModifier extends ClassModifier with InterfaceModifier with DSLModifier with ContextModifier with FieldModifier with MethodModifier with OperatorModifier
-case object PrivateModifier extends ClassModifier with InterfaceModifier with ContextModifier with FieldModifier with MethodModifier with OperatorModifier
-case object ProtectedModifier extends ClassModifier with InterfaceModifier with ContextModifier with FieldModifier with MethodModifier with OperatorModifier
-case object StaticModifier extends ClassModifier with InterfaceModifier with FieldModifier with MethodModifier
-case object FinalModifier extends ClassModifier with ContextModifier with FieldModifier with MethodModifier with OperatorModifier
-case object SynchronizedModifier extends MethodModifier with OperatorModifier
-case object VolatileModifier extends FieldModifier
-case object TransientModifier extends FieldModifier
-case object NativeModifier extends MethodModifier with OperatorModifier
-case object AbstractModifier extends ClassModifier with InterfaceModifier with ContextModifier with MethodModifier with OperatorModifier
-case object StrictFPModifier extends ClassModifier with InterfaceModifier with ContextModifier with MethodModifier with OperatorModifier
+case object PublicModifier extends ModuleModifier with MemberModifier
+case object PrivateModifier extends ModuleModifier with MemberModifier
+case object ProtectedModifier extends ModuleModifier with MemberModifier
+case object StaticModifier extends ModuleModifier with MemberModifier
+case object FinalModifier extends ModuleModifier with MemberModifier
+case object SynchronizedModifier extends MemberModifier
+case object VolatileModifier extends MemberModifier
+case object TransientModifier extends MemberModifier
+case object NativeModifier extends MemberModifier
+case object AbstractModifier extends ModuleModifier with MemberModifier
+case object StrictFPModifier extends ModuleModifier with MemberModifier
 
-case object AutoCloseModifier extends DSLModifier
-case object PropagateModifier extends DSLModifier
-case object PureModifier extends ClassModifier with MethodModifier with OperatorModifier
+case object AutoCloseModifier extends ModuleModifier
+case object PropagateModifier extends ModuleModifier
+case object PureModifier extends ModuleModifier with MemberModifier
 
-sealed trait AnnotationModifier extends ClassModifier with InterfaceModifier with DSLModifier with ContextModifier with FieldModifier with MethodModifier with OperatorModifier
+sealed trait AnnotationModifier extends ModuleModifier with MemberModifier
 
-case class FullAnnotation (name: QualifiedName, args: Map[String, AnnotationArgument]) extends AnnotationModifier
-case class SingleElementAnnotation (name: QualifiedName, arg: AnnotationArgument) extends AnnotationModifier
+case class FullAnnotation (name: QualifiedName, args: Map[String, String]) extends AnnotationModifier
+case class SingleElementAnnotation (name: QualifiedName, arg: String) extends AnnotationModifier
 case class MarkerAnnotation (name: QualifiedName) extends AnnotationModifier
 
-case class AnnotationArgument (expression: String)
+case class TypeParameter (name: String, bounds: List[ClassTypeName])
 
+sealed trait TypeArgument
+sealed trait TypeName extends TypeArgument
+
+case class ClassTypeName (name: QualifiedName, args: List[TypeArgument]) extends TypeName
+case class ArrayTypeName (component: TypeName) extends TypeName
+case class WildcardType (upper: Option[TypeName], lower: Option[TypeName]) extends TypeArgument
 
 sealed trait QualifiedNameOrStar
 

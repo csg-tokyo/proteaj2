@@ -40,8 +40,6 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
   def position: Int = pos
 
   def eof: Boolean = head.eof
-  
-
 
   /* for look-ahead */
 
