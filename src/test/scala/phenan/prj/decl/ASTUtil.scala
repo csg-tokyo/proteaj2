@@ -8,6 +8,8 @@ trait ASTUtil {
   def staticImportAll (names: String*): AllStaticMembersImportDeclaration = AllStaticMembersImportDeclaration(qualifiedName(names:_*))
   def dslImport (names: String*): DSLImportDeclaration = DSLImportDeclaration(qualifiedName(names:_*), None)
 
+  def simpleType (names: String*): ClassTypeName = ClassTypeName(qualifiedName(names:_*), Nil)
+  
   def arrayOf (components: AnnotationElement*): ArrayOfAnnotationElement = ArrayOfAnnotationElement(components.toList)
   def expression (src: String, line: Int): ExpressionSnippet = ExpressionSnippet(Snippet(src, line))
   def qualifiedName (names: String*): QualifiedName = QualifiedName(names.toList)

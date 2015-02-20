@@ -299,14 +299,15 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* List[TypeParameter]
-   *  : # ( '<' TypeParameter # ( ',' TypeParameter ).* '>' ).?
+   *  : ( '<' TypeParameter # ( ',' TypeParameter ).* '>' ).?
    */
   private def parseTypeParameters (params: List[TypeParameter]): Try[List[TypeParameter]] = {
     if (read(',')) parseTypeParameter match {
       case Success(param) => parseTypeParameters(params :+ param)
       case Failure(e)     => Failure(e)
     }
-    else Success(params)
+    else if (read('>')) Success(params)
+    else Failure(parseError("',' or '>'"))
   }
 
   /* TypeParameter

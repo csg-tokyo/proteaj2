@@ -107,15 +107,59 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("フルアノテーション") {
     val src =
-      """@full.Annotation(numArgs = (1 + 1), value = {"foo", "bar"})
+      """@full.Annotation(numArgs = (1 + 1), value = {"foo", @Sub, "bar"})
         |public class Main {}""".stripMargin
     val ast = DeclarationParser(source(src)).get.parseAll
 
-    val ann = FullAnnotation(qualifiedName("full", "Annotation"), Map("numArgs" -> expression(" (1 + 1)", 1), "value" -> arrayOf(expression("\"foo\"", 1), expression(" \"bar\"", 1))))
+    val ann = FullAnnotation(qualifiedName("full", "Annotation"), Map("numArgs" -> expression(" (1 + 1)", 1), "value" -> arrayOf(expression("\"foo\"", 1), MarkerAnnotation(qualifiedName("Sub")), expression(" \"bar\"", 1))))
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe Nil
     ast.modules shouldBe List(ClassDeclaration(List(ann, PublicModifier), "Main", Nil, None, Nil, Nil))
+  }
+
+  test ("extends 節付きのクラス宣言") {
+    val src = "public class Main extends java.awt.event.MouseAdapter {}"
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Main", Nil, Some(simpleType("java", "awt", "event", "MouseAdapter")), Nil, Nil))
+  }
+
+  test ("implements 節付きのクラス宣言") {
+    val src = "public class Main implements Cloneable, Serializable {}"
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Main", Nil, None, List(simpleType("Cloneable"), simpleType("Serializable")), Nil))
+  }
+
+  test ("型引数付きのクラス宣言") {
+    val src = "public class MyList <T> extends AbstractList<T> implements List<T> {}"
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "MyList", List(TypeParameter("T", Nil)),
+      Some(ClassTypeName(qualifiedName("AbstractList"), List(simpleType("T")))),
+      List(ClassTypeName(qualifiedName("List"), List(simpleType("T")))), Nil))
+  }
+
+  test ("複雑な型引数") {
+    val src = "public class Foo <S extends java.lang.Object, T extends Bar<?> & Baz<? extends S>> extends Fizz<S, ? super T> {}"
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+
+    val typeParams = List(
+      TypeParameter("S", List(simpleType("java", "lang", "Object"))),
+      TypeParameter("T", List(ClassTypeName(qualifiedName("Bar"), List(WildcardType(None, None))), ClassTypeName(qualifiedName("Baz"), List(WildcardType(Some(simpleType("S")), None))))))
+    val superType = Some(
+      ClassTypeName(qualifiedName("Fizz"), List(simpleType("S"), WildcardType(None, Some(simpleType("T"))))))
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", typeParams, superType, Nil, Nil))
   }
 
   test("正常終了したか") {
