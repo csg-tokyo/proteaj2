@@ -78,6 +78,46 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
     ast.modules shouldBe Nil
   }
 
+  test ("単純なクラス宣言") {
+    val src = "public class Main {}"
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Main", Nil, None, Nil, Nil))
+  }
+
+  test ("マーカーアノテーション") {
+    val src = "@Test public class Main {}"
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(MarkerAnnotation(qualifiedName("Test")), PublicModifier), "Main", Nil, None, Nil, Nil))
+  }
+
+  test ("単一引数アノテーション") {
+    val src = "public @SingleArg(Foo.class) class Main {}"
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier, SingleElementAnnotation(qualifiedName("SingleArg"), expression("Foo.class", 1))), "Main", Nil, None, Nil, Nil))
+  }
+
+  test ("フルアノテーション") {
+    val src =
+      """@full.Annotation(numArgs = (1 + 1), value = {"foo", "bar"})
+        |public class Main {}""".stripMargin
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val ann = FullAnnotation(qualifiedName("full", "Annotation"), Map("numArgs" -> expression(" (1 + 1)", 1), "value" -> arrayOf(expression("\"foo\"", 1), expression(" \"bar\"", 1))))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(ann, PublicModifier), "Main", Nil, None, Nil, Nil))
+  }
+
   test("正常終了したか") {
     state.clean()
     state.errors shouldBe 0

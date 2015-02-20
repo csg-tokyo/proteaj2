@@ -105,7 +105,7 @@ class SourceReaderTest extends FunSuite with Matchers {
     in.next shouldBe IdentifierToken("int", 1)
     in.next shouldBe IdentifierToken("func", 1)
     in.next shouldBe SymbolToken('=', 1)
-    in.nextExpression shouldBe Success(" '\\n'")
+    in.nextExpression shouldBe Success(Snippet(" '\\n'", 1))
     in.next shouldBe SymbolToken(';', 1)
     in.next shouldBe EndOfSource
   }
@@ -124,7 +124,7 @@ class SourceReaderTest extends FunSuite with Matchers {
     in.next shouldBe IdentifierToken("int", 1)
     in.next shouldBe IdentifierToken("func", 1)
     in.next shouldBe SymbolToken('=', 1)
-    in.nextExpression shouldBe Success(" '\\n'")
+    in.nextExpression shouldBe Success(Snippet(" '\\n'", 1))
     in.next shouldBe SymbolToken(';', 1)
     in.next shouldBe EndOfSource
   }
@@ -138,11 +138,11 @@ class SourceReaderTest extends FunSuite with Matchers {
     in.next shouldBe SymbolToken('(', 1)
     in.next shouldBe IdentifierToken("a", 1)
     in.next shouldBe SymbolToken('=', 1)
-    in.nextExpression shouldBe Success(" (1 + 2) * 3")
+    in.nextExpression shouldBe Success(Snippet(" (1 + 2) * 3", 1))
     in.next shouldBe SymbolToken(',', 1)
     in.next shouldBe IdentifierToken("b", 1)
     in.next shouldBe SymbolToken('=', 1)
-    in.nextExpression shouldBe Success(" Foo.class ")
+    in.nextExpression shouldBe Success(Snippet(" Foo.class ", 1))
     in.next shouldBe SymbolToken(')', 1)
     in.next shouldBe EndOfSource
   }

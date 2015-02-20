@@ -171,18 +171,19 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ModuleDeclaration
-   *  : ClassDeclaration         ; # List[ModuleModifier] "class" Identifier List[TypeParameter] ExtendsClass.? Interfaces.? ClassBody
-   *  | EnumDeclaration          ; # List[ModuleModifier] "enum" Identifier Interfaces.? EnumBody
+   *  : ClassDeclaration         ; # List[ModuleModifier] "class" Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   *  | EnumDeclaration          ; # List[ModuleModifier] "enum" Identifier ImplementsInterfaces EnumBody
    *  | InterfaceDeclaration     ; # List[ModuleModifier] "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
    *  | AnnotationDeclaration    ; # List[ModuleModifier] '@' "interface" Identifier AnnotationBody
    *  | DSLDeclaration           ; # List[ModuleModifier] "dsl" Identifier DependsDSLs DSLBody
    */
-  private def parseModuleDeclaration: Try[ModuleDeclaration] = {
-    ???
+  private def parseModuleDeclaration: Try[ModuleDeclaration] = parseModuleModifiers.flatMap { modifiers =>
+    if (read("class")) parseClassDeclaration(modifiers)
+    else ???
   }
 
   /* List[ModuleModifier]
-   *  : ( AnnotationModifier | PublicModifier | PrivateModifier | ProtectedModifier
+   *  : ( Annotation | PublicModifier | PrivateModifier | ProtectedModifier
    *    | StaticModifier | FinalModifier | AbstractModifier | StrictFPModifier
    *    | AutoCloseModifier | PropagateModifier | PureModifier ).*
    */
@@ -191,7 +192,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   private def parseModuleModifiers (list: List[ModuleModifier]): Try[List[ModuleModifier]] = reader.head match {
     case SymbolToken('@', _) =>
       reader.next  // '@'
-      parseAnnotationModifier match {
+      parseAnnotation match {
         case Success(ann) => parseModuleModifiers(list :+ ann)
         case Failure(e) => Failure(e)
       }
@@ -207,28 +208,29 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
     "strictfp" -> StrictFPModifier, "autoclose" -> AutoCloseModifier, "propagate" -> PropagateModifier, "pure" -> PureModifier
   )
 
-  /* AnnotationModifier
-   *  : FullAnnotation             ; '@' # QualifiedName '(' ( Identifier '=' Expression ).*','*  ')'
-   *  | SingleElementAnnotation    ; '@' # QualifiedName '(' Expression ')'
+  /* Annotation
+   *  : FullAnnotation             ; '@' # QualifiedName '(' ( Identifier '=' AnnotationElement ).*','*  ')'
+   *  | SingleElementAnnotation    ; '@' # QualifiedName '(' AnnotationElement ')'
    *  | MarkerAnnotation           ; '@' # QualifiedName
    */
-  private def parseAnnotationModifier: Try[AnnotationModifier] = parseQualifiedName.flatMap { name =>
+  private def parseAnnotation: Try[Annotation] = parseQualifiedName.flatMap { name =>
     if (read('(')) reader.look(0) match {
       case IdentifierToken(_, _) if reader.look(1) is '=' => parseFullAnnotation(name, Map.empty)
-      case _ => reader.nextExpression.flatMap { arg =>
-        if (read(')')) Success(SingleElementAnnotation(name, arg))
-        else Failure(parseError("')'"))
-      }
+      case SymbolToken(')', _) => Success(FullAnnotation(name, Map.empty))
+      case _ => for {
+        arg <- parseAnnotationElement
+        _   <- parseToken(')')
+      } yield SingleElementAnnotation(name, arg)
     }
     else Success(MarkerAnnotation(name))
   }
 
   /* FullAnnotation
-   *  : '@' QualifiedName '(' ( # Identifier '=' Expression ).*','* ')'
+   *  : '@' QualifiedName '(' ( # Identifier '=' AnnotationElement ).*','* ')'
    */
-  private def parseFullAnnotation(name: QualifiedName, args: Map[String, String]): Try[FullAnnotation] = reader.next match {
+  private def parseFullAnnotation(name: QualifiedName, args: Map[String, AnnotationElement]): Try[FullAnnotation] = reader.next match {
     case IdentifierToken(id, _) =>
-      if (read('=')) reader.nextExpression match {
+      if (read('=')) parseAnnotationElement match {
         case Success(arg) =>
           if (read(',')) parseFullAnnotation(name, args + (id -> arg))
           else if (read(')')) Success(FullAnnotation(name, args + (id -> arg)))
@@ -238,6 +240,55 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
       else Failure(parseError("'='"))
     case token => Failure(parseError("identifier", token))
   }
+
+  /* AnnotationElement
+   *  : Annotation
+   *  | ArrayOfAnnotationElement
+   *  | ExpressionSnippet
+   */
+  private def parseAnnotationElement: Try[AnnotationElement] = {
+    if (read('@')) parseAnnotation
+    else if (read('{')) parseArrayOfAnnotationElement
+    else parseExpressionSnippet
+  }
+
+  /* ArrayOfAnnotationElement
+   *  : '{' # ( AnnotationElement ( ',' AnnotationElement ).* ).? ','.? '}'
+   */
+  private def parseArrayOfAnnotationElement: Try[ArrayOfAnnotationElement] = {
+    if (read('}')) Success(ArrayOfAnnotationElement(Nil))
+    else if (read(',')) {
+      if (read('}')) Success(ArrayOfAnnotationElement(Nil))
+      else Failure(parseError("'}'"))
+    }
+    else parseAnnotationElement.flatMap(elem => parseArrayOfAnnotationElement(List(elem)))
+  }
+
+  /* ArrayOfAnnotationElement
+   *  : '{' ( AnnotationElement # ( ',' AnnotationElement ).* ).? ','.? '}'
+   */
+  private def parseArrayOfAnnotationElement(array: List[AnnotationElement]): Try[ArrayOfAnnotationElement] = {
+    if (read(',')) {
+      if (read('}')) Success(ArrayOfAnnotationElement(array))
+      else parseAnnotationElement match {
+        case Success(elem) => parseArrayOfAnnotationElement(array :+ elem)
+        case Failure(e)    => Failure(e)
+      }
+    }
+    else if (read('}')) Success(ArrayOfAnnotationElement(array))
+    else Failure(parseError("',' or '}'"))
+  }
+
+  /* ClassDeclaration
+   *  : List[ModuleModifier] "class" # Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   */
+  private def parseClassDeclaration (modifiers: List[ModuleModifier]): Try[ClassDeclaration] = for {
+    name           <- parseIdentifier
+    typeParameters <- parseTypeParameters
+    extendsClass   <- parseExtendsClass
+    interfaces     <- parseImplementsInterfaces
+    members        <- parseClassBody
+  } yield ClassDeclaration(modifiers, name, typeParameters, extendsClass, interfaces, members)
 
   /* List[TypeParameter]
    *  : # ( '<' TypeParameter ( ',' TypeParameter ).* '>' ).?
@@ -276,6 +327,54 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
     }
     else Success(TypeParameter(name, bounds))
   }
+
+  /* ExtendsClass
+   *  : ( "extends" ClassTypeName ).?
+   */
+  private def parseExtendsClass: Try[Option[ClassTypeName]] = {
+    if (read("extends")) parseClassTypeName.map(Some(_))
+    else Success(None)
+  }
+
+  /* ImplementsInterfaces
+   *  : # ( "implements" ClassTypeName ( ',' ClassTypeName ).* ).?
+   */
+  private def parseImplementsInterfaces: Try[List[ClassTypeName]] = {
+    if (read("implements")) parseClassTypeName.flatMap(i => parseImplementsInterfaces(List(i)))
+    else Success(Nil)
+  }
+
+  /* ImplementsInterfaces
+   *  : ( "implements" ClassTypeName # ( ',' ClassTypeName ).* ).?
+   */
+  private def parseImplementsInterfaces(interfaces: List[ClassTypeName]): Try[List[ClassTypeName]] = {
+    if (read(',')) parseClassTypeName match {
+      case Success(i) => parseImplementsInterfaces(interfaces :+ i)
+      case Failure(e) => Failure(e)
+    }
+    else Success(interfaces)
+  }
+
+  /* ClassBody
+   *  : # '{' ClassMember.* '}'
+   */
+  private def parseClassBody: Try[List[ClassMember]] = parseToken('{').flatMap(_ => parseClassBody(Nil))
+
+  /* ClassBody
+   *  : '{' # ClassMember.* '}'
+   */
+  private def parseClassBody(members: List[ClassMember]): Try[List[ClassMember]] = {
+    if (read('}')) Success(members)
+    else parseClassMember match {
+      case Success(member) => parseClassBody(members :+ member)
+      case Failure(e) => Failure(e)
+    }
+  }
+
+  /* ClassMember
+   *
+   */
+  private def parseClassMember: Try[ClassMember] = ???
 
   /* TypeName
    *  : # ClassTypeName ( '[' ']' ).*
@@ -363,6 +462,8 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
     else QualifiedName(names)
   }
 
+  private def parseExpressionSnippet: Try[ExpressionSnippet] = reader.nextExpression.map(new ExpressionSnippet(_))
+
   private def parseIdentifier: Try[String] = reader.next match {
     case IdentifierToken(id, _) => Success(id)
     case token => Failure(parseError("identifier", token))
@@ -428,7 +529,7 @@ case class DescendingDSLPrecedence (names: List[QualifiedName]) extends DSLPrece
 
 sealed trait ModuleDeclaration
 
-case class ClassDeclaration (modifiers: List[ModuleModifier], name: String) extends ModuleDeclaration
+case class ClassDeclaration (modifiers: List[ModuleModifier], name: String, typeParameters: List[TypeParameter], superClass: Option[ClassTypeName], interfaces: List[ClassTypeName], members: List[ClassMember]) extends ModuleDeclaration
 
 sealed trait PrjModifier
 
@@ -451,11 +552,19 @@ case object AutoCloseModifier extends ModuleModifier
 case object PropagateModifier extends ModuleModifier
 case object PureModifier extends ModuleModifier with MemberModifier
 
-sealed trait AnnotationModifier extends ModuleModifier with MemberModifier
+sealed trait AnnotationElement
+sealed trait Annotation extends ModuleModifier with MemberModifier with AnnotationElement
 
-case class FullAnnotation (name: QualifiedName, args: Map[String, String]) extends AnnotationModifier
-case class SingleElementAnnotation (name: QualifiedName, arg: String) extends AnnotationModifier
-case class MarkerAnnotation (name: QualifiedName) extends AnnotationModifier
+case class FullAnnotation (name: QualifiedName, args: Map[String, AnnotationElement]) extends Annotation
+case class SingleElementAnnotation (name: QualifiedName, arg: AnnotationElement) extends Annotation
+case class MarkerAnnotation (name: QualifiedName) extends Annotation
+
+case class ExpressionSnippet (snippet: Snippet) extends AnnotationElement
+case class ArrayOfAnnotationElement (array: List[AnnotationElement]) extends AnnotationElement
+
+sealed trait ClassMember
+
+case class ConstructorDeclaration (modifiers: List[MemberModifier], typeParameters: List[TypeParameter], throws: List[TypeName], body: String)
 
 case class TypeParameter (name: String, bounds: List[ClassTypeName])
 

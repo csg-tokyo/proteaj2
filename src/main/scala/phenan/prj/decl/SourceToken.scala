@@ -17,6 +17,7 @@ case class StringLitToken (lit: String, line: Int) extends SourceToken
 
 case class SymbolToken (ch: Int, line: Int) extends SourceToken {
   override def is (sym: Int): Boolean = this.ch == sym
+  override def toString: String = new String(Character.toChars(ch))
 }
 
 case class Whitespaces (ws: String, line: Int) extends SourceToken
@@ -27,3 +28,5 @@ case object EndOfSource extends SourceToken {
 }
 
 case class InvalidToken (line: Int) extends SourceToken
+
+case class Snippet (src: String, line: Int)

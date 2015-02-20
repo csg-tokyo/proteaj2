@@ -30,7 +30,10 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
 
   def nextBlock: Try[String] = ???
 
-  def nextExpression: Try[String] = readUntilEndOfExpr(new SBuilder, 0)
+  def nextExpression: Try[Snippet] = {
+    val l = line
+    readUntilEndOfExpr(new SBuilder, 0).map(Snippet(_, l))
+  }
 
   def skipUntil (f: SourceToken => Boolean): SourceToken = {
     while (! eof && ! f(head)) next
@@ -90,27 +93,34 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
 
   private def readUntilEndOfExpr (buf: SBuilder, pars: Int): Try[String] = {
     if (queue.nonEmpty) queue.head match {
-      case SymbolToken('(', _) =>
+      case s @ SymbolToken('(' | '{', _) =>
         queue = queue.tail
-        readUntilEndOfExpr(buf.appendCodePoint('('), pars + 1)
-      case SymbolToken(')', _) if pars > 0 =>
+        nFetched -= 1
+        readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars + 1)
+      case s @ SymbolToken(')' | '}', _) if pars > 0 =>
         queue = queue.tail
-        readUntilEndOfExpr(buf.appendCodePoint(')'), pars - 1)
-      case SymbolToken(')' | ',' | ';', _) =>
+        nFetched -= 1
+        readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars - 1)
+      case SymbolToken(')' | '}' | ',' | ';', _) =>
         Success(buf.toString)
       case InvalidToken(_) =>
         Failure(ParseException("invalid token"))
+      case Whitespaces(ws, _) =>
+        queue = queue.tail
+        readUntilEndOfExpr(buf.append(ws), pars)
       case token =>
         queue = queue.tail
+        nFetched -= 1
         readUntilEndOfExpr(appendToken(buf, token), pars)
     }
     else readNext() match {
-      case Some(SymbolToken('(', _)) =>
-        readUntilEndOfExpr(buf.appendCodePoint('('), pars + 1)
-      case Some(SymbolToken(')', _)) if pars > 0 =>
-        readUntilEndOfExpr(buf.appendCodePoint(')'), pars - 1)
-      case Some(s @ SymbolToken(')' | ',' | ';', _)) =>
+      case Some(s @ SymbolToken('(' | '{', _)) =>
+        readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars + 1)
+      case Some(s @ SymbolToken(')' | '}', _)) if pars > 0 =>
+        readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars - 1)
+      case Some(s @ SymbolToken(')' | '}' | ',' | ';', _)) =>
         queue = queue :+ s
+        nFetched += 1
         Success(buf.toString)
       case Some(InvalidToken(_)) =>
         Failure(ParseException("invalid token"))
