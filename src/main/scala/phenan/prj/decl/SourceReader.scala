@@ -23,6 +23,11 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
     discard(0)
   }
 
+  def next (n: Int): SourceToken = {
+    fetch(n)
+    discard(n)
+  }
+
   def nextBlock: Try[String] = ???
 
   def nextExpression: Try[String] = readUntilEndOfExpr(new SBuilder, 0)

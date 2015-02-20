@@ -3,13 +3,12 @@ package phenan.prj.decl
 trait ASTUtil {
   def packageDcl (names: String*): PackageDeclaration = PackageDeclaration(qualifiedName(names:_*))
   def classImport (names: String*): SingleClassImportDeclaration = SingleClassImportDeclaration(qualifiedName(names:_*))
-  def packageImport (names: String*): PackageImportDeclaration = PackageImportDeclaration(qualifiedStar(names:_*))
+  def packageImport (names: String*): PackageImportDeclaration = PackageImportDeclaration(qualifiedName(names:_*))
   def staticImport (names: String*): StaticMemberImportDeclaration = StaticMemberImportDeclaration(qualifiedName(names:_*))
-  def staticImportAll (names: String*): AllStaticMembersImportDeclaration = AllStaticMembersImportDeclaration(qualifiedStar(names:_*))
+  def staticImportAll (names: String*): AllStaticMembersImportDeclaration = AllStaticMembersImportDeclaration(qualifiedName(names:_*))
   def dslImport (names: String*): DSLImportDeclaration = DSLImportDeclaration(qualifiedName(names:_*), None)
 
   def qualifiedName (names: String*): QualifiedName = QualifiedName(names.toList)
-  def qualifiedStar (names: String*): QualifiedStar = QualifiedStar(names.toList)
 
   implicit class DSLImportDclOps (d : DSLImportDeclaration) {
     def < (names: QualifiedName): DSLImportDeclaration = DSLImportDeclaration(d.name, d.precedence match {

@@ -80,9 +80,9 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ImportDeclaration
-   *  : StaticImportDeclaration   ; "import" # "static" QualifiedNameOrStar ';'
+   *  : StaticImportDeclaration   ; "import" # "static" QualifiedName [ '.' '*' ] ';'
    *  | DSLImportDeclaration      ; "import" # "dsl" QualifiedName DSLPrecedence ';'
-   *  | ClassImportDeclaration    ; "import" # QualifiedNameOrStar ';'
+   *  | ClassImportDeclaration    ; "import" # QualifiedName [ '.' '*' ] ';'
    */
   private def parseImportDeclaration: Try[ImportDeclaration] = {
     if (read("static")) parseStaticImportDeclaration
@@ -91,17 +91,15 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* StaticImportDeclaration
-   *  : StaticMemberImportDeclaration       ; "import" "static" # QualifiedName ';'
-   *  | AllStaticMembersImportDeclaration   ; "import" "static" # QualifiedStar ';'
+   *  : "import" "static" # QualifiedName [ '.' '*' ] ';'
    */
-  private def parseStaticImportDeclaration: Try[StaticImportDeclaration] = for {
-    name <- parseQualifiedNameOrStar
-    _    <- parseToken(';')
-  } yield makeStaticImportDeclaration(name)
-
-  private def makeStaticImportDeclaration (name: QualifiedNameOrStar): StaticImportDeclaration = name match {
-    case q: QualifiedName => StaticMemberImportDeclaration(q)
-    case q: QualifiedStar => AllStaticMembersImportDeclaration(q)
+  private def parseStaticImportDeclaration: Try[StaticImportDeclaration] = parseQualifiedName.flatMap { name =>
+    if (reader.look(0).is('.') && reader.look(1).is('*') && reader.look(2).is(';')) {
+      reader.next(2)
+      Success(AllStaticMembersImportDeclaration(name))
+    }
+    else if (read(';')) Success(StaticMemberImportDeclaration(name))
+    else Failure(parseError("'.*' or ';'"))
   }
 
   /* DSLImportDeclaration
@@ -146,17 +144,15 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ClassImportDeclaration
-   *  : SingleClassImportDeclaration  ; "import" # QualifiedName ';'
-   *  | PackageImportDeclaration      ; "import" # QualifiedStar ';'
+   *  : "import" # QualifiedName [ '.' '*' ] ';'
    */
-  private def parseClassImportDeclaration: Try[ClassImportDeclaration] = for {
-    name <- parseQualifiedNameOrStar
-    _    <- parseToken(';')
-  } yield makeClassImportDeclaration(name)
-
-  private def makeClassImportDeclaration (name: QualifiedNameOrStar): ClassImportDeclaration = name match {
-    case q: QualifiedName => SingleClassImportDeclaration(q)
-    case q: QualifiedStar => PackageImportDeclaration(q)
+  private def parseClassImportDeclaration: Try[ClassImportDeclaration] = parseQualifiedName.flatMap { name =>
+    if (reader.look(0).is('.') && reader.look(1).is('*') && reader.look(2).is(';')) {
+      reader.next(2)
+      Success(PackageImportDeclaration(name))
+    }
+    else if (read(';')) Success(SingleClassImportDeclaration(name))
+    else Failure(parseError("'.*' or ';'"))
   }
 
   /* List[ModuleDeclaration]
@@ -345,49 +341,26 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
     else Success(WildcardType(None, None))
   }
 
-  /* QualifiedNameOrStar
-   *  : QualifiedName   ; # Identifier ( '.' Identifier ).*
-   *  | QualifiedStar   ; # Identifier ( '.' Identifier ).* '.' '*'
-   */
-  private def parseQualifiedNameOrStar: Try[QualifiedNameOrStar] = reader.next match {
-    case IdentifierToken(id, _) =>
-      parseQualifiedNameOrStar(List(id))
-    case token =>
-      Failure(parseError("identifier", token))
-  }
-
-  /* QualifiedNameOrStar
-   *  : QualifiedName   ; Identifier # ( '.' Identifier ).*
-   *  | QualifiedStar   ; Identifier # ( '.' Identifier ).* '.' '*'
-   */
-  private def parseQualifiedNameOrStar (names: List[String]): Try[QualifiedNameOrStar] = {
-    if (read('.')) reader.next match {
-      case IdentifierToken(id, _) => parseQualifiedNameOrStar(names :+ id)
-      case SymbolToken('*', _)    => Success(QualifiedStar(names))
-      case token                  => Failure(parseError("identifier or '*'", token))
-    }
-    else Success(QualifiedName(names))
-  }
-
   /* QualifiedName
    *  : # Identifier ( '.' Identifier ).*
    */
   private def parseQualifiedName: Try[QualifiedName] = reader.next match {
-    case IdentifierToken(id, _) =>
-      parseQualifiedName(List(id))
-    case token =>
-      Failure(parseError("identifier", token))
+    case IdentifierToken(id, _) => Success(parseQualifiedName(List(id)))
+    case token => Failure(parseError("identifier", token))
   }
 
   /* QualifiedName
    *  : Identifier # ( '.' Identifier ).*
    */
-  private def parseQualifiedName (names: List[String]): Try[QualifiedName] = {
-    if (read('.')) reader.next match {
-      case IdentifierToken(id, _) => parseQualifiedName(names :+ id)
-      case token                  => Failure(parseError("identifier", token))
+  private def parseQualifiedName (names: List[String]): QualifiedName = {
+    if (reader.look(0).is('.')) reader.look(1) match {
+      case IdentifierToken(id, _) =>
+        reader.next
+        reader.next
+        parseQualifiedName(names :+ id)
+      case _ => QualifiedName(names)
     }
-    else Success(QualifiedName(names))
+    else QualifiedName(names)
   }
 
   private def parseIdentifier: Try[String] = reader.next match {
@@ -437,13 +410,13 @@ sealed trait ClassImportDeclaration extends ImportDeclaration
 
 case class SingleClassImportDeclaration (name: QualifiedName) extends ClassImportDeclaration
 
-case class PackageImportDeclaration (name: QualifiedStar) extends ClassImportDeclaration
+case class PackageImportDeclaration (name: QualifiedName) extends ClassImportDeclaration
 
 sealed trait StaticImportDeclaration extends ImportDeclaration
 
 case class StaticMemberImportDeclaration (name: QualifiedName) extends StaticImportDeclaration
 
-case class AllStaticMembersImportDeclaration (name: QualifiedStar) extends StaticImportDeclaration
+case class AllStaticMembersImportDeclaration (name: QualifiedName) extends StaticImportDeclaration
 
 case class DSLImportDeclaration (name: QualifiedName, precedence: Option[DSLPrecedence]) extends ImportDeclaration
 
@@ -493,11 +466,8 @@ case class ClassTypeName (name: QualifiedName, args: List[TypeArgument]) extends
 case class ArrayTypeName (component: TypeName) extends TypeName
 case class WildcardType (upper: Option[TypeName], lower: Option[TypeName]) extends TypeArgument
 
-sealed trait QualifiedNameOrStar
+case class QualifiedName (names: List[String])
 
-case class QualifiedName (names: List[String]) extends QualifiedNameOrStar
-
-case class QualifiedStar (names: List[String]) extends QualifiedNameOrStar
 
 
 

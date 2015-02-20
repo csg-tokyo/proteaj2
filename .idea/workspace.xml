@@ -5,8 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1a2bfb5f-48ff-4e99-a1e6-cdebd652ef95" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/ASTUtil.scala" afterPath="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/ASTUtil.scala" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/DeclarationParser.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/DeclarationParser.scala" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala" afterPath="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
     <ignored path="prj.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -37,8 +39,8 @@
       <file leaf-file-name="SourceReader.scala" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="60" max-vertical-offset="5250">
-              <caret line="41" column="29" selection-start-line="41" selection-start-column="29" selection-end-line="41" selection-end-column="29" />
+            <state vertical-scroll-proportion="0.0" vertical-offset="60" max-vertical-offset="5325">
+              <caret line="26" column="12" selection-start-line="26" selection-start-column="12" selection-end-line="26" selection-end-column="12" />
               <folding>
                 <element signature="e#25#41#0" expanded="true" />
               </folding>
@@ -49,8 +51,8 @@
       <file leaf-file-name="DeclarationParser.scala" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/DeclarationParser.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="1.539519" vertical-offset="3439" max-vertical-offset="7635">
-              <caret line="289" column="24" selection-start-line="289" selection-start-column="24" selection-end-line="289" selection-end-column="24" />
+            <state vertical-scroll-proportion="8.78866" vertical-offset="0" max-vertical-offset="7185">
+              <caret line="341" column="3" selection-start-line="341" selection-start-column="3" selection-end-line="341" selection-end-column="3" />
               <folding>
                 <element signature="e#25#41#0" expanded="true" />
               </folding>
@@ -66,16 +68,6 @@
               <folding>
                 <element signature="e#25#41#0" expanded="true" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="ASTUtil.scala" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/test/scala/phenan/prj/decl/ASTUtil.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="480">
-              <caret line="22" column="49" selection-start-line="22" selection-start-column="49" selection-end-line="22" selection-end-column="49" />
-              <folding />
             </state>
           </provider>
         </entry>
@@ -96,7 +88,7 @@
         <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceToken.scala">
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="525">
-              <caret line="5" column="38" selection-start-line="5" selection-start-column="38" selection-end-line="5" selection-end-column="38" />
+              <caret line="6" column="0" selection-start-line="6" selection-start-column="0" selection-end-line="6" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -155,11 +147,11 @@
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/exception/ParseException.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/state/JState.scala" />
         <option value="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/DeclarationParserTest.scala" />
-        <option value="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/ASTUtil.scala" />
         <option value="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/AllTests.scala" />
         <option value="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/SourceReaderTest.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceToken.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala" />
+        <option value="$PROJECT_DIR$/src/test/scala/phenan/prj/decl/ASTUtil.scala" />
         <option value="$PROJECT_DIR$/src/main/scala/phenan/prj/decl/DeclarationParser.scala" />
       </list>
     </option>
@@ -1706,14 +1698,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceToken.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="525">
-          <caret line="5" column="38" selection-start-line="5" selection-start-column="38" selection-end-line="5" selection-end-column="38" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/test/scala/phenan/prj/decl/SourceReaderTest.scala">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0" vertical-offset="1564" max-vertical-offset="2445">
@@ -1724,10 +1708,28 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceToken.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="525">
+          <caret line="6" column="0" selection-start-line="6" selection-start-column="0" selection-end-line="6" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0" vertical-offset="60" max-vertical-offset="5325">
+          <caret line="26" column="12" selection-start-line="26" selection-start-column="12" selection-end-line="26" selection-end-column="12" />
+          <folding>
+            <element signature="e#25#41#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/test/scala/phenan/prj/decl/ASTUtil.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="480">
-          <caret line="22" column="49" selection-start-line="22" selection-start-column="49" selection-end-line="22" selection-end-column="49" />
+        <state vertical-scroll-proportion="0.12886597" vertical-offset="0" max-vertical-offset="582">
+          <caret line="5" column="114" selection-start-line="5" selection-start-column="114" selection-end-line="5" selection-end-column="114" />
           <folding />
         </state>
       </provider>
@@ -1742,20 +1744,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/SourceReader.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="60" max-vertical-offset="5250">
-          <caret line="41" column="29" selection-start-line="41" selection-start-column="29" selection-end-line="41" selection-end-column="29" />
-          <folding>
-            <element signature="e#25#41#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/main/scala/phenan/prj/decl/DeclarationParser.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="1.539519" vertical-offset="3439" max-vertical-offset="7635">
-          <caret line="289" column="24" selection-start-line="289" selection-start-column="24" selection-end-line="289" selection-end-column="24" />
+        <state vertical-scroll-proportion="8.78866" vertical-offset="0" max-vertical-offset="7185">
+          <caret line="341" column="3" selection-start-line="341" selection-start-column="3" selection-end-line="341" selection-end-column="3" />
           <folding>
             <element signature="e#25#41#0" expanded="true" />
           </folding>
