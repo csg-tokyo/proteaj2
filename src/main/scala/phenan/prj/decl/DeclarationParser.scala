@@ -161,7 +161,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   private def parseModuleDeclarations (modules: List[ModuleDeclaration]):  List[ModuleDeclaration] = {
     val pos = reader.position
     if (reader.eof) modules
-    else parseModuleDeclaration match {
+    else parseModifiers.flatMap(parseModuleDeclaration) match {
       case Success(m) => parseModuleDeclarations(modules :+ m)
       case Failure(e) =>
         state.error("parse error : invalid module declaration", e)
@@ -171,41 +171,44 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ModuleDeclaration
-   *  : ClassDeclaration         ; # ModuleModifiers "class" Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
-   *  | EnumDeclaration          ; # ModuleModifiers "enum" Identifier ImplementsInterfaces EnumBody
-   *  | InterfaceDeclaration     ; # ModuleModifiers "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
-   *  | AnnotationDeclaration    ; # ModuleModifiers '@' "interface" Identifier AnnotationBody
-   *  | DSLDeclaration           ; # ModuleModifiers "dsl" Identifier DependsDSLs DSLBody
+   *  : ClassDeclaration         ; # Modifiers "class" Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   *  | EnumDeclaration          ; # Modifiers "enum" Identifier ImplementsInterfaces EnumBody
+   *  | InterfaceDeclaration     ; # Modifiers "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
+   *  | AnnotationDeclaration    ; # Modifiers '@' "interface" Identifier AnnotationBody
+   *  | DSLDeclaration           ; # Modifiers "dsl" Identifier DependsDSLs DSLBody
    */
-  private def parseModuleDeclaration: Try[ModuleDeclaration] = parseModuleModifiers.flatMap { modifiers =>
+  private def parseModuleDeclaration (modifiers: List[Modifier]): Try[ModuleDeclaration] = {
     if (read("class")) parseClassDeclaration(modifiers)
     else ???
   }
 
-  /* ModuleModifiers
-   *  : ( Annotation | PublicModifier | PrivateModifier | ProtectedModifier
-   *    | StaticModifier | FinalModifier | AbstractModifier | StrictFPModifier
+  /* Modifiers
+   *  : ( Annotation        | PublicModifier    | PrivateModifier      | ProtectedModifier
+   *    | StaticModifier    | FinalModifier     | SynchronizedModifier | VolatileModifier
+   *    | TransientModifier | NativeModifier    | AbstractModifier     | StrictFPModifier
    *    | AutoCloseModifier | PropagateModifier | PureModifier ).*
    */
-  private def parseModuleModifiers: Try[List[Modifier]] = parseModuleModifiers(Nil)
+  private def parseModifiers: Try[List[Modifier]] = parseModifiers(Nil)
 
-  private def parseModuleModifiers (list: List[Modifier]): Try[List[Modifier]] = reader.head match {
+  private def parseModifiers (list: List[Modifier]): Try[List[Modifier]] = reader.head match {
     case SymbolToken('@', _) =>
       reader.next  // '@'
       parseAnnotation match {
-        case Success(ann) => parseModuleModifiers(list :+ ann)
+        case Success(ann) => parseModifiers(list :+ ann)
         case Failure(e) => Failure(e)
       }
-    case IdentifierToken(id, _) if moduleModifiers.contains(id) =>
+    case IdentifierToken(id, _) if modifiers.contains(id) =>
       reader.next  // id
-      parseModuleModifiers(list :+ moduleModifiers(id))
+      parseModifiers(list :+ modifiers(id))
     case _ => Success(list)
   }
 
-  private val moduleModifiers: Map[String, Modifier] = Map(
+  private val modifiers: Map[String, Modifier] = Map(
     "public" -> PublicModifier, "private" -> PrivateModifier, "protected" -> ProtectedModifier,
-    "static" -> StaticModifier, "final" -> FinalModifier, "abstract" -> AbstractModifier,
-    "strictfp" -> StrictFPModifier, "autoclose" -> AutoCloseModifier, "propagate" -> PropagateModifier, "pure" -> PureModifier
+    "static" -> StaticModifier, "final" -> FinalModifier, "synchronized" -> SynchronizedModifier,
+    "volatile" -> VolatileModifier, "transient" -> TransientModifier, "native" -> NativeModifier,
+    "abstract" -> AbstractModifier, "strictfp" -> StrictFPModifier, "autoclose" -> AutoCloseModifier,
+    "propagate" -> PropagateModifier, "pure" -> PureModifier
   )
 
   /* Annotation
@@ -280,7 +283,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ClassDeclaration
-   *  : ModuleModifiers "class" # Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   *  : Modifiers "class" # Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
    */
   private def parseClassDeclaration (modifiers: List[Modifier]): Try[ClassDeclaration] = for {
     name           <- parseIdentifier
@@ -373,14 +376,25 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ClassMember
-   *  : InstanceInitializer
-   *  | StaticInitializer
-   *  | ConstructorDeclaration
-   *  | FieldDeclaration
-   *  | MethodDeclaration
-   *  | ModuleDeclaration
+   *  : InstanceInitializer      ; # BlockSnippet
+   *  | StaticInitializer        ; # "static" BlockSnippet
+   *  | ConstructorDeclaration   ; # Modifiers List[TypeParameter] ClassName List[FormalParameter] ThrowsExceptions BlockSnippet
+   *  | FieldDeclaration         ; # Modifiers TypeName List[VariableDeclarator] ';'
+   *  | MethodDeclaration        ; # Modifiers List[TypeParameter] TypeName Identifier List[FormalParameter] ThrowsExceptions MethodBody
+   *  | ClassDeclaration         ; # Modifiers "class" Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   *  | EnumDeclaration          ; # Modifiers "enum" Identifier ImplementsInterfaces EnumBody
+   *  | InterfaceDeclaration     ; # Modifiers "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
+   *  | AnnotationDeclaration    ; # Modifiers '@' "interface" Identifier AnnotationBody
+   *  | DSLDeclaration           ; # Modifiers "dsl" Identifier DependsDSLs DSLBody
    */
-  private def parseClassMember: Try[ClassMember] = ???
+  private def parseClassMember: Try[ClassMember] = {
+    if (read('{')) ???
+    else ???
+  }
+
+  /* InstanceInitializer
+   *  :
+   */
 
   /* TypeName
    *  : # ClassTypeName ( '[' ']' ).*
@@ -468,7 +482,22 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
     else QualifiedName(names)
   }
 
+  /* ExpressionSnippet
+   *  : # ... ( ')' | '}' | ',' | ';' )
+   *
+   * Note.
+   * (1) the last ( ')' | '}' | ',' | ';' ) is not included in ExpressionSnippet.
+   * (2) all parentheses and curly braces opened in ... must be closed at the inside of ...
+   */
   private def parseExpressionSnippet: Try[ExpressionSnippet] = reader.nextExpression.map(new ExpressionSnippet(_))
+
+  /* BlockSnippet
+   *  : '{' # ... '}'
+   *
+   * Note.
+   * (1) all curly braces opened in ... must be closed at the inside of ...
+   */
+  private def parseBlockSnippet: Try[BlockSnippet] = reader.nextBlock.map(new BlockSnippet(_))
 
   private def parseIdentifier: Try[String] = reader.next match {
     case IdentifierToken(id, _) => Success(id)
@@ -536,6 +565,39 @@ case class DescendingDSLPrecedence (names: List[QualifiedName]) extends DSLPrece
 sealed trait ModuleDeclaration extends ClassMember
 
 case class ClassDeclaration (modifiers: List[Modifier], name: String, typeParameters: List[TypeParameter], superClass: Option[ClassTypeName], interfaces: List[ClassTypeName], members: List[ClassMember]) extends ModuleDeclaration
+case class EnumDeclaration (modifiers: List[Modifier], name: String, interfaces: List[ClassTypeName], enumConstants: List[EnumConstant], members: List[ClassMember]) extends ModuleDeclaration
+case class InterfaceDeclaration (modifiers: List[Modifier], name: String, typeParameters: List[TypeParameter], superInterfaces: List[ClassTypeName], members: List[ClassMember]) extends ModuleDeclaration
+case class AnnotationDeclaration (modifiers: List[Modifier], name: String, members: List[AnnotationMember]) extends ModuleDeclaration
+case class DSLDeclaration (modifiers: List[Modifier], name: String, withDSLs: Option[DependsDSLs], members: List[DSLMember]) extends ModuleDeclaration
+
+sealed trait ClassMember
+sealed trait AnnotationMember
+sealed trait DSLMember
+sealed trait ContextMember
+
+case class InstanceInitializer (block: BlockSnippet) extends ClassMember
+case class StaticInitializer (block: BlockSnippet) extends ClassMember
+case class ConstructorDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], formalParameters: List[FormalParameter], throws: List[TypeName], body: BlockSnippet) extends ClassMember with ContextMember
+case class FieldDeclaration (modifiers: List[Modifier], fieldType: TypeName, declarators: List[VariableDeclarator]) extends ClassMember with DSLMember with ContextMember
+case class MethodDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], returnType: TypeName, name: String, formalParameters: List[FormalParameter], throws: List[TypeName], body: Option[BlockSnippet]) extends ClassMember
+case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], typeParameters: List[TypeParameter], returnType: TypeName, syntax: List[SyntaxElement], formalParameters: List[FormalParameter], throws: List[TypeName], body: Option[BlockSnippet]) extends DSLMember with ContextMember
+case class PrioritiesDeclaration (names: List[String], constraints: List[Constraint]) extends DSLMember
+
+case class ContextDeclaration (modifiers: List[Modifier], name: String, typeParameters: List[TypeParameter], superClass: Option[ClassTypeName], interfaces: List[ClassTypeName], members: List[ContextMember]) extends DSLMember
+
+case class FormalParameter (modifiers: List[Modifier], parameterType: TypeName, name: String, dim: Int)
+case class VariableDeclarator (name: String, dim: Int, initializer: Option[ExpressionSnippet])
+
+case class EnumConstant (annotations: List[Annotation], name: String, arguments: List[ExpressionSnippet], members: List[ClassMember])
+
+sealed trait SyntaxElement
+
+
+sealed trait Constraint
+
+sealed trait DependsDSLs
+case class AscendingOrder (names: List[QualifiedName]) extends DependsDSLs
+case class DescendingOrder (names: List[QualifiedName]) extends DependsDSLs
 
 sealed trait Modifier
 
@@ -562,12 +624,10 @@ case class FullAnnotation (name: QualifiedName, args: Map[String, AnnotationElem
 case class SingleElementAnnotation (name: QualifiedName, arg: AnnotationElement) extends Annotation
 case class MarkerAnnotation (name: QualifiedName) extends Annotation
 
-case class ExpressionSnippet (snippet: Snippet) extends AnnotationElement
 case class ArrayOfAnnotationElement (array: List[AnnotationElement]) extends AnnotationElement
+case class ExpressionSnippet (snippet: Snippet) extends AnnotationElement
 
-sealed trait ClassMember
-
-case class ConstructorDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], throws: List[TypeName], body: String)
+case class BlockSnippet (snippet: Snippet)
 
 case class TypeParameter (name: String, bounds: List[ClassTypeName])
 
@@ -579,7 +639,3 @@ case class ArrayTypeName (component: TypeName) extends TypeName
 case class WildcardType (upper: Option[TypeName], lower: Option[TypeName]) extends TypeArgument
 
 case class QualifiedName (names: List[String])
-
-
-
-

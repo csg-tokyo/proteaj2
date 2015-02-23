@@ -28,7 +28,10 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
     discard(n)
   }
 
-  def nextBlock: Try[String] = ???
+  def nextBlock: Try[Snippet] = {
+    val l = line
+    readUntilEndOfBlock(new SBuilder, 0).map(Snippet(_, l))
+  }
 
   def nextExpression: Try[Snippet] = {
     val l = line
@@ -92,6 +95,7 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
   }
 
   private def readUntilEndOfExpr (buf: SBuilder, pars: Int): Try[String] = {
+    fetch(0)
     if (queue.nonEmpty) queue.head match {
       case s @ SymbolToken('(' | '{', _) =>
         queue = queue.tail
@@ -103,32 +107,43 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
         readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars - 1)
       case SymbolToken(')' | '}' | ',' | ';', _) =>
         Success(buf.toString)
-      case InvalidToken(_) =>
-        Failure(ParseException("invalid token"))
       case Whitespaces(ws, _) =>
         queue = queue.tail
         readUntilEndOfExpr(buf.append(ws), pars)
+      case InvalidToken(_) =>
+        Failure(ParseException("invalid token"))
       case token =>
         queue = queue.tail
         nFetched -= 1
         readUntilEndOfExpr(appendToken(buf, token), pars)
     }
-    else readNext() match {
-      case Some(s @ SymbolToken('(' | '{', _)) =>
-        readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars + 1)
-      case Some(s @ SymbolToken(')' | '}', _)) if pars > 0 =>
-        readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars - 1)
-      case Some(s @ SymbolToken(')' | '}' | ',' | ';', _)) =>
-        queue = queue :+ s
-        nFetched += 1
+    else Failure(ParseException("end of expression is not found"))
+  }
+
+  private def readUntilEndOfBlock (buf: SBuilder, braces: Int): Try[String] = {
+    fetch(0)
+    if (queue.nonEmpty) queue.head match {
+      case s @ SymbolToken('{', _) =>
+        queue = queue.tail
+        nFetched -= 1
+        readUntilEndOfBlock(buf.appendCodePoint(s.ch), braces + 1)
+      case s @ SymbolToken('}', _) if braces > 0 =>
+        queue = queue.tail
+        nFetched -= 1
+        readUntilEndOfBlock(buf.appendCodePoint(s.ch), braces - 1)
+      case SymbolToken('}', _) =>
         Success(buf.toString)
-      case Some(InvalidToken(_)) =>
+      case Whitespaces(ws, _) =>
+        queue = queue.tail
+        readUntilEndOfBlock(buf.append(ws), braces)
+      case InvalidToken(_) =>
         Failure(ParseException("invalid token"))
-      case Some(token) =>
-        readUntilEndOfExpr(appendToken(buf, token), pars)
-      case None =>
-        Failure(ParseException("end of expression is not found"))
+      case token =>
+        queue = queue.tail
+        nFetched -= 1
+        readUntilEndOfBlock(appendToken(buf, token), braces)
     }
+    else Failure(ParseException("end of block is not found"))
   }
 
   private def appendToken (buf: SBuilder, token: SourceToken): SBuilder = token match {

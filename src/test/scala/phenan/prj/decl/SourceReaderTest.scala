@@ -147,6 +147,50 @@ class SourceReaderTest extends FunSuite with Matchers {
     in.next shouldBe EndOfSource
   }
 
+  test("単純なブロックの取得") {
+    val src = """ { a b c d } """
+    val in = SourceReader(source(src)).get
+
+    in.next shouldBe SymbolToken('{', 1)
+    in.nextBlock shouldBe Success(Snippet(" a b c d ", 1))
+    in.next shouldBe SymbolToken('}', 1)
+    in.next shouldBe EndOfSource
+  }
+
+  test("中括弧を含むブロックの取得") {
+    val src =
+      """int fib (int n) {
+        |  if (n < 2) return 1;
+        |  else {
+        |    int a = fib(n - 1);
+        |    int b = fib(n - 2);
+        |    return a + b;
+        |  }
+        |} """.stripMargin
+    val in = SourceReader(source(src)).get
+
+    val body =
+      """
+        |  if (n < 2) return 1;
+        |  else {
+        |    int a = fib(n - 1);
+        |    int b = fib(n - 2);
+        |    return a + b;
+        |  }
+        |""".stripMargin
+
+    in.next shouldBe IdentifierToken("int", 1)
+    in.next shouldBe IdentifierToken("fib", 1)
+    in.next shouldBe SymbolToken('(', 1)
+    in.next shouldBe IdentifierToken("int", 1)
+    in.next shouldBe IdentifierToken("n", 1)
+    in.next shouldBe SymbolToken(')', 1)
+    in.next shouldBe SymbolToken('{', 1)
+    in.nextBlock shouldBe Success(Snippet(body, 1))
+    in.next shouldBe SymbolToken('}', 8)
+    in.next shouldBe EndOfSource
+  }
+
   test("正常終了したか") {
     state.clean()
     state.errors shouldBe 0
