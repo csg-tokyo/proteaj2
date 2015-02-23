@@ -171,25 +171,25 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ModuleDeclaration
-   *  : ClassDeclaration         ; # List[ModuleModifier] "class" Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
-   *  | EnumDeclaration          ; # List[ModuleModifier] "enum" Identifier ImplementsInterfaces EnumBody
-   *  | InterfaceDeclaration     ; # List[ModuleModifier] "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
-   *  | AnnotationDeclaration    ; # List[ModuleModifier] '@' "interface" Identifier AnnotationBody
-   *  | DSLDeclaration           ; # List[ModuleModifier] "dsl" Identifier DependsDSLs DSLBody
+   *  : ClassDeclaration         ; # ModuleModifiers "class" Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   *  | EnumDeclaration          ; # ModuleModifiers "enum" Identifier ImplementsInterfaces EnumBody
+   *  | InterfaceDeclaration     ; # ModuleModifiers "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
+   *  | AnnotationDeclaration    ; # ModuleModifiers '@' "interface" Identifier AnnotationBody
+   *  | DSLDeclaration           ; # ModuleModifiers "dsl" Identifier DependsDSLs DSLBody
    */
   private def parseModuleDeclaration: Try[ModuleDeclaration] = parseModuleModifiers.flatMap { modifiers =>
     if (read("class")) parseClassDeclaration(modifiers)
     else ???
   }
 
-  /* List[ModuleModifier]
+  /* ModuleModifiers
    *  : ( Annotation | PublicModifier | PrivateModifier | ProtectedModifier
    *    | StaticModifier | FinalModifier | AbstractModifier | StrictFPModifier
    *    | AutoCloseModifier | PropagateModifier | PureModifier ).*
    */
-  private def parseModuleModifiers: Try[List[ModuleModifier]] = parseModuleModifiers(Nil)
+  private def parseModuleModifiers: Try[List[Modifier]] = parseModuleModifiers(Nil)
 
-  private def parseModuleModifiers (list: List[ModuleModifier]): Try[List[ModuleModifier]] = reader.head match {
+  private def parseModuleModifiers (list: List[Modifier]): Try[List[Modifier]] = reader.head match {
     case SymbolToken('@', _) =>
       reader.next  // '@'
       parseAnnotation match {
@@ -202,7 +202,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
     case _ => Success(list)
   }
 
-  private val moduleModifiers: Map[String, ModuleModifier] = Map(
+  private val moduleModifiers: Map[String, Modifier] = Map(
     "public" -> PublicModifier, "private" -> PrivateModifier, "protected" -> ProtectedModifier,
     "static" -> StaticModifier, "final" -> FinalModifier, "abstract" -> AbstractModifier,
     "strictfp" -> StrictFPModifier, "autoclose" -> AutoCloseModifier, "propagate" -> PropagateModifier, "pure" -> PureModifier
@@ -280,9 +280,9 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ClassDeclaration
-   *  : List[ModuleModifier] "class" # Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   *  : ModuleModifiers "class" # Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
    */
-  private def parseClassDeclaration (modifiers: List[ModuleModifier]): Try[ClassDeclaration] = for {
+  private def parseClassDeclaration (modifiers: List[Modifier]): Try[ClassDeclaration] = for {
     name           <- parseIdentifier
     typeParameters <- parseTypeParameters
     extendsClass   <- parseExtendsClass
@@ -373,7 +373,12 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   }
 
   /* ClassMember
-   *
+   *  : InstanceInitializer
+   *  | StaticInitializer
+   *  | ConstructorDeclaration
+   *  | FieldDeclaration
+   *  | MethodDeclaration
+   *  | ModuleDeclaration
    */
   private def parseClassMember: Try[ClassMember] = ???
 
@@ -528,33 +533,30 @@ case class AscendingDSLPrecedence (names: List[QualifiedName]) extends DSLPreced
 
 case class DescendingDSLPrecedence (names: List[QualifiedName]) extends DSLPrecedence
 
-sealed trait ModuleDeclaration
+sealed trait ModuleDeclaration extends ClassMember
 
-case class ClassDeclaration (modifiers: List[ModuleModifier], name: String, typeParameters: List[TypeParameter], superClass: Option[ClassTypeName], interfaces: List[ClassTypeName], members: List[ClassMember]) extends ModuleDeclaration
+case class ClassDeclaration (modifiers: List[Modifier], name: String, typeParameters: List[TypeParameter], superClass: Option[ClassTypeName], interfaces: List[ClassTypeName], members: List[ClassMember]) extends ModuleDeclaration
 
-sealed trait PrjModifier
+sealed trait Modifier
 
-sealed trait ModuleModifier extends PrjModifier
-sealed trait MemberModifier extends PrjModifier
+case object PublicModifier extends Modifier
+case object PrivateModifier extends Modifier
+case object ProtectedModifier extends Modifier
+case object StaticModifier extends Modifier
+case object FinalModifier extends Modifier
+case object SynchronizedModifier extends Modifier
+case object VolatileModifier extends Modifier
+case object TransientModifier extends Modifier
+case object NativeModifier extends Modifier
+case object AbstractModifier extends Modifier
+case object StrictFPModifier extends Modifier
 
-case object PublicModifier extends ModuleModifier with MemberModifier
-case object PrivateModifier extends ModuleModifier with MemberModifier
-case object ProtectedModifier extends ModuleModifier with MemberModifier
-case object StaticModifier extends ModuleModifier with MemberModifier
-case object FinalModifier extends ModuleModifier with MemberModifier
-case object SynchronizedModifier extends MemberModifier
-case object VolatileModifier extends MemberModifier
-case object TransientModifier extends MemberModifier
-case object NativeModifier extends MemberModifier
-case object AbstractModifier extends ModuleModifier with MemberModifier
-case object StrictFPModifier extends ModuleModifier with MemberModifier
-
-case object AutoCloseModifier extends ModuleModifier
-case object PropagateModifier extends ModuleModifier
-case object PureModifier extends ModuleModifier with MemberModifier
+case object AutoCloseModifier extends Modifier
+case object PropagateModifier extends Modifier
+case object PureModifier extends Modifier
 
 sealed trait AnnotationElement
-sealed trait Annotation extends ModuleModifier with MemberModifier with AnnotationElement
+sealed trait Annotation extends Modifier with AnnotationElement
 
 case class FullAnnotation (name: QualifiedName, args: Map[String, AnnotationElement]) extends Annotation
 case class SingleElementAnnotation (name: QualifiedName, arg: AnnotationElement) extends Annotation
@@ -565,7 +567,7 @@ case class ArrayOfAnnotationElement (array: List[AnnotationElement]) extends Ann
 
 sealed trait ClassMember
 
-case class ConstructorDeclaration (modifiers: List[MemberModifier], typeParameters: List[TypeParameter], throws: List[TypeName], body: String)
+case class ConstructorDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], throws: List[TypeName], body: String)
 
 case class TypeParameter (name: String, bounds: List[ClassTypeName])
 
