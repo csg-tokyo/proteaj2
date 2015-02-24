@@ -18,7 +18,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
 
   /* BNF-like notation
    *
-   * # indicates the current position
+   * # indicates current position
    * E.? indicates E is optional
    * E.* indicates zero or more times repetition of E
    * E.+ indicates zero or more times repetition of E
@@ -179,7 +179,342 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
    */
   private def parseModuleDeclaration (modifiers: List[Modifier]): Try[ModuleDeclaration] = {
     if (read("class")) parseClassDeclaration(modifiers)
-    else ???
+    else if (read("enum")) parseEnumDeclaration(modifiers)
+    else if (read("interface")) parseInterfaceDeclaration(modifiers)
+    else if (read("dsl")) parseDSLDeclaration(modifiers)
+    else if (reader.look(0).is('@') && reader.look(1).is("interface")) {
+      reader.next(1)
+      parseAnnotationDeclaration(modifiers)
+    }
+    else Failure(parseError("class, enum, interface, @interface, or dsl"))
+  }
+
+
+  /* ClassDeclaration
+   *  : Modifiers "class" # Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   */
+  private def parseClassDeclaration (modifiers: List[Modifier]): Try[ClassDeclaration] = for {
+    name           <- parseIdentifier
+    typeParameters <- parseTypeParameters
+    extendsClass   <- parseExtendsClass
+    interfaces     <- parseImplementsInterfaces
+    members        <- parseClassBody(name)
+  } yield ClassDeclaration(modifiers, name, typeParameters, extendsClass, interfaces, members)
+
+  /* EnumDeclaration
+   *  : Modifiers "enum" # Identifier ImplementsInterfaces EnumBody
+   */
+  private def parseEnumDeclaration (modifiers: List[Modifier]): Try[EnumDeclaration] = ???
+
+  /* InterfaceDeclaration
+   *  : Modifiers "interface" # Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
+   */
+  private def parseInterfaceDeclaration (modifiers: List[Modifier]): Try[InterfaceDeclaration] = ???
+
+  /* AnnotationDeclaration
+   *  : Modifiers '@' "interface" # Identifier AnnotationBody
+   */
+  private def parseAnnotationDeclaration (modifiers: List[Modifier]): Try[AnnotationDeclaration] = ???
+
+  /* DSLDeclaration
+   *  : Modifiers "dsl" Identifier DependsDSLs DSLBody
+   */
+  private def parseDSLDeclaration (modifiers: List[Modifier]): Try[DSLDeclaration] = ???
+
+  /* List[TypeParameter]
+   *  : # ( '<' TypeParameter ( ',' TypeParameter ).* '>' ).?
+   */
+  private def parseTypeParameters: Try[List[TypeParameter]] = {
+    if (read('<')) parseTypeParameter.flatMap { param => parseTypeParameters(List(param)) }
+    else Success(Nil)
+  }
+
+  /* List[TypeParameter]
+   *  : ( '<' TypeParameter # ( ',' TypeParameter ).* '>' ).?
+   */
+  private def parseTypeParameters (params: List[TypeParameter]): Try[List[TypeParameter]] = {
+    if (read(',')) parseTypeParameter match {
+      case Success(param) => parseTypeParameters(params :+ param)
+      case Failure(e)     => Failure(e)
+    }
+    else if (read('>')) Success(params)
+    else Failure(parseError("',' or '>'"))
+  }
+
+  /* TypeParameter
+   *  : # Identifier ( "extends" ClassTypeName ( '&' ClassTypeName ).* ).?
+   */
+  private def parseTypeParameter: Try[TypeParameter] = parseIdentifier.flatMap { name =>
+    if (read("extends")) parseClassTypeName.flatMap { bound => parseTypeParameter(name, List(bound)) }
+    else Success(TypeParameter(name, Nil))
+  }
+
+  /* TypeParameter
+   *  : Identifier ( "extends" ClassTypeName # ( '&' ClassTypeName ).* ).?
+   */
+  private def parseTypeParameter (name: String, bounds: List[ClassTypeName]): Try[TypeParameter] = {
+    if (read('&')) parseClassTypeName match {
+      case Success(bound) => parseTypeParameter(name, bounds :+ bound)
+      case Failure(e)     => Failure(e)
+    }
+    else Success(TypeParameter(name, bounds))
+  }
+
+  /* ExtendsClass
+   *  : ( "extends" ClassTypeName ).?
+   */
+  private def parseExtendsClass: Try[Option[ClassTypeName]] = {
+    if (read("extends")) parseClassTypeName.map(Some(_))
+    else Success(None)
+  }
+
+  /* ImplementsInterfaces
+   *  : # ( "implements" ClassTypeName ( ',' ClassTypeName ).* ).?
+   */
+  private def parseImplementsInterfaces: Try[List[ClassTypeName]] = {
+    if (read("implements")) parseClassTypeName.flatMap(i => parseImplementsInterfaces(List(i)))
+    else Success(Nil)
+  }
+
+  /* ImplementsInterfaces
+   *  : ( "implements" ClassTypeName # ( ',' ClassTypeName ).* ).?
+   */
+  private def parseImplementsInterfaces(interfaces: List[ClassTypeName]): Try[List[ClassTypeName]] = {
+    if (read(',')) parseClassTypeName match {
+      case Success(i) => parseImplementsInterfaces(interfaces :+ i)
+      case Failure(e) => Failure(e)
+    }
+    else Success(interfaces)
+  }
+
+  /* ClassBody
+   *  : # '{' ClassMember.* '}'
+   */
+  private def parseClassBody(className: String): Try[List[ClassMember]] = parseToken('{').flatMap(_ => parseClassBody(className, Nil))
+
+  /* ClassBody
+   *  : '{' # ClassMember.* '}'
+   */
+  private def parseClassBody(className: String, members: List[ClassMember]): Try[List[ClassMember]] = {
+    if (read('}')) Success(members)
+    else parseClassMember(className) match {
+      case Success(member) => parseClassBody(className, members :+ member)
+      case Failure(e) => Failure(e)
+    }
+  }
+
+  /* ClassMember
+   *  : InstanceInitializer      ; # '{' BlockSnippet '}'
+   *  | StaticInitializer        ; # "static" '{' BlockSnippet '}'
+   *  | ConstructorDeclaration   ; # Modifiers List[TypeParameter] TypeName List[FormalParameter] ThrowsExceptions '{' BlockSnippet '}'
+   *  | MethodDeclaration        ; # Modifiers List[TypeParameter] TypeName Identifier List[FormalParameter] ThrowsExceptions MethodBody
+   *  | FieldDeclaration         ; # Modifiers TypeName List[VariableDeclarator] ';'
+   *  | ClassDeclaration         ; # Modifiers "class" Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
+   *  | EnumDeclaration          ; # Modifiers "enum" Identifier ImplementsInterfaces EnumBody
+   *  | InterfaceDeclaration     ; # Modifiers "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
+   *  | AnnotationDeclaration    ; # Modifiers '@' "interface" Identifier AnnotationBody
+   *  | DSLDeclaration           ; # Modifiers "dsl" Identifier DependsDSLs DSLBody
+   */
+  private def parseClassMember(className: String): Try[ClassMember] = {
+    if (read('{')) parseInstanceInitializer
+    else if (reader.look(0).is("static") && reader.look(1).is('{')) {
+      reader.next(1)
+      parseStaticInitializer
+    }
+    else parseModifiers.flatMap { modifiers =>
+      if (read("class")) parseClassDeclaration(modifiers)
+      else if (read("enum")) parseEnumDeclaration(modifiers)
+      else if (read("interface")) parseInterfaceDeclaration(modifiers)
+      else if (read("dsl")) parseDSLDeclaration(modifiers)
+      else if (reader.look(0).is('@') && reader.look(1).is("interface")) {
+        reader.next(1)
+        parseAnnotationDeclaration(modifiers)
+      }
+      else parseTypeParameters.flatMap {
+        case Nil => parseTypeName.flatMap { typeName =>
+          if (sameClassName(typeName, className) && reader.head.is('(')) parseConstructorDeclaration(modifiers, Nil)
+          else if (reader.look(1).is('(')) parseMethodDeclaration(modifiers, Nil, typeName)
+          else parseFieldDeclaration(modifiers, typeName)
+        }
+        case typeParameters => parseTypeName.flatMap { typeName =>
+          if (sameClassName(typeName, className) && reader.head.is('(')) parseConstructorDeclaration(modifiers, typeParameters)
+          else parseMethodDeclaration(modifiers, typeParameters, typeName)
+        }
+      }
+    }
+  }
+
+  private def sameClassName (typeName: TypeName, className: String): Boolean = typeName match {
+    case ClassTypeName(QualifiedName(List(simpleName)), Nil) if simpleName == className => true
+    case _ => false
+  }
+
+  /* InstanceInitializer
+   *  : '{' # BlockSnippet '}'
+   */
+  private def parseInstanceInitializer: Try[InstanceInitializer] = for {
+    block <- parseBlockSnippet
+    _     <- parseToken('}')
+  } yield InstanceInitializer(block)
+
+  /* StaticInitializer
+   *  : "static" '{' # BlockSnippet '}'
+   */
+  private def parseStaticInitializer: Try[StaticInitializer] = for {
+    block <- parseBlockSnippet
+    _     <- parseToken('}')
+  } yield StaticInitializer(block)
+
+  /* ConstructorDeclaration
+   *  : Modifiers List[TypeParameter] TypeName # List[FormalParameter] ThrowsExceptions '{' BlockSnippet '}'
+   */
+  private def parseConstructorDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter]): Try[ConstructorDeclaration] = for {
+    formalParameters <- parseFormalParameters
+    throwsExceptions <- parseThrowsExceptions
+    _                <- parseToken('(')
+    blockSnippet     <- parseBlockSnippet
+    _                <- parseToken(')')
+  } yield ConstructorDeclaration(modifiers, typeParameters, formalParameters, throwsExceptions, blockSnippet)
+
+  /* MethodDeclaration
+   *  : Modifiers List[TypeParameter] TypeName # Identifier List[FormalParameter] ThrowsExceptions MethodBody
+   */
+  private def parseMethodDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], returnType: TypeName): Try[MethodDeclaration] = for {
+    name             <- parseIdentifier
+    formalParameters <- parseFormalParameters
+    throwsExceptions <- parseThrowsExceptions
+    body             <- parseMethodBody
+  } yield MethodDeclaration(modifiers, typeParameters, returnType, name, formalParameters, throwsExceptions, body)
+
+  /* FieldDeclaration
+   *  : Modifiers TypeName # List[VariableDeclarator] ';'
+   */
+  private def parseFieldDeclaration (modifiers: List[Modifier], fieldType: TypeName): Try[FieldDeclaration] = for {
+    declarators <- parseVariableDeclarators
+    _           <- parseToken(';')
+  } yield FieldDeclaration(modifiers, fieldType, declarators)
+
+  /* List[FormalParameter]
+   *  : # '(' ( FormalParameter ( ',' FormalParameter ) ).? ')'
+   */
+  private def parseFormalParameters: Try[List[FormalParameter]] = {
+    if (read('(')) {
+      if (read(')')) Success(Nil)
+      else parseFormalParameter.flatMap(param => parseFormalParameters(List(param)))
+    }
+    else Failure(parseError("formal parameters"))
+  }
+
+  /* List[FormalParameter]
+   *  : '(' ( FormalParameter # ( ',' FormalParameter ) ).? ')'
+   */
+  private def parseFormalParameters(parameters: List[FormalParameter]): Try[List[FormalParameter]] = {
+    if (read(',')) parseFormalParameter match {
+      case Success(param) => parseFormalParameters(parameters :+ param)
+      case Failure(e)     => Failure(e)
+    }
+    else Success(parameters)
+  }
+
+  /* FormalParameter
+   *  : Modifiers TypeName VariableArgumentsIndicator Identifier EmptyBrackets Initializer
+   */
+  private def parseFormalParameter: Try[FormalParameter] = for {
+    modifiers     <- parseModifiers
+    parameterType <- parseTypeName
+    varArgs       <- parseVariableArgumentsIndicator
+    name          <- parseIdentifier
+    dim           <- parseEmptyBrackets
+    initializer   <- parseInitializer
+  } yield FormalParameter(modifiers, parameterType, varArgs, name, dim, initializer)
+
+  /* VariableArgumentsIndicator
+   *  : ( '.' '.' '.' ).?
+   */
+  private def parseVariableArgumentsIndicator: Try[Boolean] = {
+    if (reader.look(0).is('.') && reader.look(1).is('.') && reader.look(2).is('.')) {
+      reader.next(2)
+      Success(true)
+    }
+    else Success(false)
+  }
+
+  /* ThrowsExceptions
+   *  : # ( "throws" ClassTypeName ( ',' ClassTypeName ).* ).?
+   */
+  private def parseThrowsExceptions: Try[List[ClassTypeName]] = {
+    if (read("throws")) parseClassTypeName.flatMap(e => parseThrowsExceptions(List(e)))
+    else Success(Nil)
+  }
+
+  /* ThrowsExceptions
+   *  : ( "throws" ClassTypeName # ( ',' ClassTypeName ).* ).?
+   */
+  private def parseThrowsExceptions (exceptions: List[ClassTypeName]): Try[List[ClassTypeName]] = {
+    if (read(',')) parseClassTypeName match {
+      case Success(e) => parseThrowsExceptions(exceptions :+ e)
+      case Failure(e) => Failure(e)
+    }
+    else Success(exceptions)
+  }
+
+  /* MethodBody
+   *  : ';'
+   *  | '{' BlockSnippet '}'
+   */
+  private def parseMethodBody: Try[Option[BlockSnippet]] = {
+    if (read(';')) Success(None)
+    else if (read('{')) for {
+      block <- parseBlockSnippet
+      _     <- parseToken('}')
+    } yield Some(block)
+    else Failure(parseError("';' or '{'"))
+  }
+
+  /* List[VariableDeclarator]
+   *  : # VariableDeclarator ( ',' VariableDeclarator ).*
+   */
+  private def parseVariableDeclarators: Try[List[VariableDeclarator]] = parseVariableDeclarator.flatMap(v => parseVariableDeclarators(List(v)))
+
+  /* List[VariableDeclarator]
+   *  : VariableDeclarator # ( ',' VariableDeclarator ).*
+   */
+  private def parseVariableDeclarators(declarators: List[VariableDeclarator]): Try[List[VariableDeclarator]] = {
+    if (read(',')) parseVariableDeclarator match {
+      case Success(v) => parseVariableDeclarators(declarators :+ v)
+      case Failure(e) => Failure(e)
+    }
+    else Success(declarators)
+  }
+
+  /* VariableDeclarator
+   *  : # Identifier EmptyBrackets Initializer
+   */
+  private def parseVariableDeclarator: Try[VariableDeclarator] = for {
+    name <- parseIdentifier
+    dim  <- parseEmptyBrackets
+    ini  <- parseInitializer
+  } yield VariableDeclarator(name, dim, ini)
+
+  /* EmptyBrackets
+   *  : # ( '[' ']' ).*
+   */
+  private def parseEmptyBrackets: Try[Int] = parseEmptyBrackets(0)
+
+  private def parseEmptyBrackets (n: Int) : Try[Int] = {
+    if (read('[')) {
+      if (read(']')) parseEmptyBrackets(n + 1)
+      else Failure(parseError("']'"))
+    }
+    else Success(n)
+  }
+
+  /* Initializer
+   *  : ( '=' ExpressionSnippet ).?
+   */
+  private def parseInitializer: Try[Option[ExpressionSnippet]] = {
+    if (read('=')) parseExpressionSnippet.map(Some(_))
+    else Success(None)
   }
 
   /* Modifiers
@@ -191,7 +526,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   private def parseModifiers: Try[List[Modifier]] = parseModifiers(Nil)
 
   private def parseModifiers (list: List[Modifier]): Try[List[Modifier]] = reader.head match {
-    case SymbolToken('@', _) =>
+    case SymbolToken('@', _) if ! reader.look(1).is("interface") =>
       reader.next  // '@'
       parseAnnotation match {
         case Success(ann) => parseModifiers(list :+ ann)
@@ -282,120 +617,6 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
     else Failure(parseError("',' or '}'"))
   }
 
-  /* ClassDeclaration
-   *  : Modifiers "class" # Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
-   */
-  private def parseClassDeclaration (modifiers: List[Modifier]): Try[ClassDeclaration] = for {
-    name           <- parseIdentifier
-    typeParameters <- parseTypeParameters
-    extendsClass   <- parseExtendsClass
-    interfaces     <- parseImplementsInterfaces
-    members        <- parseClassBody
-  } yield ClassDeclaration(modifiers, name, typeParameters, extendsClass, interfaces, members)
-
-  /* List[TypeParameter]
-   *  : # ( '<' TypeParameter ( ',' TypeParameter ).* '>' ).?
-   */
-  private def parseTypeParameters: Try[List[TypeParameter]] = {
-    if (read('<')) parseTypeParameter.flatMap { param => parseTypeParameters(List(param)) }
-    else Success(Nil)
-  }
-
-  /* List[TypeParameter]
-   *  : ( '<' TypeParameter # ( ',' TypeParameter ).* '>' ).?
-   */
-  private def parseTypeParameters (params: List[TypeParameter]): Try[List[TypeParameter]] = {
-    if (read(',')) parseTypeParameter match {
-      case Success(param) => parseTypeParameters(params :+ param)
-      case Failure(e)     => Failure(e)
-    }
-    else if (read('>')) Success(params)
-    else Failure(parseError("',' or '>'"))
-  }
-
-  /* TypeParameter
-   *  : # Identifier ( "extends" ClassTypeName ( '&' ClassTypeName ).* ).?
-   */
-  private def parseTypeParameter: Try[TypeParameter] = parseIdentifier.flatMap { name =>
-    if (read("extends")) parseClassTypeName.flatMap { bound => parseTypeParameter(name, List(bound)) }
-    else Success(TypeParameter(name, Nil))
-  }
-
-  /* TypeParameter
-   *  : Identifier ( "extends" ClassTypeName # ( '&' ClassTypeName ).* ).?
-   */
-  private def parseTypeParameter (name: String, bounds: List[ClassTypeName]): Try[TypeParameter] = {
-    if (read('&')) parseClassTypeName match {
-      case Success(bound) => parseTypeParameter(name, bounds :+ bound)
-      case Failure(e)     => Failure(e)
-    }
-    else Success(TypeParameter(name, bounds))
-  }
-
-  /* ExtendsClass
-   *  : ( "extends" ClassTypeName ).?
-   */
-  private def parseExtendsClass: Try[Option[ClassTypeName]] = {
-    if (read("extends")) parseClassTypeName.map(Some(_))
-    else Success(None)
-  }
-
-  /* ImplementsInterfaces
-   *  : # ( "implements" ClassTypeName ( ',' ClassTypeName ).* ).?
-   */
-  private def parseImplementsInterfaces: Try[List[ClassTypeName]] = {
-    if (read("implements")) parseClassTypeName.flatMap(i => parseImplementsInterfaces(List(i)))
-    else Success(Nil)
-  }
-
-  /* ImplementsInterfaces
-   *  : ( "implements" ClassTypeName # ( ',' ClassTypeName ).* ).?
-   */
-  private def parseImplementsInterfaces(interfaces: List[ClassTypeName]): Try[List[ClassTypeName]] = {
-    if (read(',')) parseClassTypeName match {
-      case Success(i) => parseImplementsInterfaces(interfaces :+ i)
-      case Failure(e) => Failure(e)
-    }
-    else Success(interfaces)
-  }
-
-  /* ClassBody
-   *  : # '{' ClassMember.* '}'
-   */
-  private def parseClassBody: Try[List[ClassMember]] = parseToken('{').flatMap(_ => parseClassBody(Nil))
-
-  /* ClassBody
-   *  : '{' # ClassMember.* '}'
-   */
-  private def parseClassBody(members: List[ClassMember]): Try[List[ClassMember]] = {
-    if (read('}')) Success(members)
-    else parseClassMember match {
-      case Success(member) => parseClassBody(members :+ member)
-      case Failure(e) => Failure(e)
-    }
-  }
-
-  /* ClassMember
-   *  : InstanceInitializer      ; # BlockSnippet
-   *  | StaticInitializer        ; # "static" BlockSnippet
-   *  | ConstructorDeclaration   ; # Modifiers List[TypeParameter] ClassName List[FormalParameter] ThrowsExceptions BlockSnippet
-   *  | FieldDeclaration         ; # Modifiers TypeName List[VariableDeclarator] ';'
-   *  | MethodDeclaration        ; # Modifiers List[TypeParameter] TypeName Identifier List[FormalParameter] ThrowsExceptions MethodBody
-   *  | ClassDeclaration         ; # Modifiers "class" Identifier List[TypeParameter] ExtendsClass ImplementsInterfaces ClassBody
-   *  | EnumDeclaration          ; # Modifiers "enum" Identifier ImplementsInterfaces EnumBody
-   *  | InterfaceDeclaration     ; # Modifiers "interface" Identifier List[TypeParameter] ExtendsInterfaces.? InterfaceBody
-   *  | AnnotationDeclaration    ; # Modifiers '@' "interface" Identifier AnnotationBody
-   *  | DSLDeclaration           ; # Modifiers "dsl" Identifier DependsDSLs DSLBody
-   */
-  private def parseClassMember: Try[ClassMember] = {
-    if (read('{')) ???
-    else ???
-  }
-
-  /* InstanceInitializer
-   *  :
-   */
-
   /* TypeName
    *  : # ClassTypeName ( '[' ']' ).*
    */
@@ -474,8 +695,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   private def parseQualifiedName (names: List[String]): QualifiedName = {
     if (reader.look(0).is('.')) reader.look(1) match {
       case IdentifierToken(id, _) =>
-        reader.next
-        reader.next
+        reader.next(1)
         parseQualifiedName(names :+ id)
       case _ => QualifiedName(names)
     }
@@ -486,16 +706,19 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
    *  : # ... ( ')' | '}' | ',' | ';' )
    *
    * Note.
-   * (1) the last ( ')' | '}' | ',' | ';' ) is not included in ExpressionSnippet.
-   * (2) all parentheses and curly braces opened in ... must be closed at the inside of ...
+   * (1) this method do NOT read the last ( ')' | '}' | ',' | ';' )
+   * (2) the last ( ')' | '}' | ',' | ';' ) is not included in ExpressionSnippet.
+   * (3) all parentheses and curly braces opened in ... must be closed at the inside of ...
    */
   private def parseExpressionSnippet: Try[ExpressionSnippet] = reader.nextExpression.map(new ExpressionSnippet(_))
 
   /* BlockSnippet
-   *  : '{' # ... '}'
+   *  : # ... '}'
    *
    * Note.
-   * (1) all curly braces opened in ... must be closed at the inside of ...
+   * (1) this method do NOT read the last '}'
+   * (2) the last '}' is not included in BlockSnippet.
+   * (3) all curly braces opened in ... must be closed at the inside of ...
    */
   private def parseBlockSnippet: Try[BlockSnippet] = reader.nextBlock.map(new BlockSnippet(_))
 
@@ -577,15 +800,15 @@ sealed trait ContextMember
 
 case class InstanceInitializer (block: BlockSnippet) extends ClassMember
 case class StaticInitializer (block: BlockSnippet) extends ClassMember
-case class ConstructorDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], formalParameters: List[FormalParameter], throws: List[TypeName], body: BlockSnippet) extends ClassMember with ContextMember
+case class ConstructorDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], formalParameters: List[FormalParameter], throws: List[ClassTypeName], body: BlockSnippet) extends ClassMember with ContextMember
 case class FieldDeclaration (modifiers: List[Modifier], fieldType: TypeName, declarators: List[VariableDeclarator]) extends ClassMember with DSLMember with ContextMember
-case class MethodDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], returnType: TypeName, name: String, formalParameters: List[FormalParameter], throws: List[TypeName], body: Option[BlockSnippet]) extends ClassMember
-case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], typeParameters: List[TypeParameter], returnType: TypeName, syntax: List[SyntaxElement], formalParameters: List[FormalParameter], throws: List[TypeName], body: Option[BlockSnippet]) extends DSLMember with ContextMember
+case class MethodDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter], returnType: TypeName, name: String, formalParameters: List[FormalParameter], throws: List[ClassTypeName], body: Option[BlockSnippet]) extends ClassMember
+case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], typeParameters: List[TypeParameter], returnType: TypeName, syntax: List[SyntaxElement], formalParameters: List[FormalParameter], throws: List[ClassTypeName], body: Option[BlockSnippet]) extends DSLMember with ContextMember
 case class PrioritiesDeclaration (names: List[String], constraints: List[Constraint]) extends DSLMember
 
 case class ContextDeclaration (modifiers: List[Modifier], name: String, typeParameters: List[TypeParameter], superClass: Option[ClassTypeName], interfaces: List[ClassTypeName], members: List[ContextMember]) extends DSLMember
 
-case class FormalParameter (modifiers: List[Modifier], parameterType: TypeName, name: String, dim: Int)
+case class FormalParameter (modifiers: List[Modifier], parameterType: TypeName, varArgs: Boolean, name: String, dim: Int, initializer: Option[ExpressionSnippet])
 case class VariableDeclarator (name: String, dim: Int, initializer: Option[ExpressionSnippet])
 
 case class EnumConstant (annotations: List[Annotation], name: String, arguments: List[ExpressionSnippet], members: List[ClassMember])
