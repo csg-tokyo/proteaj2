@@ -48,6 +48,8 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
     next
   }
 
+  def close(): Unit = in.close()
+
   def position: Int = pos
 
   def eof: Boolean = head.eof
@@ -101,12 +103,12 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
         queue = queue.tail
         nFetched -= 1
         readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars + 1)
-      case s @ SymbolToken(')' | '}', _) if pars > 0 =>
+      case SymbolToken(')' | '}' | ',' | ';', _) if pars <= 0 =>
+        Success(buf.toString)
+      case s @ SymbolToken(')' | '}', _) =>
         queue = queue.tail
         nFetched -= 1
         readUntilEndOfExpr(buf.appendCodePoint(s.ch), pars - 1)
-      case SymbolToken(')' | '}' | ',' | ';', _) =>
-        Success(buf.toString)
       case Whitespaces(ws, _) =>
         queue = queue.tail
         readUntilEndOfExpr(buf.append(ws), pars)

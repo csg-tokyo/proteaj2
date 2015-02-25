@@ -14,7 +14,11 @@ object DeclarationParser {
 }
 
 class DeclarationParser private (private val reader: SourceReader)(implicit state: JState) {
-  lazy val parseAll: CompilationUnit = parseCompilationUnit
+  lazy val parseAll: CompilationUnit = {
+    val cu = parseCompilationUnit
+    reader.close()
+    cu
+  }
 
   /* BNF-like notation
    *
@@ -371,9 +375,9 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   private def parseConstructorDeclaration (modifiers: List[Modifier], typeParameters: List[TypeParameter]): Try[ConstructorDeclaration] = for {
     formalParameters <- parseFormalParameters
     throwsExceptions <- parseThrowsExceptions
-    _                <- parseToken('(')
+    _                <- parseToken('{')
     blockSnippet     <- parseBlockSnippet
-    _                <- parseToken(')')
+    _                <- parseToken('}')
   } yield ConstructorDeclaration(modifiers, typeParameters, formalParameters, throwsExceptions, blockSnippet)
 
   /* MethodDeclaration
@@ -413,7 +417,8 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
       case Success(param) => parseFormalParameters(parameters :+ param)
       case Failure(e)     => Failure(e)
     }
-    else Success(parameters)
+    else if (read(')')) Success(parameters)
+    else Failure(parseError("',' or ')'"))
   }
 
   /* FormalParameter

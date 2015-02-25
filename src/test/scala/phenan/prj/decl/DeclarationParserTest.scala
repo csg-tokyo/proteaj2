@@ -162,6 +162,165 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
     ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", typeParams, superType, Nil, Nil))
   }
 
+  test ("インスタンスイニシャライザ") {
+    val src =
+      """public class Foo {
+        |  { System.out.println("Hello, world!"); }
+        |}
+      """.stripMargin
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val member = InstanceInitializer(block(" System.out.println(\"Hello, world!\"); ", 2))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", Nil, None, Nil, List(member)))
+  }
+
+  test ("スタティックイニシャライザ") {
+    val src =
+      """public class Foo {
+        |  static { System.out.println("Hello, world!"); }
+        |}
+      """.stripMargin
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val member = StaticInitializer(block(" System.out.println(\"Hello, world!\"); ", 2))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", Nil, None, Nil, List(member)))
+  }
+
+  test ("単純なフィールド宣言") {
+    val src =
+      """public class Foo {
+        |  private static final int zero = 0;
+        |}
+      """.stripMargin
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val member = FieldDeclaration(List(PrivateModifier, StaticModifier, FinalModifier), simpleType("int"), List(VariableDeclarator("zero", 0, Some(expression(" 0", 2)))))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", Nil, None, Nil, List(member)))
+  }
+
+  test ("複雑なフィールド宣言") {
+    val src =
+      """public class Foo {
+        |  protected static final String comma = ",", braces[] = {"{", "}"};
+        |  private java.lang.StringBuilder buf1, buf2 = new StringBuilder();
+        |}
+      """.stripMargin
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val member1 = FieldDeclaration(List(ProtectedModifier, StaticModifier, FinalModifier), simpleType("String"), List(
+      VariableDeclarator("comma", 0, Some(expression(" \",\"", 2))),
+      VariableDeclarator("braces", 1, Some(expression(" {\"{\", \"}\"}", 2)))))
+    val member2 = FieldDeclaration(List(PrivateModifier), simpleType("java", "lang", "StringBuilder"), List(
+      VariableDeclarator("buf1", 0, None),
+      VariableDeclarator("buf2", 0, Some(expression(" new StringBuilder()", 3)))))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", Nil, None, Nil, List(member1, member2)))
+  }
+
+  test ("単純なコンストラクタ宣言") {
+    val src =
+      """public class Foo {
+        |  Foo() {}
+        |}
+      """.stripMargin
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val member = ConstructorDeclaration(Nil, Nil, Nil, Nil, block("", 2))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", Nil, None, Nil, List(member)))
+  }
+
+  test ("複雑なコンストラクタ宣言") {
+    val src =
+      """public class Foo {
+        |  protected <T> Foo(pure final T... ts, @Annotation List<T> list) throws Exception {
+        |    if (list.containsAll(Arrays.asList(ts))) System.out.println("contains");
+        |  }
+        |}
+      """.stripMargin
+
+    val body =
+      """
+        |    if (list.containsAll(Arrays.asList(ts))) System.out.println("contains");
+        |  """.stripMargin
+
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val member = ConstructorDeclaration(List(ProtectedModifier), List(TypeParameter("T", Nil)),
+      List(FormalParameter(List(PureModifier, FinalModifier), simpleType("T"), true, "ts", 0, None),
+        FormalParameter(List(MarkerAnnotation(qualifiedName("Annotation"))), ClassTypeName(qualifiedName("List"), List(simpleType("T"))), false, "list", 0, None)), List(simpleType("Exception")), block(body, 2))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", Nil, None, Nil, List(member)))
+  }
+
+  test ("単純なメソッド宣言") {
+    val src =
+      """public class Foo {
+        |  public static void main (String[] args) {
+        |    System.out.println("Hello, world!");
+        |  }
+        |}
+      """.stripMargin
+
+    val body =
+      """
+        |    System.out.println("Hello, world!");
+        |  """.stripMargin
+
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val member = MethodDeclaration(List(PublicModifier, StaticModifier), Nil, simpleType("void"), "main", List(FormalParameter(Nil, ArrayTypeName(simpleType("String")), false, "args", 0, None)), Nil, Some(block(body, 2)))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", Nil, None, Nil, List(member)))
+  }
+
+  test ("複雑なメソッド宣言") {
+    val src =
+      """public class Foo {
+        |  public <T, R> R map (T array[], Function<T, R> func) throws NullPointerException, FunctionCannotAppliedException {
+        |    R[] rs = new R[array.length];
+        |    for (int i = 0; i < array.length; i++) { rs[i] = func(array[i]); }
+        |    return rs;
+        |  }
+        |}
+      """.stripMargin
+
+    val body =
+      """
+        |    R[] rs = new R[array.length];
+        |    for (int i = 0; i < array.length; i++) { rs[i] = func(array[i]); }
+        |    return rs;
+        |  """.stripMargin
+
+    val ast = DeclarationParser(source(src)).get.parseAll
+
+    val member = MethodDeclaration(List(PublicModifier), List(TypeParameter("T", Nil), TypeParameter("R", Nil)), simpleType("R"), "map",
+      List(FormalParameter(Nil, simpleType("T"), false, "array", 1, None),
+        FormalParameter(Nil, ClassTypeName(qualifiedName("Function"), List(simpleType("T"), simpleType("R"))), false, "func", 0, None)),
+      List(simpleType("NullPointerException"), simpleType("FunctionCannotAppliedException")), Some(block(body, 2)))
+
+    ast.header.pack shouldBe None
+    ast.header.imports shouldBe Nil
+    ast.modules shouldBe List(ClassDeclaration(List(PublicModifier), "Foo", Nil, None, Nil, List(member)))
+  }
+
   test("正常終了したか") {
     state.clean()
     state.errors shouldBe 0

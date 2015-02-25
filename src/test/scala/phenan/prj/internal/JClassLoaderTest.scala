@@ -8,8 +8,8 @@ import phenan.prj.state._
 import scala.util._
 
 class JClassLoaderTest extends FunSuite with Matchers {
-  val state  = JConfig().configure.get
-  val loader = new JClassLoader(new JCompiler)(state)
+  implicit val state  = JConfig().configure.get
+  val loader = new JClassLoader(new JCompiler)
 
   test ("String 型をロード") {
     val clazz = loader.load("java/lang/String")

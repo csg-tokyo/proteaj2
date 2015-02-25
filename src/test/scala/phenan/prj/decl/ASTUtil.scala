@@ -12,6 +12,7 @@ trait ASTUtil {
   
   def arrayOf (components: AnnotationElement*): ArrayOfAnnotationElement = ArrayOfAnnotationElement(components.toList)
   def expression (src: String, line: Int): ExpressionSnippet = ExpressionSnippet(Snippet(src, line))
+  def block (src: String, line: Int): BlockSnippet = BlockSnippet(Snippet(src, line))
   def qualifiedName (names: String*): QualifiedName = QualifiedName(names.toList)
 
   implicit class DSLImportDclOps (d : DSLImportDeclaration) {

@@ -74,7 +74,7 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
   /* factory method for JClass ( without cache ) */
 
   private def getClass(name: String): Try[JClass] = {
-    jdc.findCompiling(name).map(Success(_)) getOrElse state.searchPath.find(name) match {
+    jdc.findIR(name).map(Success(_)) getOrElse state.searchPath.find(name) match {
       case Some(cf: FoundClassFile)  => classFileParser.fromStream(cf.in).map(new JLoadedClass(_, this))
       case Some(sf: FoundSourceFile) => jdc.compile(sf.in)
       case None => Failure(ClassFileNotFoundException("not found : " + name))
