@@ -11,14 +11,14 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("空のプログラム") {
     val src = ""
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
-    ast shouldBe CompilationUnit(Header(None, Nil), Nil)
+    ast shouldBe CompilationUnit(Header(None, Nil), Nil, "test_source")
   }
 
   test ("パッケージ宣言") {
     val src = "package phenan.prj.decl;"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe Some(packageDcl("phenan", "prj", "decl"))
     ast.header.imports shouldBe Nil
@@ -27,7 +27,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("クラスインポート") {
     val src = "import java.io.Reader;"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe List(classImport("java", "io", "Reader"))
@@ -36,7 +36,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("パッケージインポート") {
     val src = "import java.util.*;"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe List(packageImport("java", "util"))
@@ -45,7 +45,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("静的メソッドインポート") {
     val src = "import static java.lang.Character.isDigit;"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe List(staticImport("java", "lang", "Character", "isDigit"))
@@ -54,7 +54,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("全静的メンバインポート") {
     val src = "import static java.lang.Character.*;"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe List(staticImportAll("java", "lang", "Character"))
@@ -68,7 +68,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |import dsl phenan.SQL > phenan.File;
         |import dsl phenan.Regex < phenan.Grep < phenan.Test;
         |""".stripMargin
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe List(
@@ -80,7 +80,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("単純なクラス宣言") {
     val src = "public class Main {}"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe Nil
@@ -89,7 +89,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("マーカーアノテーション") {
     val src = "@Test public class Main {}"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe Nil
@@ -98,7 +98,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("単一引数アノテーション") {
     val src = "public @SingleArg(Foo.class) class Main {}"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe Nil
@@ -109,7 +109,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
     val src =
       """@full.Annotation(numArgs = (1 + 1), value = {"foo", @Sub, "bar"})
         |public class Main {}""".stripMargin
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val ann = FullAnnotation(qualifiedName("full", "Annotation"), Map("numArgs" -> expression(" (1 + 1)", 1), "value" -> arrayOf(expression("\"foo\"", 1), MarkerAnnotation(qualifiedName("Sub")), expression(" \"bar\"", 1))))
 
@@ -120,7 +120,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("extends 節付きのクラス宣言") {
     val src = "public class Main extends java.awt.event.MouseAdapter {}"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe Nil
@@ -129,7 +129,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("implements 節付きのクラス宣言") {
     val src = "public class Main implements Cloneable, Serializable {}"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe Nil
@@ -138,7 +138,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("型引数付きのクラス宣言") {
     val src = "public class MyList <T> extends AbstractList<T> implements List<T> {}"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe Nil
@@ -149,7 +149,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
 
   test ("複雑な型引数") {
     val src = "public class Foo <S extends java.lang.Object, T extends Bar<?> & Baz<? extends S>> extends Fizz<S, ? super T> {}"
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     ast.header.pack shouldBe None
     ast.header.imports shouldBe Nil
@@ -168,7 +168,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |  { System.out.println("Hello, world!"); }
         |}
       """.stripMargin
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val member = InstanceInitializer(block(" System.out.println(\"Hello, world!\"); ", 2))
 
@@ -183,7 +183,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |  static { System.out.println("Hello, world!"); }
         |}
       """.stripMargin
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val member = StaticInitializer(block(" System.out.println(\"Hello, world!\"); ", 2))
 
@@ -198,7 +198,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |  private static final int zero = 0;
         |}
       """.stripMargin
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val member = FieldDeclaration(List(PrivateModifier, StaticModifier, FinalModifier), simpleType("int"), List(VariableDeclarator("zero", 0, Some(expression(" 0", 2)))))
 
@@ -214,7 +214,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |  private java.lang.StringBuilder buf1, buf2 = new StringBuilder();
         |}
       """.stripMargin
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val member1 = FieldDeclaration(List(ProtectedModifier, StaticModifier, FinalModifier), simpleType("String"), List(
       VariableDeclarator("comma", 0, Some(expression(" \",\"", 2))),
@@ -234,7 +234,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |  Foo() {}
         |}
       """.stripMargin
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val member = ConstructorDeclaration(Nil, Nil, Nil, Nil, block("", 2))
 
@@ -257,7 +257,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |    if (list.containsAll(Arrays.asList(ts))) System.out.println("contains");
         |  """.stripMargin
 
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val member = ConstructorDeclaration(List(ProtectedModifier), List(TypeParameter("T", Nil)),
       List(FormalParameter(List(PureModifier, FinalModifier), simpleType("T"), true, "ts", 0, None),
@@ -282,7 +282,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |    System.out.println("Hello, world!");
         |  """.stripMargin
 
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val member = MethodDeclaration(List(PublicModifier, StaticModifier), Nil, simpleType("void"), "main", List(FormalParameter(Nil, ArrayTypeName(simpleType("String")), false, "args", 0, None)), Nil, Some(block(body, 2)))
 
@@ -309,7 +309,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
         |    return rs;
         |  """.stripMargin
 
-    val ast = DeclarationParser(source(src)).get.parseAll
+    val ast = parse(src)
 
     val member = MethodDeclaration(List(PublicModifier), List(TypeParameter("T", Nil), TypeParameter("R", Nil)), simpleType("R"), "map",
       List(FormalParameter(Nil, simpleType("T"), false, "array", 1, None),
@@ -327,6 +327,9 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
     state.warns shouldBe 0
   }
 
-
-  def source (src: String): Reader = new StringReader(src)
+  def parse (src: String): CompilationUnit = {
+    val reader = new StringReader(src)
+    val parser = DeclarationParser(reader, "test_source")
+    parser.get.parseAll
+  }
 }

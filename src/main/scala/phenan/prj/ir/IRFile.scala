@@ -1,5 +1,5 @@
 package phenan.prj.ir
 
-class IRFile {
+class IRFile (val fileName: String) {
 
 }

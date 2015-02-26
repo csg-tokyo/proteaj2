@@ -13,7 +13,7 @@ class SourceReaderTest extends FunSuite with Matchers {
 
   test("識別子") {
     val src = "foo bar0 _baz$Baz"
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe IdentifierToken("foo", 1)
     in.next shouldBe IdentifierToken("bar0", 1)
@@ -23,7 +23,7 @@ class SourceReaderTest extends FunSuite with Matchers {
 
   test("文字リテラル") {
     val src = "'a''b''\\n'"
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe CharLitToken('a', 1)
     in.next shouldBe CharLitToken('b', 1)
@@ -33,7 +33,7 @@ class SourceReaderTest extends FunSuite with Matchers {
 
   test("文字列リテラル") {
     val src = "\"ab cd\" \"'x'\" \"\\\"\\\"\""
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe StringLitToken("ab cd", 1)
     in.next shouldBe StringLitToken("'x'", 1)
@@ -43,7 +43,7 @@ class SourceReaderTest extends FunSuite with Matchers {
 
   test("記号") {
     val src = "* +32=> [/"
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe SymbolToken('*', 1)
     in.next shouldBe SymbolToken('+', 1)
@@ -62,7 +62,7 @@ class SourceReaderTest extends FunSuite with Matchers {
         |// x y x
         |// foo bar baz
       """.stripMargin
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe EndOfSource
   }
@@ -74,14 +74,14 @@ class SourceReaderTest extends FunSuite with Matchers {
         | * 'a'
         | **/
       """.stripMargin
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe EndOfSource
   }
 
   test("先読み") {
     val src = """ int func = '\n'; """
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.look(0) shouldBe IdentifierToken("int", 1)
     in.look(1) shouldBe IdentifierToken("func", 1)
@@ -100,7 +100,7 @@ class SourceReaderTest extends FunSuite with Matchers {
 
   test("フィールド初期化部の取り出し") {
     val src = """ int func = '\n'; """
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe IdentifierToken("int", 1)
     in.next shouldBe IdentifierToken("func", 1)
@@ -112,7 +112,7 @@ class SourceReaderTest extends FunSuite with Matchers {
 
   test("フィールド初期化部の取り出し(先読み済み)") {
     val src = """ int func = '\n'; """
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.look(0) shouldBe IdentifierToken("int", 1)
     in.look(1) shouldBe IdentifierToken("func", 1)
@@ -131,7 +131,7 @@ class SourceReaderTest extends FunSuite with Matchers {
 
   test("フルアノテーションの実引数部の取り出し") {
     val src = """@Annotation (a = (1 + 2) * 3, b = Foo.class )"""
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe SymbolToken('@', 1)
     in.next shouldBe IdentifierToken("Annotation", 1)
@@ -149,7 +149,7 @@ class SourceReaderTest extends FunSuite with Matchers {
 
   test("単純なブロックの取得") {
     val src = """ { a b c d } """
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     in.next shouldBe SymbolToken('{', 1)
     in.nextBlock shouldBe Success(Snippet(" a b c d ", 1))
@@ -167,7 +167,7 @@ class SourceReaderTest extends FunSuite with Matchers {
         |    return a + b;
         |  }
         |} """.stripMargin
-    val in = SourceReader(source(src)).get
+    val in = reader(src)
 
     val body =
       """
@@ -198,4 +198,5 @@ class SourceReaderTest extends FunSuite with Matchers {
   }
 
   def source (src: String): Reader = new StringReader(src)
+  def reader (src: String): SourceReader = SourceReader(new StringReader(src), "test_source").get
 }

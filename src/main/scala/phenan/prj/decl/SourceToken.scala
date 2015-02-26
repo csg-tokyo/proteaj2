@@ -1,5 +1,7 @@
 package phenan.prj.decl
 
+import phenan.prj.exception.ParseException
+
 sealed trait SourceToken {
   def line: Int
   def is (sym: Int): Boolean = false
@@ -27,6 +29,6 @@ case object EndOfSource extends SourceToken {
   override def eof: Boolean = true
 }
 
-case class InvalidToken (line: Int) extends SourceToken
+case class InvalidToken (e: ParseException, line: Int) extends SourceToken
 
 case class Snippet (src: String, line: Int)

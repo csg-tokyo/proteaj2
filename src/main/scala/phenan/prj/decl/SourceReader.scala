@@ -10,7 +10,7 @@ import scala.util._
 
 import Character._
 
-class SourceReader private (private val in: Reader, private var current: Int)(implicit state: JState) {
+class SourceReader private (private val in: Reader, private var current: Int, private val fileName: String)(implicit state: JState) {
   def head: SourceToken = look(0)
 
   def look (n: Int): SourceToken = {
@@ -112,14 +112,14 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
       case Whitespaces(ws, _) =>
         queue = queue.tail
         readUntilEndOfExpr(buf.append(ws), pars)
-      case InvalidToken(_) =>
-        Failure(ParseException("invalid token"))
+      case InvalidToken(e, _) =>
+        Failure(e)
       case token =>
         queue = queue.tail
         nFetched -= 1
         readUntilEndOfExpr(appendToken(buf, token), pars)
     }
-    else Failure(ParseException("end of expression is not found"))
+    else Failure(ParseException("end of expression", "end of file", fileName, line))
   }
 
   private def readUntilEndOfBlock (buf: SBuilder, braces: Int): Try[String] = {
@@ -138,14 +138,14 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
       case Whitespaces(ws, _) =>
         queue = queue.tail
         readUntilEndOfBlock(buf.append(ws), braces)
-      case InvalidToken(_) =>
-        Failure(ParseException("invalid token"))
+      case InvalidToken(e, _) =>
+        Failure(e)
       case token =>
         queue = queue.tail
         nFetched -= 1
         readUntilEndOfBlock(appendToken(buf, token), braces)
     }
-    else Failure(ParseException("end of block is not found"))
+    else Failure(ParseException("'}'", "end of file", fileName, line))
   }
 
   private def appendToken (buf: SBuilder, token: SourceToken): SBuilder = token match {
@@ -226,9 +226,12 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
   private def readCharLiteral(): SourceToken = {
     read()
     if (current == -1 || current == '\n' || current == '\'') {
+      val actual =
+        if (current == -1) "end of file"
+        else if (current == '\n') "line feed"
+        else "single quote"
       read()
-      state.error("invalid character literal")
-      InvalidToken(line)
+      InvalidToken(ParseException("literal character", actual, fileName, line), line)
     }
     else {
       val lit = current match {
@@ -240,10 +243,7 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
         read()
         CharLitToken(lit, line)
       }
-      else {
-        state.error("invalid character literal : expected single quote but found " + current)
-        InvalidToken(line)
-      }
+      else InvalidToken(ParseException("single quote", "'" + codePointToString(current) + "'", fileName, line), line)
     }
   }
 
@@ -258,8 +258,7 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
       StringLitToken(buf.toString, line)
     case '\n' | -1 =>
       read()
-      state.error("invalid string literal")
-      InvalidToken(line)
+      InvalidToken(ParseException("double quote", "end of line", fileName, line), line)
     case '\\'      =>
       readStringLiteral(buf.appendCodePoint(readEscapedChar()))
     case ch        =>
@@ -353,6 +352,10 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
     current
   }
 
+  private def codePointToString (cp: Int): String = {
+    new SBuilder().appendCodePoint(cp).toString
+  }
+
   private var pos: Int = 0
   private var line: Int = 1
 
@@ -362,16 +365,16 @@ class SourceReader private (private val in: Reader, private var current: Int)(im
 object SourceReader {
   def apply (file: File)(implicit state: JState): Try[SourceReader] = Try {
     val in = new BufferedReader(new FileReader(file))
-    new SourceReader(in, in.read())
+    new SourceReader(in, in.read(), file.getName)
   }
 
   def apply (file: String)(implicit state: JState): Try[SourceReader] = Try {
     val in = new BufferedReader(new FileReader(file))
-    new SourceReader(in, in.read())
+    new SourceReader(in, in.read(), file)
   }
 
-  def apply (reader: Reader)(implicit state: JState): Try[SourceReader] = Try {
+  def apply (reader: Reader, fileName: String)(implicit state: JState): Try[SourceReader] = Try {
     val in = new BufferedReader(reader)
-    new SourceReader(in, in.read())
+    new SourceReader(in, in.read(), fileName)
   }
 }

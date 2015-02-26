@@ -8,12 +8,12 @@ import phenan.prj.state.JState
 import scala.util._
 
 object DeclarationParser {
-  def apply (reader: Reader)(implicit state: JState): Try[DeclarationParser] = {
-    SourceReader(reader).map(new DeclarationParser(_))
+  def apply (reader: Reader, fileName: String)(implicit state: JState): Try[DeclarationParser] = {
+    SourceReader(reader, fileName).map(new DeclarationParser(_, fileName))
   }
 }
 
-class DeclarationParser private (private val reader: SourceReader)(implicit state: JState) {
+class DeclarationParser private (private val reader: SourceReader, private val fileName: String)(implicit state: JState) {
   lazy val parseAll: CompilationUnit = {
     val cu = parseCompilationUnit
     reader.close()
@@ -35,7 +35,7 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
   private def parseCompilationUnit: CompilationUnit = {
     val header  = parseHeader
     val modules = parseModuleDeclarations(Nil)
-    CompilationUnit(header, modules)
+    CompilationUnit(header, modules, fileName)
   }
 
   /* Header
@@ -753,16 +753,14 @@ class DeclarationParser private (private val reader: SourceReader)(implicit stat
     else false
   }
 
-  private def parseError (expected: String) = {
-    ParseException("expected " + expected + ", but found " + reader.head)
-  }
+  private def parseError (expected: String): ParseException = parseError(expected, reader.head)
 
-  private def parseError (expected: String, found: SourceToken) = {
-    ParseException("expected " + expected + ", but found " + found)
+  private def parseError (expected: String, found: SourceToken): ParseException = {
+    ParseException(expected, found.toString, fileName, found.line)
   }
 }
 
-case class CompilationUnit (header: Header, modules: List[ModuleDeclaration])
+case class CompilationUnit (header: Header, modules: List[ModuleDeclaration], fileName: String)
 
 case class Header (pack: Option[PackageDeclaration], imports: List[ImportDeclaration])
 
