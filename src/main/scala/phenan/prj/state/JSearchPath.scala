@@ -31,6 +31,7 @@ sealed trait FoundClassFile extends FoundFile {
 }
 
 sealed trait FoundSourceFile extends FoundFile {
+  def name: String
   def in: Reader
 }
 
@@ -45,11 +46,13 @@ private[state] class FoundClassFileFromJarPath (entry: JarEntry, jar: JarFile) e
 }
 
 private[state] class FoundSourceFileFromDirPath (file: File) extends FoundSourceFile {
+  override def name: String = file.getName
   override def in: Reader = new BufferedReader(new FileReader(file))
   override def lastModified: Long = file.lastModified()
 }
 
 private[state] class FoundSourceFileFromJarPath (entry: JarEntry, jar: JarFile) extends FoundSourceFile {
+  override def name: String = entry.getName
   override def in: Reader = new BufferedReader(new InputStreamReader(jar.getInputStream(entry)))
   override def lastModified: Long = entry.getLastModifiedTime.toMillis
 }

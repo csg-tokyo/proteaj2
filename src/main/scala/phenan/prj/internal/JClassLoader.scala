@@ -19,6 +19,8 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
     else loadClass(name)
   }
 
+  val loadClass: String => Try[JClass] = mutableHashMapMemo(getClass)
+
   val arrayOf: JErasedType => JArrayClass = mutableHashMapMemo(getArray)
 
   def arrayOf(clazz: JErasedType, dim: Int): JErasedType = {
@@ -36,6 +38,13 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
   lazy val double: JPrimitiveClass = new JPrimitiveClassImpl("double", "java/lang/Double", this)
   lazy val void: JPrimitiveClass = new JPrimitiveClassImpl("void", "java/lang/Void", this)
 
+  lazy val primitives: Map[String, JPrimitiveClass] = Map(
+    "boolean" -> boolean, "byte" -> byte, "char" -> char, "short" -> short, "int" -> int,
+    "long" -> long, "float" -> float, "double" -> double, "void" -> void
+  )
+
+  lazy val objectClass: Option[JClass] = loadClassOption("java/lang/Object")
+
   /* package private methods */
   private[internal] def loadClassOption (name: String): Option[JClass] = {
     loadClass(name) match {
@@ -45,8 +54,6 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
         None
     }
   }
-
-  private[internal] val loadClass: String => Try[JClass] = mutableHashMapMemo(getClass)
 
   private[internal] def methodDescriptor(desc: String): Option[(List[JErasedType], JErasedType)] = {
     // "(" ParameterTypeDescriptors ")" ReturnTypeDescriptor
@@ -75,9 +82,13 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
 
   private def getClass(name: String): Try[JClass] = {
     jdc.findIR(name).map(Success(_)) getOrElse state.searchPath.find(name) match {
-      case Some(cf: FoundClassFile)  => classFileParser.fromStream(cf.in).map(new JLoadedClass(_, this))
-      case Some(sf: FoundSourceFile) => jdc.compile(sf.in)
-      case None => Failure(ClassFileNotFoundException("not found : " + name))
+      case Some(cf: FoundClassFile)  =>
+        classFileParser.fromStream(cf.in).map(new JLoadedClass(_, this))
+      case Some(sf: FoundSourceFile) =>
+        jdc.generateIR(sf.in, sf.name)
+        jdc.findIR(name).map(Success(_)).getOrElse(Failure(ClassFileNotFoundException("not found : " + name)))
+      case None =>
+        Failure(ClassFileNotFoundException("not found : " + name))
     }
   }
 

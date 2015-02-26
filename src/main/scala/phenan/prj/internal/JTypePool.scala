@@ -21,7 +21,7 @@ class JTypePool private (state: JState) {
   def rawTypeArguments (typeParams: List[FormalTypeParameter], env: Map[String, JValueType], loader: JClassLoader): Map[String, JValueType] = {
     typeParams.foldLeft(env) { (e, param) =>
       param.classBound.orElse(param.interfaceBounds.headOption).flatMap(fromTypeSignature(_, e, loader)).
-        orElse(loader.loadClassOption("java/lang/Object").flatMap(_.objectType(Nil))).map(t => e + (param.name -> t)).getOrElse {
+        orElse(loader.objectClass.flatMap(_.objectType(Nil))).map(t => e + (param.name -> t)).getOrElse {
         state.error("cannot load object type")
         e
       }
@@ -112,12 +112,12 @@ class JTypePool private (state: JState) {
     case UpperBoundWildcardArgument(sig) =>
       fromTypeSignature(sig, env, loader).map(bound => new JWildcardTypeImpl(bound, None, loader))
     case LowerBoundWildcardArgument(sig) => for {
-      objectClass <- loader.loadClassOption("java/lang/Object")
+      objectClass <- loader.objectClass
       upperBound  <- objectClass.objectType(Nil)
       lowerBound  <- fromTypeSignature(sig, env, loader)
     } yield new JWildcardTypeImpl(upperBound, Some(lowerBound), loader)
     case UnboundWildcardArgument         => for {
-      objectClass <- loader.loadClassOption("java/lang/Object")
+      objectClass <- loader.objectClass
       upperBound  <- objectClass.objectType(Nil)
     } yield new JWildcardTypeImpl(upperBound, None, loader)
   }
