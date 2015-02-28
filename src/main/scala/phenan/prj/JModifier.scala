@@ -3,6 +3,8 @@ package phenan.prj
 case class JModifier (flags: Int) extends AnyVal {
   override def toString: String = toFlagList(1, Nil).map(JModifier.toString).mkString(" ")
 
+  def | (flag: Int): JModifier = JModifier(flags | flag)
+
   private def toFlagList(checked: Int, list: List[Int]): List[Int] = {
     if (flags < checked) list.reverse
     else {

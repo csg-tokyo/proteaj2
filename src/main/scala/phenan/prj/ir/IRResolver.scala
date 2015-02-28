@@ -5,6 +5,7 @@ import phenan.prj.decl._
 import phenan.prj.exception.InvalidTypeException
 import phenan.prj.internal.JClassLoader
 import phenan.prj.state.JState
+import phenan.util._
 
 import scala.util._
 import scalaz.Scalaz._
@@ -35,15 +36,60 @@ class IRResolver (header: Header, val loader: JClassLoader)(implicit state: JSta
   }
 
   def arrayOf (t: JErasedType): JArrayClass = loader.arrayOf(t)
+
+  def arrayOf (t: IRGenericType, dim: Int): IRGenericType = {
+    if (dim > 1) arrayOf(IRGenericArrayType(t, this), dim - 1)
+    else t
+  }
+
+  def voidClass = loader.void
   def objectClass = loader.objectClass
 
   def primitives = loader.primitives
 
-  private[ir] def getClass (name: QualifiedName): Option[JClass] = loadClass(name.names) match {
-    case Success(c) => Some(c)
-    case Failure(e) =>
-      state.error("class not found : " + name.names.mkString("."))
-      None
+  private[ir] def declareTypeVariables (parameters: List[TypeParameter], env: Map[String, IRTypeVariable]): Map[String, IRTypeVariable] = {
+    parameters.foldLeft (env) { (env, param) =>
+      env + (param.name -> IRTypeParameter(param, env, this).typeVariable)
+    }
+  }
+
+  private[ir] def typeName (t: TypeName, typeVariables: Map[String, IRTypeVariable]): Try[IRGenericType] = t match {
+    case c : ClassTypeName => simpleTypeName(c, typeVariables)
+    case a : ArrayTypeName => arrayTypeName(a, typeVariables)
+  }
+
+  private[ir] def simpleTypeName (c: ClassTypeName, typeVariables: Map[String, IRTypeVariable]): Try[IRGenericType] = {
+    if (c.args.isEmpty && c.name.names.size == 1) {
+      val name = c.name.names.head
+      if (primitives.contains(name)) Success(IRGenericPrimitiveType(primitives(name)))
+      else if (typeVariables.contains(name)) Success(typeVariables(name))
+      else classTypeName(c, typeVariables)
+    }
+    else classTypeName(c, typeVariables)
+  }
+
+  private[ir] def refTypeNames (cs: List[ClassTypeName], typeVariables: Map[String, IRTypeVariable]): Try[List[IRGenericRefType]] = {
+    cs.traverse(refTypeName(_, typeVariables))
+  }
+
+  private[ir] def refTypeName (c: ClassTypeName, typeVariables: Map[String, IRTypeVariable]): Try[IRGenericRefType] = {
+    if (c.args.isEmpty && c.name.names.size == 1 && typeVariables.contains(c.name.names.head)) Success(typeVariables(c.name.names.head))
+    else classTypeName(c, typeVariables)
+  }
+
+  private[ir] def classTypeName (c: ClassTypeName, typeVariables: Map[String, IRTypeVariable]): Try[IRGenericClassType] = for {
+    clazz <- loadClass(c.name.names)
+    args  <- c.args.traverse(typeArgument(_, typeVariables))
+  } yield IRGenericClassType(clazz, args)
+
+  private[ir] def arrayTypeName (a: ArrayTypeName, typeVariables: Map[String, IRTypeVariable]): Try[IRGenericArrayType] = typeName(a.component, typeVariables).map(IRGenericArrayType(_, this))
+
+  private[ir] def typeArgument (arg: TypeArgument, typeVariables: Map[String, IRTypeVariable]): Try[IRTypeArgument] = arg match {
+    case t: TypeName                => typeName(t, typeVariables)
+    case WildcardType(upper, lower) => for {
+      u <- upper.traverse(typeName(_, typeVariables))
+      l <- lower.traverse(typeName(_, typeVariables))
+    } yield IRGenericWildcardType(u, l)
   }
 
   private def tryLoadClass (name: List[String]): Try[JClass] = tryLoadClass(name.head, name.tail)
@@ -76,32 +122,5 @@ class IRResolver (header: Header, val loader: JClassLoader)(implicit state: JSta
     case None => header.imports.collect {
       case PackageImportDeclaration(name) => name
     }
-  }
-}
-
-trait TypeNameResolver {
-  protected def resolver: IRResolver
-  def typeVariables: Map[String, IRTypeVariable]
-
-  private[ir] def typeName (t: TypeName): Option[IRGenericType] = t match {
-    case c : ClassTypeName => simpleTypeName(c)
-    case a : ArrayTypeName => arrayTypeName(a)
-  }
-
-  private[ir] def simpleTypeName (c: ClassTypeName): Option[IRGenericType] = {
-    if (c.args.isEmpty && c.name.names.size == 1 && resolver.primitives.contains(c.name.names.head)) resolver.primitives.get(c.name.names.head).map(IRGenericPrimitiveType)
-    else classTypeName(c)
-  }
-
-  private[ir] def classTypeName (c: ClassTypeName): Option[IRGenericClassType] = for {
-    clazz <- resolver.getClass(c.name)
-    args  <- c.args.traverse(typeArgument)
-  } yield IRGenericClassType(clazz, args)
-
-  private[ir] def arrayTypeName (a: ArrayTypeName): Option[IRGenericArrayType] = typeName(a.component).map(IRGenericArrayType(_, resolver))
-
-  private[ir] def typeArgument (arg: TypeArgument): Option[IRTypeArgument] = arg match {
-    case t: TypeName                => typeName(t)
-    case WildcardType(upper, lower) => Some(IRGenericWildcardType(upper.flatMap(typeName), lower.flatMap(typeName)))
   }
 }

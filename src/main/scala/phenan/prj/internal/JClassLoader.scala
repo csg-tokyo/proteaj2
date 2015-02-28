@@ -43,7 +43,7 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
     "long" -> long, "float" -> float, "double" -> double, "void" -> void
   )
 
-  lazy val objectClass: Option[JClass] = loadClassOption("java/lang/Object")
+  lazy val objectClass: JClass = loadClass("java/lang/Object").get
 
   /* package private methods */
   private[internal] def loadClassOption (name: String): Option[JClass] = {
