@@ -107,20 +107,20 @@ class IRResolver (header: Header, val loader: JClassLoader)(implicit state: JSta
     else Failure(InvalidTypeException("inner class " + name.head + " is not found"))
   }
 
-  private def tryLoadClassFromPackage (name: List[String], packages: List[QualifiedName]): Try[JClass] = packages match {
-    case pack :: rest => tryLoadClass(pack.names ++ name) match {
+  private def tryLoadClassFromPackage (name: List[String], packages: List[List[String]]): Try[JClass] = packages match {
+    case pack :: rest => tryLoadClass(pack ++ name) match {
       case Success(clazz) => Success(clazz)
       case Failure(e) => tryLoadClassFromPackage(name, rest)
     }
     case Nil => tryLoadClass(name)
   }
 
-  private val packages = header.pack match {
-    case Some(pack) => pack.name :: header.imports.collect {
-      case PackageImportDeclaration(name) => name
+  private val packages = {
+    val pack = header.pack.map(_.name.names).toList
+    val imports = header.imports.collect {
+      case PackageImportDeclaration(name) => name.names
     }
-    case None => header.imports.collect {
-      case PackageImportDeclaration(name) => name
-    }
+    val primitives = List(List("proteaj", "lang"), List("java", "lang"))
+    pack ::: imports ::: primitives
   }
 }

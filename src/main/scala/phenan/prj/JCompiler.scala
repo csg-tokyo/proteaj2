@@ -12,14 +12,12 @@ import scala.util._
 class JCompiler (implicit state: JState) {
 
   def compile (files: List[String]): Unit = {
-    for (file <- files) generateIR(new FileReader(file), file)
+    generateIR(files)
+    generateClassFile()
+  }
 
-    while (modules.nonEmpty) {
-      val (name, module) = modules.head
-      generateClassFile(module)
-      compiled += name -> module
-      modules -= name
-    }
+  def generateIR (files: List[String]): Unit = {
+    for (file <- files) generateIR(new FileReader(file), file)
   }
 
   def generateIR (in: Reader, fileName: String): Unit = {
@@ -30,6 +28,15 @@ class JCompiler (implicit state: JState) {
   }
 
   def findIR (name: String): Option[IRModule] = compiled.get(name).orElse(modules.get(name))
+
+  def generateClassFile (): Unit = {
+    while (modules.nonEmpty) {
+      val (name, module) = modules.head
+      generateClassFile(module)
+      compiled += name -> module
+      modules -= name
+    }
+  }
 
   private def generateClassFile (module: IRModule): Unit = {
 
