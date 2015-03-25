@@ -7,6 +7,7 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader)(implici
 
   import classFile.poolReader._
   import classFile.attrParser._
+  import classFile.annReader._
   import SignatureParsers._
 
   lazy val mod = JModifier(outerInfo.map(_.mod).getOrElse(0) | classFile.mod)
@@ -34,6 +35,8 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader)(implici
   def objectType (typeArgs: List[JValueType]): Option[JObjectType] = JTypePool.get.getObjectType(this, typeArgs)
 
   lazy val signature = attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature)))
+
+  lazy val annotations = attributes.annotations.map(readClassAnnotations)
 
   private lazy val attributes = parseClassAttributes(classFile.attributes)
 
@@ -65,6 +68,7 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._
+  import declaringClass.classFile.annReader._
   import SignatureParsers._
 
   lazy val mod = JModifier(method.mod)
@@ -78,6 +82,8 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
   lazy val exceptions: List[JClass] = exceptionNames.flatMap(name => declaringClass.loader.loadClassOption(name))
 
   lazy val signature = attributes.signature.flatMap(sig => parseMethodSignature(readUTF(sig.signature)))
+
+  lazy val annotations = attributes.annotations.map(readMethodAnnotations)
 
   private def exceptionNames = attributes.exceptions.toList.flatMap(attr => attr.exceptions.map(readClassName))
 

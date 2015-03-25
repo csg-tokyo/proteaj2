@@ -81,9 +81,6 @@ case object TransientModifier extends Modifier
 case object NativeModifier extends Modifier
 case object AbstractModifier extends Modifier
 case object StrictFPModifier extends Modifier
-
-case object AutoCloseModifier extends Modifier
-case object PropagateModifier extends Modifier
 case object PureModifier extends Modifier
 
 sealed trait AnnotationElement

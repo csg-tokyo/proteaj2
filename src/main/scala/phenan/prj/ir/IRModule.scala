@@ -8,23 +8,28 @@ import JModifier._
 
 import scala.util._
 
-sealed trait IRModule extends JClass {
+sealed trait IRClassMemberDef
+
+sealed trait IRModule extends JClass with IRClassMemberDef {
   protected val declaration: ModuleDeclaration
 
-  def name: String = file.getPackageName match {
-    case Some(pack) => pack + "." + declaration.name
-    case None       => declaration.name
+  def name: String = outerClass match {
+    case Some(outer) => outer.name + '.' + declaration.name
+    case None        => file.getPackageName.map(_ + '.').getOrElse("") + declaration.name
   }
 
-  val internalName: String = file.getPackageInternalName match {
-    case Some(pack) => pack + "/" + declaration.name
-    case None       => declaration.name
+  def simpleName: String = declaration.name
+
+  val internalName: String = outerClass match {
+    case Some(outer) => outer.internalName + '$' + declaration.name
+    case None => file.getPackageInternalName.map(_ + '/').getOrElse("") + declaration.name
   }
 
   def file: IRFile
+  def outerClass: Option[IRModule]
 }
 
-class IRClass (protected val declaration: ClassDeclaration, val file: IRFile)(implicit state: JState) extends IRModule {
+class IRClass (protected val declaration: ClassDeclaration, val outerClass: Option[IRModule], val file: IRFile)(implicit state: JState) extends IRModule {
   lazy val modifiers = IRModifiers(declaration.modifiers)
 
   lazy val typeVariables = resolver.declareTypeVariables(declaration.typeParameters, Map.empty)
@@ -49,7 +54,24 @@ class IRClass (protected val declaration: ClassDeclaration, val file: IRFile)(im
     }
   }
 
-  lazy val members: List[IRClassMemberDef] = declaration.members.flatMap {
+  lazy val members: List[IRClassMemberDef] = declaration.members.flatMap(getIRMember)
+
+  override def mod: JModifier = modifiers.flags | accSuper
+
+  override def superClass: Option[JClass] = superType.map(_.erase)
+  override def interfaces: List[JClass] = interfaceTypes.map(_.erase)
+
+  override def innerClasses: Map[String, IRModule] = members.collect { case c: IRModule => c.simpleName -> c }.toMap
+
+  override def methods: List[IRMethodDef] = members.collect { case m: IRMethodDef => m }
+  override def fields: List[IRFieldDef] = members.collect { case f: IRFieldDef => f }
+
+  override def classType: JClassType = ???
+  override def objectType(typeArgs: List[JValueType]): Option[JObjectType] = ???
+
+  def resolver = file.resolver
+
+  private def getIRMember (member: ClassMember): List[IRClassMemberDef] = member match {
     case InstanceInitializer(block) =>
       List(IRInstanceInitializerDef(block, this))
 
@@ -103,24 +125,9 @@ class IRClass (protected val declaration: ClassDeclaration, val file: IRFile)(im
           Nil
       }
 
+    case clazz: ClassDeclaration => List(new IRClass(clazz, Some(this), file))
     case _ => ???
   }
-
-  override def mod: JModifier = modifiers.flags | accSuper
-
-  override def superClass: Option[JClass] = superType.map(_.erase)
-  override def interfaces: List[JClass] = interfaceTypes.map(_.erase)
-
-  override def outerClass: Option[JClass] = None
-  override def innerClasses: Map[String, JClass] = ???
-
-  override def methods: List[IRMethodDef] = members.collect { case m: IRMethodDef => m }
-  override def fields: List[IRFieldDef] = members.collect { case f: IRFieldDef => f }
-
-  override def classType: JClassType = ???
-  override def objectType(typeArgs: List[JValueType]): Option[JObjectType] = ???
-
-  def resolver = file.resolver
 
   private def getIRFormalParameters (formalParameters: List[FormalParameter], env: Map[String, IRTypeVariable]): Try[List[IRFormalParameter]] = getIRFormalParameters(formalParameters, env, Nil)
 
@@ -136,10 +143,6 @@ class IRClass (protected val declaration: ClassDeclaration, val file: IRFile)(im
     }
     case Nil => Success(result)
   }
-}
-
-sealed trait IRClassMemberDef {
-  def declaringClass: IRClass
 }
 
 case class IRFieldDef (modifiers: IRModifiers, name: String, genericType: IRGenericType, initializerSnippet: Option[ExpressionSnippet], declaringClass: IRClass) extends JFieldDef with IRClassMemberDef {

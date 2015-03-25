@@ -14,7 +14,7 @@ class IRFile (compilationUnit: CompilationUnit, loader: JClassLoader)(implicit s
   def getPackageInternalName: Option[String] = resolver.packageInternalName
 
   private def moduleToIR (module: ModuleDeclaration): IRModule = module match {
-    case cls: ClassDeclaration      => new IRClass(cls, this)
+    case cls: ClassDeclaration      => new IRClass(cls, None, this)
     case enm: EnumDeclaration       => ???
     case ifc: InterfaceDeclaration  => ???
     case ann: AnnotationDeclaration => ???

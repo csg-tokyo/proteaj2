@@ -107,7 +107,7 @@ class JTypePool private (state: JState) {
   }
 
   private def argSig2JType (arg: TypeArgument, env: Map[String, JValueType], loader: JClassLoader): Option[JValueType] = arg match {
-    case FixedTypeArgument(sig)          =>
+    case sig: TypeSignature              =>
       fromTypeSignature(sig, env, loader)
     case UpperBoundWildcardArgument(sig) =>
       fromTypeSignature(sig, env, loader).map(bound => new JWildcardTypeImpl(bound, None, loader))

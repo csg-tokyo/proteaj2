@@ -547,8 +547,7 @@ class DeclarationParser private (private val reader: SourceReader, private val f
     "public" -> PublicModifier, "private" -> PrivateModifier, "protected" -> ProtectedModifier,
     "static" -> StaticModifier, "final" -> FinalModifier, "synchronized" -> SynchronizedModifier,
     "volatile" -> VolatileModifier, "transient" -> TransientModifier, "native" -> NativeModifier,
-    "abstract" -> AbstractModifier, "strictfp" -> StrictFPModifier, "autoclose" -> AutoCloseModifier,
-    "propagate" -> PropagateModifier, "pure" -> PureModifier
+    "abstract" -> AbstractModifier, "strictfp" -> StrictFPModifier, "pure" -> PureModifier
   )
 
   /* Annotation

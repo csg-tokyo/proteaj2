@@ -14,6 +14,10 @@ object SignatureParsers extends PackratParsers {
 
   def parseMethodSignature (sig: String)(implicit state: JState): Option[MethodSignature] = parse(sig, "method signature", methodSignature)
 
+  def parseTypeSignature (sig: String)(implicit state: JState): Option[TypeSignature] = parse(sig, "type signature", typeSignature)
+
+  def parseClassTypeSignature (sig: String)(implicit state: JState): Option[ClassTypeSignature] = parse(sig, "class type signature", classType)
+
   private def parse[T] (sig: String, kind: String, parser: Parser[T])(implicit state: JState): Option[T] = parser(new PackratReader[Char](new CharSequenceReader(sig))) match {
     case Success(ret, _)   => Some(ret)
     case NoSuccess(msg, _) =>
@@ -70,7 +74,7 @@ object SignatureParsers extends PackratParsers {
 
   private lazy val typeArgList = '<' ~> typeArgument.+ <~ '>' | success(Nil)
 
-  private lazy val typeArgument = upperBoundedWildcard | lowerBoundedWildcard | unboundedWildcard | fixedTypeArgument
+  private lazy val typeArgument = upperBoundedWildcard | lowerBoundedWildcard | unboundedWildcard | pureVariable | fieldType
 
   private lazy val upperBoundedWildcard = '+' ~> fieldType ^^ UpperBoundWildcardArgument
 
@@ -78,7 +82,7 @@ object SignatureParsers extends PackratParsers {
 
   private lazy val unboundedWildcard = '*' ^^^ UnboundWildcardArgument
 
-  private lazy val fixedTypeArgument = fieldType ^^ FixedTypeArgument
+  private lazy val pureVariable = 'P' ~> identifier <~ ';' ^^ PureVariable
 
   private lazy val throwsType = '^' ~> (classType | typeVariable)
 

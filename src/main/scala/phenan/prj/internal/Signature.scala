@@ -6,7 +6,7 @@ case class MethodSignature (typeParams: List[FormalTypeParameter], paramTypes: L
 
 case class FormalTypeParameter (name: String, classBound: Option[TypeSignature], interfaceBounds: List[TypeSignature])
 
-sealed trait TypeSignature
+sealed trait TypeSignature extends TypeArgument
 
 sealed trait ClassTypeSignature extends TypeSignature
 
@@ -32,7 +32,7 @@ case class TypeVariableSignature (name: String) extends TypeSignature
 
 sealed trait TypeArgument
 
-case class FixedTypeArgument (signature: TypeSignature) extends TypeArgument
+case class PureVariable (name: String) extends TypeArgument
 
 case class UpperBoundWildcardArgument (signature: TypeSignature) extends TypeArgument
 

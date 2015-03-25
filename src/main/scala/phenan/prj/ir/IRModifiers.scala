@@ -11,7 +11,7 @@ case class IRModifiers (flags: JModifier) {
 
 object IRModifiers {
   def apply (modifiers: List[Modifier]): IRModifiers = {
-    IRModifiers(JModifier(modifiers.foldRight(accSuper)((mod, flags) => flags | getModifierFlag(mod))))
+    IRModifiers(JModifier(modifiers.foldRight(0)((mod, flags) => flags | getModifierFlag(mod))))
   }
 
   private def getModifierFlag (modifier: Modifier): Int = modifier match {

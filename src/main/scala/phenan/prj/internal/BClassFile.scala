@@ -8,6 +8,7 @@ case class BClassFile (minor: Int, major: Int, pool: BConstantPool, mod: Int,
 {
   lazy val poolReader = new BConstantPoolReader(pool)
   lazy val attrParser = new BAttributeParsers(this)
+  lazy val annReader = new AnnotationReader(this)
 }
 
 case class BField (mod: Int, name: Int, desc: Int, attributes: List[BAttributeInfo])

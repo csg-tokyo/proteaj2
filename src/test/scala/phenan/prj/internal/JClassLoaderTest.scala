@@ -44,7 +44,87 @@ class JClassLoaderTest extends FunSuite with Matchers {
     clazz shouldBe a [Success[_]]
     clazz.get shouldBe a [IRClass]
 
-    val ir = clazz.get.asInstanceOf[IRClass]
+  }
 
+  test ("アノテーションを持つクラスをロード") {
+    implicit val state  = JConfig().configure.get
+    val loader = (new JCompiler).loader
+
+    val clazz = loader.load("java/lang/Deprecated")
+    clazz shouldBe a [Success[_]]
+    clazz.get shouldBe a [JLoadedClass]
+
+    val cl = clazz.get.asInstanceOf[JLoadedClass]
+    cl.annotations shouldBe a [Some[_]]
+
+    val annotations = cl.annotations.get
+    annotations.dsl shouldBe None
+  }
+
+  test("SimpleDSLClass") {
+    val config = new JConfig
+    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
+    implicit val state = config.configure.get
+    val loader = (new JCompiler).loader
+
+    val clazz = loader.load("test/SimpleDSLClass")
+    clazz shouldBe a [Success[_]]
+    clazz.get shouldBe a [JLoadedClass]
+
+    val cl = clazz.get.asInstanceOf[JLoadedClass]
+    cl.annotations shouldBe a [Some[_]]
+
+    val annotations = cl.annotations.get
+    annotations.dsl shouldBe a [Some[_]]
+    annotations.signature shouldBe None
+
+    annotations.dsl.get.priorities shouldBe Nil
+    annotations.dsl.get.withDSLs shouldBe Nil
+  }
+
+  test("ClassSigが読めるか") {
+    val config = new JConfig
+    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
+    implicit val state = config.configure.get
+    val loader = (new JCompiler).loader
+
+    val clazz = loader.load("test/Var")
+    clazz shouldBe a [Success[_]]
+    clazz.get shouldBe a [JLoadedClass]
+
+    val cl = clazz.get.asInstanceOf[JLoadedClass]
+    cl.annotations shouldBe a [Some[_]]
+
+    val annotations = cl.annotations.get
+    annotations.signature shouldBe a [Some[_]]
+
+    annotations.isContext shouldBe true
+  }
+
+  test("Operatorが読めるか") {
+    val config = new JConfig
+    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
+    implicit val state = config.configure.get
+    val loader = (new JCompiler).loader
+
+    val clazz = loader.load("test/Var")
+    clazz shouldBe a [Success[_]]
+    clazz.get shouldBe a [JLoadedClass]
+
+    val cl = clazz.get.asInstanceOf[JLoadedClass]
+    val setterMethod = cl.methods.find(_.name == "setter")
+
+    setterMethod shouldBe a [Some[_]]
+    setterMethod.get.annotations shouldBe a [Some[_]]
+
+    val annotations = setterMethod.get.annotations.get
+    annotations.signature shouldBe None
+    annotations.operator shouldBe a [Some[_]]
+
+    annotations.operator.get shouldBe a [PrjExpressionOperator]
+    annotations.operator.get.association shouldBe a [PrjNonAssociation]
+
+    val pattern = annotations.operator.get.pattern
+    pattern shouldBe List(PrjOperatorPureValueRef("id"), PrjOperatorName("="), PrjOperatorHole)
   }
 }

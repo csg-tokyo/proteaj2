@@ -26,6 +26,8 @@ trait ByteParsers {
 
   def list [T] (p: ByteParser[T]): ByteParser[List[T]] = u2 >>= p.rep
 
+  def ref [T] (p: ByteParser[T]): ByteParser[T] = ByteParser.ref(p)
+
 
   def parseFile[T] (file: String)(parser: ByteParser[T]): Try[T] = ByteReader.openFile(file)(parser)
 
