@@ -54,10 +54,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     clazz shouldBe a [Success[_]]
     clazz.get shouldBe a [JLoadedClass]
 
-    val cl = clazz.get.asInstanceOf[JLoadedClass]
-    cl.annotations shouldBe a [Some[_]]
-
-    val annotations = cl.annotations.get
+    val annotations = clazz.get.asInstanceOf[JLoadedClass].annotations
     annotations.dsl shouldBe None
   }
 
@@ -71,10 +68,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     clazz shouldBe a [Success[_]]
     clazz.get shouldBe a [JLoadedClass]
 
-    val cl = clazz.get.asInstanceOf[JLoadedClass]
-    cl.annotations shouldBe a [Some[_]]
-
-    val annotations = cl.annotations.get
+    val annotations = clazz.get.asInstanceOf[JLoadedClass].annotations
     annotations.dsl shouldBe a [Some[_]]
     annotations.signature shouldBe None
 
@@ -92,10 +86,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     clazz shouldBe a [Success[_]]
     clazz.get shouldBe a [JLoadedClass]
 
-    val cl = clazz.get.asInstanceOf[JLoadedClass]
-    cl.annotations shouldBe a [Some[_]]
-
-    val annotations = cl.annotations.get
+    val annotations = clazz.get.asInstanceOf[JLoadedClass].annotations
     annotations.signature shouldBe a [Some[_]]
 
     annotations.isContext shouldBe true
@@ -115,9 +106,8 @@ class JClassLoaderTest extends FunSuite with Matchers {
     val setterMethod = cl.methods.find(_.name == "setter")
 
     setterMethod shouldBe a [Some[_]]
-    setterMethod.get.annotations shouldBe a [Some[_]]
 
-    val annotations = setterMethod.get.annotations.get
+    val annotations = setterMethod.get.annotations
     annotations.signature shouldBe None
     annotations.operator shouldBe a [Some[_]]
 

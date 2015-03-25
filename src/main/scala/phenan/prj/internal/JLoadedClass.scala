@@ -34,9 +34,10 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader)(implici
 
   def objectType (typeArgs: List[JValueType]): Option[JObjectType] = JTypePool.get.getObjectType(this, typeArgs)
 
-  lazy val signature = attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature)))
+  lazy val signature =
+    attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature)))
 
-  lazy val annotations = attributes.annotations.map(readClassAnnotations)
+  lazy val annotations = readClassAnnotations(attributes.annotations)
 
   private lazy val attributes = parseClassAttributes(classFile.attributes)
 
@@ -53,6 +54,7 @@ class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val 
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._
+  import declaringClass.classFile.annReader._
   import SignatureParsers._
 
   lazy val mod = JModifier(field.mod)
@@ -60,6 +62,8 @@ class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val 
   lazy val name = readUTF(field.name)
 
   lazy val signature = attributes.signature.flatMap(sig => parseFieldSignature(readUTF(sig.signature)))
+
+  lazy val annotations = readFieldAnnotations(attributes.annotations)
 
   private lazy val attributes = parseFieldAttribute(field.attributes)
 }
@@ -83,7 +87,7 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
 
   lazy val signature = attributes.signature.flatMap(sig => parseMethodSignature(readUTF(sig.signature)))
 
-  lazy val annotations = attributes.annotations.map(readMethodAnnotations)
+  lazy val annotations = readMethodAnnotations(attributes.annotations)
 
   private def exceptionNames = attributes.exceptions.toList.flatMap(attr => attr.exceptions.map(readClassName))
 

@@ -12,8 +12,6 @@ case class ExceptionsAttribute (exceptions: List[Int]) extends BAttribute
 
 case class RuntimeVisibleAnnotationsAttribute (annotations: List[BAnnotation]) extends BAttribute
 
-case class RuntimeVisibleParameterAnnotationsAttribute (annotations: List[List[BAnnotation]]) extends BAttribute
-
 
 case class BAnnotation (annotationType: Int, values: List[(Int, BAnnotationElement)])
 

@@ -7,8 +7,12 @@ import scalaz._
 class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   import classFile.poolReader._
 
-  def readClassAnnotations (attribute: RuntimeVisibleAnnotationsAttribute): PrjClassAnnotations = classAnnotations(attribute)
-  def readMethodAnnotations (attribute: RuntimeVisibleAnnotationsAttribute): PrjMethodAnnotations = methodAnnotations(attribute)
+  def readClassAnnotations (attribute: Option[RuntimeVisibleAnnotationsAttribute]): PrjClassAnnotations =
+    attribute.map(classAnnotations).getOrElse(PrjClassAnnotations(None, None, false, false))
+  def readMethodAnnotations (attribute: Option[RuntimeVisibleAnnotationsAttribute]): PrjMethodAnnotations =
+    attribute.map(methodAnnotations).getOrElse(PrjMethodAnnotations(None, None, false, false))
+  def readFieldAnnotations (attribute: Option[RuntimeVisibleAnnotationsAttribute]): PrjFieldAnnotations =
+    attribute.map(fieldAnnotations).getOrElse(PrjFieldAnnotations(false))
 
   private lazy val classAnnotations = annotations >=> {
     for {
@@ -26,6 +30,10 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
       pr  <- pure
       fnl <- finalizer
     } yield PrjMethodAnnotations(sig, op, pr, fnl)
+  }
+
+  private lazy val fieldAnnotations = annotations >=> {
+    pure >==> PrjFieldAnnotations
   }
 
   private lazy val classSig = annotation("ClassSig") {
