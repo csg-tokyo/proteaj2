@@ -40,7 +40,7 @@ sealed trait JRefType extends JType with MetaValue
 trait JObjectType extends JRefType {
   def erase: JClass
 
-  def typeArguments: Map[String, MetaValue]
+  def env: Map[String, MetaValue]
 
   def superType: Option[JObjectType]
   def interfaceTypes: List[JObjectType]
@@ -48,7 +48,7 @@ trait JObjectType extends JRefType {
   def declaredFields: List[JField]
   def declaredMethods: List[JGenMethod]
 
-  def constructors: List[JConstructor]
+  def constructors: List[JGenConstructor]
 
   lazy val privateFields: Map[String, JField] = declaredFields.filter(_.isPrivate).map(f => f.name -> f).toMap
   lazy val privateMethods: Map[String, List[JGenMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
@@ -64,7 +64,7 @@ trait JObjectType extends JRefType {
   }
 
   def isSubtypeOf (that: JObjectType): Boolean = {
-    (this.erase == that.erase && matchTypeArgs(that.typeArguments)) || superType.exists(_.isSubtypeOf(that)) || interfaceTypes.exists(_.isSubtypeOf(that))
+    (this.erase == that.erase && matchTypeArgs(that.env)) || superType.exists(_.isSubtypeOf(that)) || interfaceTypes.exists(_.isSubtypeOf(that))
   }
 
   def matches (that: MetaValue): Boolean = this == that
@@ -90,7 +90,7 @@ trait JObjectType extends JRefType {
     }
   }
 
-  private def matchTypeArgs (args: Map[String, MetaValue]): Boolean = typeArguments.forall { case (key, value) =>
+  private def matchTypeArgs (args: Map[String, MetaValue]): Boolean = env.forall { case (key, value) =>
     args.get(key).exists { arg => arg.matches(value) }
   }
 }

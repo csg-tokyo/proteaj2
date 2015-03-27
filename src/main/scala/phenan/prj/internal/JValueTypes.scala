@@ -7,27 +7,35 @@ private[internal] trait JType_Internal {
   def loader: JClassLoader
 }
 
-class JLoadedObjectType (val erase: JLoadedClass, val typeArguments: Map[String, MetaValue])(implicit state: JState) extends JObjectType with JType_Internal {
+class JLoadedObjectType (val erase: JLoadedClass, val env: Map[String, MetaValue])(implicit state: JState) extends JObjectType with JType_Internal {
   override def name: String = {
-    if (typeArguments.isEmpty) erase.name
-    else erase.name + typeArguments.map(kv => kv._1 + "=" + kv._2).mkString("<", ",", ">")
+    if (env.isEmpty) erase.name
+    else erase.name + env.map(kv => kv._1 + "=" + kv._2).mkString("<", ",", ">")
   }
 
   lazy val superType: Option[JObjectType] = erase.signature match {
-    case Some(sig) => typePool.fromClassTypeSignature(sig.superClass, typeArguments, loader)
+    case Some(sig) => typePool.fromClassTypeSignature(sig.superClass, env, loader)
     case None      => erase.superClass.flatMap(_.objectType(Nil))
   }
 
   lazy val interfaceTypes: List[JObjectType] = erase.signature match {
-    case Some(sig) => sig.interfaces.flatMap(typePool.fromClassTypeSignature(_, typeArguments, loader))
+    case Some(sig) => sig.interfaces.flatMap(typePool.fromClassTypeSignature(_, env, loader))
     case None      => erase.interfaces.flatMap(_.objectType(Nil))
   }
 
-  override def constructors: List[JConstructor] = ???
+  lazy val constructors: List[JGenConstructor] = {
+    erase.methods.filter(_.isConstructor).map { constructorDef => new JGenLoadedConstructor(constructorDef, env, this) }
+  }
 
-  override def declaredFields: List[JField] = ???
+  lazy val declaredFields: List[JField] = {
+    erase.fields.filterNot(_.isStatic).flatMap { fieldDef =>
+      fieldDef.signature.flatMap(sig => typePool.fromTypeSignature(sig, env, loader)).map(fieldType => new JLoadedField(fieldDef, fieldType, this))
+    }
+  }
 
-  override def declaredMethods: List[JGenMethod] = ???
+  lazy val declaredMethods: List[JGenMethod] = {
+    erase.methods.filter(_.isInstanceMethod).map { methodDef => new JGenLoadedInstanceMethod(methodDef, env, this) }
+  }
 
   override def isAssignableTo(that: JType): Boolean = ???
 

@@ -20,12 +20,16 @@ class JTypePool private (state: JState) {
 
   def rawTypeArguments (typeParams: List[FormalMetaParameter], env: Map[String, MetaValue], loader: JClassLoader): Map[String, MetaValue] = {
     typeParams.foldLeft(env) { (e, param) =>
-      param.bounds.headOption.flatMap(fromTypeSignature_RefType(_, e, loader)).
-        orElse(loader.objectClass.objectType(Nil)).map(t => e + (param.name -> t)).getOrElse {
-        state.error("cannot load object type")
+      getRawMetaValue(param, e, loader).map(t => e + (param.name -> t)).getOrElse {
+        state.error("cannot get raw meta value for " + param.name)
         e
       }
     }
+  }
+
+  private def getRawMetaValue (param: FormalMetaParameter, env: Map[String, MetaValue], loader: JClassLoader): Option[MetaValue] = {
+    if (param.metaType != TypeSignature.typeTypeSig) fromTypeSignature(param.metaType, env, loader).map(UnknownPureValue)
+    else param.bounds.headOption.flatMap(fromTypeSignature_RefType(_, env, loader)).orElse(loader.objectClass.objectType(Nil))
   }
 
   def fromTypeSignature (sig: TypeSignature, env: Map[String, MetaValue], loader: JClassLoader): Option[JType] = sig match {
@@ -112,13 +116,13 @@ class JTypePool private (state: JState) {
     else false
   }
 
-  private def validTypeArg (param: FormalMetaParameter, arg: MetaValue, env: Map[String, MetaValue], loader: JClassLoader): Boolean = {
-    param.bounds.forall(withinBound(_, arg, env, loader))
+  private def validTypeArg (param: FormalMetaParameter, arg: MetaValue, env: Map[String, MetaValue], loader: JClassLoader): Boolean = arg match {
+    case arg: JRefType => param.bounds.forall(withinBound(_, arg, env, loader))
+    case pv: PureValue => fromTypeSignature(param.metaType, env, loader).exists(pv.valueType <:< _)
   }
 
-  private def withinBound (bound: TypeSignature, arg: MetaValue, env: Map[String, MetaValue], loader: JClassLoader): Boolean = arg match {
-    case arg : JType => arg.isSubtypeOf(fromTypeSignature(bound, env, loader).get)
-    case _ => false
+  private def withinBound (bound: TypeSignature, arg: JRefType, env: Map[String, MetaValue], loader: JClassLoader): Boolean = {
+    arg.isSubtypeOf(fromTypeSignature(bound, env, loader).get)
   }
 
   private def argSig2JType (arg: TypeArgument, env: Map[String, MetaValue], loader: JClassLoader): Option[MetaValue] = arg match {
@@ -133,6 +137,8 @@ class JTypePool private (state: JState) {
     case UnboundWildcardArgument         => for {
       upperBound  <- loader.objectClass.objectType(Nil)
     } yield new JWildcardTypeImpl(upperBound, None, loader)
+    case PureVariable(name)              =>
+      env.get(name)
   }
 
   private implicit def st: JState = state
