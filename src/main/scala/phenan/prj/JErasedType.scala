@@ -13,8 +13,10 @@ trait JClass extends JErasedType {
   def fields: List[JFieldDef]
   def methods: List[JMethodDef]
 
-  def classType: JClassType
-  def objectType (typeArgs: List[JValueType]): Option[JObjectType]
+
+
+  def classModule: JClassModule
+  def objectType (typeArgs: List[MetaValue]): Option[JObjectType]
 
   lazy val classInitializer = methods.find(_.isClassInitializer)
   lazy val constructors     = methods.filter(_.isConstructor)

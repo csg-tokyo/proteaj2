@@ -1,27 +1,46 @@
 package phenan.prj
 
-sealed trait JType {
+sealed trait MetaValue {
+  def matches (v: MetaValue): Boolean
+}
+
+sealed trait PureValue extends MetaValue {
+  def valueType: JType
+}
+
+case class UnknownPureValue (valueType: JType) extends PureValue {
+  def matches (v: MetaValue): Boolean = this == v
+}
+
+case class ConcretePureValue (value: Any, valueType: JType) extends PureValue {
+  override def matches(v: MetaValue): Boolean = this == v
+}
+
+
+sealed trait JModule {
   def fields: Map[String, JField]
   def methods: Map[String, List[JGenMethod]]
 }
 
-trait JClassType extends JType
+trait JClassModule extends JModule
 
-sealed trait JValueType extends JType {
+sealed trait JType extends JModule {
   def name: String
   def array: JArrayType
 
-  def isSubtypeOf (that: JValueType): Boolean
-  def isAssignableTo (that: JValueType): Boolean
+  def isSubtypeOf (that: JType): Boolean
+  def isAssignableTo (that: JType): Boolean
 
-  def <:< (t: JValueType): Boolean = this.isSubtypeOf(t)
-  def >:> (t: JValueType): Boolean = t.isSubtypeOf(this)
+  def <:< (t: JType): Boolean = this.isSubtypeOf(t)
+  def >:> (t: JType): Boolean = t.isSubtypeOf(this)
 }
 
-trait JObjectType extends JValueType {
+sealed trait JRefType extends JType with MetaValue
+
+trait JObjectType extends JRefType {
   def erase: JClass
 
-  def typeArguments: Map[String, JValueType]
+  def typeArguments: Map[String, MetaValue]
 
   def superType: Option[JObjectType]
   def interfaceTypes: List[JObjectType]
@@ -37,7 +56,7 @@ trait JObjectType extends JValueType {
   lazy val fields: Map[String, JField] = nonPrivateFieldList.map(f => f.name -> f).toMap
   lazy val methods: Map[String, List[JGenMethod]] = nonPrivateMethodList.groupBy(_.name).mapValues(filterOutOverriddenMethod)
 
-  def isSubtypeOf (that: JValueType): Boolean = that match {
+  def isSubtypeOf (that: JType): Boolean = that match {
     case _ if this == that   => true
     case that: JObjectType   => isSubtypeOf(that)
     case that: JWildcardType => that.lowerBound.exists(lb => isSubtypeOf(lb))
@@ -45,16 +64,10 @@ trait JObjectType extends JValueType {
   }
 
   def isSubtypeOf (that: JObjectType): Boolean = {
-    isMatchedTo(that) || superType.exists(_.isSubtypeOf(that)) || interfaceTypes.exists(_.isSubtypeOf(that))
+    (this.erase == that.erase && matchTypeArgs(that.typeArguments)) || superType.exists(_.isSubtypeOf(that)) || interfaceTypes.exists(_.isSubtypeOf(that))
   }
 
-  def isMatchedTo (that: JObjectType): Boolean = {
-    if (this.erase == that.erase) that match {
-      case that: JObjectType => matchTypeArgs(that.typeArguments)
-      case _                 => false
-    }
-    else false
-  }
+  def matches (that: MetaValue): Boolean = this == that
 
   /* helper methods for collecting non-private inherited members */
 
@@ -77,27 +90,23 @@ trait JObjectType extends JValueType {
     }
   }
 
-  private def matchTypeArgs (args: Map[String, JValueType]): Boolean = typeArguments.forall { case (key, value) =>
-    args.get(key) match {
-      case Some(arg) if value == arg => true
-      case Some(arg: JWildcardType)  => arg.includes(value)
-      case _                         => false
-    }
+  private def matchTypeArgs (args: Map[String, MetaValue]): Boolean = typeArguments.forall { case (key, value) =>
+    args.get(key).exists { arg => arg.matches(value) }
   }
 }
 
-trait JPrimitiveType extends JValueType {
+trait JPrimitiveType extends JType {
   def fields: Map[String, JField] = Map.empty
   def methods: Map[String, List[JGenMethod]] = Map.empty
 
-  def isSubtypeOf (that: JValueType): Boolean = this == that
+  def isSubtypeOf (that: JType): Boolean = this == that
 }
 
-trait JArrayType extends JValueType {
-  def componentType: JValueType
+trait JArrayType extends JRefType {
+  def componentType: JType
   def superTypes: List[JObjectType]
 
-  def isSubtypeOf (that: JValueType): Boolean = that match {
+  def isSubtypeOf (that: JType): Boolean = that match {
     case _ if this == that   => true
     case that: JArrayType    => componentType.isSubtypeOf(that.componentType)
     case that: JObjectType   => superTypes.exists(_.isSubtypeOf(that))
@@ -105,15 +114,20 @@ trait JArrayType extends JValueType {
     case _                   => false
   }
 
-  def isAssignableTo (that: JValueType): Boolean = isSubtypeOf(that)
+  def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
+
+  def matches (that: MetaValue): Boolean = this == that
 }
 
-trait JWildcardType extends JValueType {
-  def upperBound: JValueType
-  def lowerBound: Option[JValueType]
+trait JWildcardType extends JRefType {
+  def upperBound: JType
+  def lowerBound: Option[JType]
 
-  def isSubtypeOf (that: JValueType): Boolean = upperBound.isSubtypeOf(that)
-  def isAssignableTo (that: JValueType): Boolean = isSubtypeOf(that)
+  def isSubtypeOf (that: JType): Boolean = upperBound.isSubtypeOf(that)
+  def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
 
-  def includes (that: JValueType): Boolean = that.isSubtypeOf(upperBound) && lowerBound.forall(_.isSubtypeOf(that))
+  def matches (that: MetaValue): Boolean = that match {
+    case that: JRefType => that.isSubtypeOf(upperBound) && lowerBound.forall(_.isSubtypeOf(that))
+    case _ => false
+  }
 }

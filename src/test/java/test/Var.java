@@ -4,7 +4,7 @@ import proteaj.lang.*;
 import static proteaj.lang.OpElemType.*;
 
 @Context
-@ClassSig(genericParameters = { @GenericParameter(name = "T"), @GenericParameter(name = "id", parameterType = "Lproteaj/lang/Identifier;") })
+@ClassSig(metaParameters = { @MetaParameter(name = "T"), @MetaParameter(name = "id", type = "Lproteaj/lang/Identifier;") })
 public class Var<T> {
   public Var (T v) {
     this.v = v;

@@ -7,10 +7,10 @@ private[internal] trait JType_Internal {
   def loader: JClassLoader
 }
 
-class JLoadedObjectType (val erase: JLoadedClass, val typeArguments: Map[String, JValueType])(implicit state: JState) extends JObjectType with JType_Internal {
+class JLoadedObjectType (val erase: JLoadedClass, val typeArguments: Map[String, MetaValue])(implicit state: JState) extends JObjectType with JType_Internal {
   override def name: String = {
     if (typeArguments.isEmpty) erase.name
-    else erase.name + typeArguments.map(kv => kv._1 + "=" + kv._2.name).mkString("<", ",", ">")
+    else erase.name + typeArguments.map(kv => kv._1 + "=" + kv._2).mkString("<", ",", ">")
   }
 
   lazy val superType: Option[JObjectType] = erase.signature match {
@@ -29,7 +29,7 @@ class JLoadedObjectType (val erase: JLoadedClass, val typeArguments: Map[String,
 
   override def declaredMethods: List[JGenMethod] = ???
 
-  override def isAssignableTo(that: JValueType): Boolean = ???
+  override def isAssignableTo(that: JType): Boolean = ???
 
   override def array: JArrayType = typePool.arrayOf(this)
 
@@ -38,7 +38,7 @@ class JLoadedObjectType (val erase: JLoadedClass, val typeArguments: Map[String,
   private def typePool = JTypePool.get
 }
 
-class JArrayTypeImpl (val componentType: JValueType with JType_Internal)(implicit state: JState) extends JArrayType with JType_Internal {
+class JArrayTypeImpl (val componentType: JType with JType_Internal)(implicit state: JState) extends JArrayType with JType_Internal {
 
   lazy val name: String = componentType.name + "[]"
 
@@ -58,9 +58,9 @@ class JPrimitiveTypeImpl (clazz: JPrimitiveClassImpl)(implicit state: JState) ex
 
   override def name: String = clazz.name
 
-  lazy val wrapperType: Option[JValueType] = clazz.wrapperClass.flatMap(_.objectType(Nil))
+  lazy val wrapperType: Option[JType] = clazz.wrapperClass.flatMap(_.objectType(Nil))
 
-  override def isAssignableTo(that: JValueType): Boolean = ???
+  override def isAssignableTo(that: JType): Boolean = ???
 
   override def array: JArrayType = typePool.arrayOf(this)
 
@@ -69,7 +69,7 @@ class JPrimitiveTypeImpl (clazz: JPrimitiveClassImpl)(implicit state: JState) ex
   private def typePool = JTypePool.get
 }
 
-class JWildcardTypeImpl (val upperBound: JValueType, val lowerBound: Option[JValueType], val loader: JClassLoader)(implicit state: JState) extends JWildcardType with JType_Internal {
+class JWildcardTypeImpl (val upperBound: JType, val lowerBound: Option[JType], val loader: JClassLoader)(implicit state: JState) extends JWildcardType with JType_Internal {
   override def name: String = ???
 
   override def array: JArrayType = typePool.arrayOf(this)

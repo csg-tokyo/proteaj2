@@ -1,17 +1,12 @@
 package phenan.prj.internal
 
-case class PrjClassAnnotations (signature: Option[PrjClassSignature], dsl: Option[PrjDSLAnnotation], isPure: Boolean, isContext: Boolean)
+case class PrjClassAnnotations (signature: Option[ClassSignature], dsl: Option[PrjDSLAnnotation], isPure: Boolean, isContext: Boolean)
 
-case class PrjMethodAnnotations (signature: Option[PrjMethodSignature], operator: Option[PrjOperatorAnnotation], isPure: Boolean, isFinalizer: Boolean)
+case class PrjMethodAnnotations (signature: Option[MethodSignature], operator: Option[PrjOperatorAnnotation], isPure: Boolean, isFinalizer: Boolean)
 
 case class PrjFieldAnnotations (isPure: Boolean)
 
 case class PrjDSLAnnotation (priorities: List[String], withDSLs: List[String])
-
-case class PrjClassSignature (genericParameters: List[PrjGenericParameter], superType: ClassTypeSignature, interfaces: List[ClassTypeSignature])
-
-case class PrjMethodSignature (genericParameters: List[PrjGenericParameter], returnType: TypeSignature, parameterTypes: List[TypeSignature], throwsTypes: List[TypeSignature],
-                               activates: List[TypeSignature], deactivates: List[TypeSignature], requires: List[TypeSignature])
 
 sealed trait PrjOperatorAnnotation {
   def association: PrjOperatorAssociation
@@ -40,5 +35,3 @@ case object PrjOperatorOptionalHole extends PrjOperatorElement
 case class PrjOperatorAndPredicate (typeSig: TypeSignature) extends PrjOperatorElement
 case class PrjOperatorNotPredicate (typeSig: TypeSignature) extends PrjOperatorElement
 case class PrjOperatorPureValueRef (name: String) extends PrjOperatorElement
-
-case class PrjGenericParameter (name: String, parameterType: TypeSignature, bounds: List[TypeSignature])

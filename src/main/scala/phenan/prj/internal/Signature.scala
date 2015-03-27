@@ -1,12 +1,18 @@
 package phenan.prj.internal
 
-case class ClassSignature (typeParams: List[FormalTypeParameter], superClass: ClassTypeSignature, interfaces: List[ClassTypeSignature])
+case class ClassSignature (metaParams: List[FormalMetaParameter], superClass: ClassTypeSignature, interfaces: List[ClassTypeSignature])
 
-case class MethodSignature (typeParams: List[FormalTypeParameter], paramTypes: List[TypeSignature], returnType: TypeSignature, throwTypes: List[TypeSignature])
+case class MethodSignature (metaParams: List[FormalMetaParameter], paramTypes: List[TypeSignature], returnType: TypeSignature, throwTypes: List[TypeSignature],
+                            activates: List[TypeSignature], deactivates: List[TypeSignature], requires: List[TypeSignature])
 
-case class FormalTypeParameter (name: String, classBound: Option[TypeSignature], interfaceBounds: List[TypeSignature])
+case class FormalMetaParameter (name: String, metaType: TypeSignature, bounds: List[TypeSignature])
 
 sealed trait TypeSignature extends TypeArgument
+
+object TypeSignature {
+  lazy val typeTypeSig = SimpleClassTypeSignature("proteaj/lang/Type", Nil)
+  lazy val objectTypeSig = SimpleClassTypeSignature("java/lang/Object", Nil)
+}
 
 sealed trait ClassTypeSignature extends TypeSignature
 

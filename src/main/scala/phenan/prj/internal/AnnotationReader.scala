@@ -38,22 +38,22 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
 
   private lazy val classSig = annotation("ClassSig") {
     for {
-      genParams  <- array("genericParameters")(genericParameter)
-      supType    <- element("superType")(classTypeSignature)(SimpleClassTypeSignature("java/lang/Object", Nil))
+      metaParams <- array("metaParameters")(metaParameter)
+      supType    <- element("superType")(classTypeSignature)(TypeSignature.objectTypeSig)
       interfaces <- array("interfaces")(classTypeSignature)
-    } yield PrjClassSignature(genParams, supType, interfaces)
+    } yield ClassSignature(metaParams, supType, interfaces)
   }
 
   private lazy val methodSig = annotation("MethodSig") {
     for {
-      genParams   <- array("genericParameters")(genericParameter)
+      metaParams  <- array("metaParameters")(metaParameter)
       retType     <- required("returnType")(typeSignature)(VoidTypeSignature)
       paramTypes  <- array("parameterTypes")(typeSignature)
       exceptions  <- array("throwsTypes")(typeSignature)
       activates   <- array("activates")(typeSignature)
       deactivates <- array("deactivates")(typeSignature)
       requires    <- array("requires")(typeSignature)
-    } yield PrjMethodSignature(genParams, retType, paramTypes, exceptions, activates, deactivates, requires)
+    } yield MethodSignature(metaParams, paramTypes, retType, exceptions, activates, deactivates, requires)
   }
 
   private lazy val dsl = annotation("DSL") {
@@ -88,12 +88,12 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
 
   private lazy val finalizer = marker("Finalizer")
 
-  private lazy val genericParameter = elementAnnotation("GenericParameter") {
+  private lazy val metaParameter = elementAnnotation("MetaParameter") {
     for {
       name      <- required("name")(string)("")
-      paramType <- element("parameterType")(typeSignature)(SimpleClassTypeSignature("proteaj/lang/Type", Nil))
+      paramType <- element("type")(typeSignature)(TypeSignature.typeTypeSig)
       bounds    <- array("bounds")(typeSignature)
-    } yield PrjGenericParameter(name, paramType, bounds)
+    } yield FormalMetaParameter(name, paramType, bounds)
   }
 
   private lazy val association = enumSwitch [PrjOperatorAssociation] ("assoc", "Association") {

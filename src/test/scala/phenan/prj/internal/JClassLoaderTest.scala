@@ -46,18 +46,6 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   }
 
-  test ("アノテーションを持つクラスをロード") {
-    implicit val state  = JConfig().configure.get
-    val loader = (new JCompiler).loader
-
-    val clazz = loader.load("java/lang/Deprecated")
-    clazz shouldBe a [Success[_]]
-    clazz.get shouldBe a [JLoadedClass]
-
-    val annotations = clazz.get.asInstanceOf[JLoadedClass].annotations
-    annotations.dsl shouldBe None
-  }
-
   test("SimpleDSLClass") {
     val config = new JConfig
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
@@ -86,10 +74,12 @@ class JClassLoaderTest extends FunSuite with Matchers {
     clazz shouldBe a [Success[_]]
     clazz.get shouldBe a [JLoadedClass]
 
-    val annotations = clazz.get.asInstanceOf[JLoadedClass].annotations
-    annotations.signature shouldBe a [Some[_]]
+    val varClass = clazz.get.asInstanceOf[JLoadedClass]
 
-    annotations.isContext shouldBe true
+    varClass.signature shouldBe Some(
+      ClassSignature(List(FormalMetaParameter("T", TypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), TypeSignature.objectTypeSig, Nil))
+
+    varClass.isContext shouldBe true
   }
 
   test("Operatorが読めるか") {

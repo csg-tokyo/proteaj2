@@ -5,7 +5,7 @@ import java.lang.annotation.*;
 @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface MethodSig {
-  public GenericParameter[] genericParameters() default {};
+  public MetaParameter[] genericParameters() default {};
   public String returnType();
   public String[] parameterTypes();
   public String[] throwsTypes() default {};

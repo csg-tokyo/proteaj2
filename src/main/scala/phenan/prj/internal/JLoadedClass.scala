@@ -30,12 +30,14 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader)(implici
     loader.methodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
   }
 
-  def classType: JClassType = JTypePool.get.getClassType(this)
+  def classModule: JClassModule = JTypePool.get.getClassModule(this)
 
-  def objectType (typeArgs: List[JValueType]): Option[JObjectType] = JTypePool.get.getObjectType(this, typeArgs)
+  def objectType (typeArgs: List[MetaValue]): Option[JObjectType] = JTypePool.get.getObjectType(this, typeArgs)
+
+  def isContext = annotations.isContext
 
   lazy val signature =
-    attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature)))
+    annotations.signature.orElse(attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature))))
 
   lazy val annotations = readClassAnnotations(attributes.annotations)
 
@@ -85,7 +87,8 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
 
   lazy val exceptions: List[JClass] = exceptionNames.flatMap(name => declaringClass.loader.loadClassOption(name))
 
-  lazy val signature = attributes.signature.flatMap(sig => parseMethodSignature(readUTF(sig.signature)))
+  lazy val signature =
+    annotations.signature.orElse(attributes.signature.flatMap(sig => parseMethodSignature(readUTF(sig.signature))))
 
   lazy val annotations = readMethodAnnotations(attributes.annotations)
 

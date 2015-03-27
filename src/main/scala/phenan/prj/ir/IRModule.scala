@@ -66,8 +66,8 @@ class IRClass (protected val declaration: ClassDeclaration, val outerClass: Opti
   override def methods: List[IRMethodDef] = members.collect { case m: IRMethodDef => m }
   override def fields: List[IRFieldDef] = members.collect { case f: IRFieldDef => f }
 
-  override def classType: JClassType = ???
-  override def objectType(typeArgs: List[JValueType]): Option[JObjectType] = ???
+  override def classModule: JClassModule = ???
+  override def objectType(typeArgs: List[MetaValue]): Option[JObjectType] = ???
 
   def resolver = file.resolver
 

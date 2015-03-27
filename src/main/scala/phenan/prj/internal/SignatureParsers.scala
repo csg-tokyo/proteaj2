@@ -32,7 +32,7 @@ object SignatureParsers extends PackratParsers {
   private lazy val fieldType: PackratParser[TypeSignature] = classType | arrayType | typeVariable
 
   private lazy val methodSignature = formalTypeParamList ~ ( '(' ~> typeSignature.* <~ ')' ) ~ returnType ~ throwsType.* ^^ {
-    case typeParams ~ paramTypes ~ retType ~ throwsTypes => MethodSignature(typeParams, paramTypes, retType, throwsTypes)
+    case typeParams ~ paramTypes ~ retType ~ throwsTypes => MethodSignature(typeParams, paramTypes, retType, throwsTypes, Nil, Nil, Nil)
   }
 
   private lazy val typeSignature: PackratParser[TypeSignature] = fieldType | baseType
@@ -69,7 +69,8 @@ object SignatureParsers extends PackratParsers {
   private lazy val formalTypeParamList = '<' ~> formalTypeParameter.+ <~ '>' | success(Nil)
 
   private lazy val formalTypeParameter = identifier ~ ( ':' ~> fieldType.? ) ~ ( ':' ~> fieldType ).* ^^ {
-    case name ~ classBound ~ interfaceBounds => FormalTypeParameter(name, classBound, interfaceBounds)
+    case name ~ classBound ~ interfaceBounds =>
+      FormalMetaParameter(name, TypeSignature.typeTypeSig, classBound.map(_ :: interfaceBounds).getOrElse(interfaceBounds))
   }
 
   private lazy val typeArgList = '<' ~> typeArgument.+ <~ '>' | success(Nil)
