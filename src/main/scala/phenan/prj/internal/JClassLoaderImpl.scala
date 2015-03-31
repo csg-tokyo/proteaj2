@@ -8,7 +8,7 @@ import scala.util._
 
 import scalaz.Memo._
 
-class JClassLoader (jdc: JCompiler)(implicit state: JState) {
+class JClassLoaderImpl (jdc: JCompiler)(implicit val state: JState) extends JClassLoader {
   def load(name: String): Try[JErasedType] = {
     if (name.startsWith("[")) arrayDescriptor(name.tail)
     else loadClass(name)
@@ -21,41 +21,24 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
 
   val loadClass: String => Try[JClass] = mutableHashMapMemo(getClass)
 
-  val arrayOf: JErasedType => JArrayClass = mutableHashMapMemo(getArray)
+  val arrayOf: JErasedType => JArrayClass = mutableHashMapMemo(new JArrayClassImpl(_))
 
   def arrayOf(clazz: JErasedType, dim: Int): JErasedType = {
     if (dim > 0) arrayOf(arrayOf(clazz), dim - 1)
     else clazz
   }
 
-  lazy val boolean: JPrimitiveClass = new JPrimitiveClassImpl("boolean", "java/lang/Boolean", this)
-  lazy val byte: JPrimitiveClass = new JPrimitiveClassImpl("byte", "java/lang/Byte", this)
-  lazy val char: JPrimitiveClass = new JPrimitiveClassImpl("char", "java/lang/Character", this)
-  lazy val short: JPrimitiveClass = new JPrimitiveClassImpl("short", "java/lang/Short", this)
-  lazy val int: JPrimitiveClass = new JPrimitiveClassImpl("int", "java/lang/Integer", this)
-  lazy val long: JPrimitiveClass = new JPrimitiveClassImpl("long", "java/lang/Long", this)
-  lazy val float: JPrimitiveClass = new JPrimitiveClassImpl("float", "java/lang/Float", this)
-  lazy val double: JPrimitiveClass = new JPrimitiveClassImpl("double", "java/lang/Double", this)
-  lazy val void: JPrimitiveClass = new JPrimitiveClassImpl("void", "java/lang/Void", this)
+  lazy val boolean: JPrimitiveClass = new JPrimitiveClassImpl("boolean", "java/lang/Boolean", jdc)
+  lazy val byte: JPrimitiveClass = new JPrimitiveClassImpl("byte", "java/lang/Byte", jdc)
+  lazy val char: JPrimitiveClass = new JPrimitiveClassImpl("char", "java/lang/Character", jdc)
+  lazy val short: JPrimitiveClass = new JPrimitiveClassImpl("short", "java/lang/Short", jdc)
+  lazy val int: JPrimitiveClass = new JPrimitiveClassImpl("int", "java/lang/Integer", jdc)
+  lazy val long: JPrimitiveClass = new JPrimitiveClassImpl("long", "java/lang/Long", jdc)
+  lazy val float: JPrimitiveClass = new JPrimitiveClassImpl("float", "java/lang/Float", jdc)
+  lazy val double: JPrimitiveClass = new JPrimitiveClassImpl("double", "java/lang/Double", jdc)
+  lazy val void: JPrimitiveClass = new JPrimitiveClassImpl("void", "java/lang/Void", jdc)
 
-  lazy val primitives: Map[String, JPrimitiveClass] = Map(
-    "boolean" -> boolean, "byte" -> byte, "char" -> char, "short" -> short, "int" -> int,
-    "long" -> long, "float" -> float, "double" -> double, "void" -> void
-  )
-
-  lazy val objectClass: JClass = loadClass("java/lang/Object").get
-
-  /* package private methods */
-  private[internal] def loadClassOption (name: String): Option[JClass] = {
-    loadClass(name) match {
-      case Success(clazz) => Some(clazz)
-      case Failure(e)     =>
-        state.error("fail to load class " + name, e)
-        None
-    }
-  }
-
-  private[internal] def methodDescriptor(desc: String): Option[(List[JErasedType], JErasedType)] = {
+  def methodDescriptor(desc: String): Option[(List[JErasedType], JErasedType)] = {
     // "(" ParameterTypeDescriptors ")" ReturnTypeDescriptor
     if (desc.startsWith("(") && desc.contains(")")) {
       methodDescriptor(desc.take(desc.indexOf(')')).tail, desc.drop(desc.indexOf(')')).tail) match {
@@ -71,7 +54,7 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
     }
   }
 
-  private[internal] def fieldDescriptor(desc: String): Option[JErasedType] = typeDescriptor(desc).map(_._1) match {
+  def fieldDescriptor(desc: String): Option[JErasedType] = typeDescriptor(desc).map(_._1) match {
     case Success(result) => Some(result)
     case Failure(e)      =>
       state.error("invalid field descriptor : " + desc, e)
@@ -83,7 +66,7 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
   private def getClass(name: String): Try[JClass] = {
     jdc.findIR(name).map(Success(_)) getOrElse state.searchPath.find(name) match {
       case Some(cf: FoundClassFile)  =>
-        classFileParser.fromStream(cf.in).map(new JLoadedClass(_, this))
+        classFileParser.fromStream(cf.in).map(new JLoadedClass(_, jdc))
       case Some(sf: FoundSourceFile) =>
         jdc.generateIR(sf.in, sf.name)
         jdc.findIR(name).map(Success(_)).getOrElse(Failure(ClassFileNotFoundException("not found : " + name)))
@@ -93,8 +76,6 @@ class JClassLoader (jdc: JCompiler)(implicit state: JState) {
   }
 
   private val classFileParser = new BClassFileParsers()
-
-  private def getArray (clazz: JErasedType): JArrayClass = new JArrayClassImpl(clazz, this)
 
   /* helper methods for parsing descriptors */
 

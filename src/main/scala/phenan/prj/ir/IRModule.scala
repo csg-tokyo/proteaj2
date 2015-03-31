@@ -29,12 +29,16 @@ sealed trait IRModule extends JClass with IRClassMemberDef {
   def outerClass: Option[IRModule]
 }
 
-class IRClass (protected val declaration: ClassDeclaration, val outerClass: Option[IRModule], val file: IRFile)(implicit state: JState) extends IRModule {
+class IRClass (protected val declaration: ClassDeclaration, val outerClass: Option[IRModule], val file: IRFile, val compiler: JCompiler)(implicit state: JState) extends IRModule {
   lazy val modifiers = IRModifiers(declaration.modifiers)
+
+  lazy val signature = ???
 
   lazy val typeVariables = resolver.declareTypeVariables(declaration.typeParameters, Map.empty)
 
   lazy val typeParameters = declaration.typeParameters.map(param => typeVariables(param.name).parameter)
+
+  lazy val metaParameterNames: List[String] = typeParameters.map(_.name)
 
   lazy val superType: Option[IRGenericClassType] = declaration.superClass.flatMap { sup =>
     resolver.classTypeName(sup, typeVariables) match {
@@ -125,7 +129,7 @@ class IRClass (protected val declaration: ClassDeclaration, val outerClass: Opti
           Nil
       }
 
-    case clazz: ClassDeclaration => List(new IRClass(clazz, Some(this), file))
+    case clazz: ClassDeclaration => List(new IRClass(clazz, Some(this), file, compiler))
     case _ => ???
   }
 
@@ -150,6 +154,8 @@ case class IRFieldDef (modifiers: IRModifiers, name: String, genericType: IRGene
 
   override def mod: JModifier = modifiers.flags
   override def fieldType: JErasedType = genericType.erase
+
+  override def signature: Option[JTypeSignature] = ???
 }
 
 sealed trait IRProcedureDef extends JMethodDef with IRClassMemberDef
@@ -168,7 +174,7 @@ case class IRConstructorDef (modifiers: IRModifiers, typeParameters: List[IRType
 
   override def mod: JModifier = modifiers.flags
   override def returnType: JErasedType = declaringClass.resolver.voidClass
-  override def name: String = "<init>"
+  override def name: String = CommonNames.constructorName
   override def paramTypes: List[JErasedType] = formalParameters.map(_.genericType.erase)
   override def exceptions: List[JClass] = throws.map(_.erase)
 }
@@ -192,7 +198,7 @@ case class IRStaticInitializerDef (blockSnippet: BlockSnippet, declaringClass: I
 
   override def mod: JModifier = JModifier(accStatic)
   override def returnType: JErasedType = declaringClass.resolver.voidClass
-  override def name: String = "<clinit>"
+  override def name: String = CommonNames.classInitializerName
   override def paramTypes: List[JErasedType] = Nil
   override def exceptions: List[JClass] = Nil
 }

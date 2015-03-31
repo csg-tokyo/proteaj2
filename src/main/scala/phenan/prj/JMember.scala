@@ -12,26 +12,21 @@ trait JField extends JMember {
   def fieldType: JType
 }
 
-trait JGenMethod extends JMember {
+trait JMethod extends JMember {
   def name: String
 
-  def returnType: JType
-  def parameterTypes: List[JType]
-  def exceptionTypes: List[JObjectType]
+  def erasedReturnType: JErasedType
+  def erasedParameterTypes: List[JErasedType]
 
-  def overrides (that: JGenMethod): Boolean = {
-    this.name == that.name && this.returnType <:< that.returnType && this.parameterTypes == that.parameterTypes
+  def returnType: JGenericType
+  def parameterTypes: List[JGenericType]
+  def exceptionTypes: List[JGenericType]
+
+  def overrides (that: JMethod): Boolean = {
+    this.name == that.name && this.erasedReturnType.isSubclassOf(that.erasedReturnType) && this.erasedParameterTypes == that.erasedParameterTypes
   }
-
-  def bind (typeArgs: List[MetaValue]): Option[JMethod]
-  def infer (returnType: JType): Option[JMethod]
-  def infer (argTypes: List[JType]): Option[JMethod]
 }
 
-trait JMethod {
-
-}
-
-trait JGenConstructor extends JMember {
+trait JConstructor extends JMember {
 
 }

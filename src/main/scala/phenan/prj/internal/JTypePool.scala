@@ -5,98 +5,154 @@ import phenan.prj.state.JState
 
 import scalaz.Memo._
 
-class JTypePool private (state: JState) {
-  val arrayOf: JType with JType_Internal => JArrayType = mutableHashMapMemo(getArrayType)
-  val getClassModule: JLoadedClass => JClassModule = mutableHashMapMemo(getLoadedClassModule)
-  val getObjectType: (JLoadedClass, List[MetaValue]) => Option[JObjectType] = Function.untupled(mutableHashMapMemo(getLoadedObjectType))
+class JTypePool (val compiler: JCompiler)(implicit state: JState) extends JTypeLoader {
+  val arrayOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
+  val getObjectType: (JClass, List[MetaValue]) => Option[JObjectType] = Function.untupled(mutableHashMapMemo(getLoadedObjectType))
 
-  val superTypesOfArray: JClassLoader => List[JObjectType] = mutableHashMapMemo(getSuperTypesOfArray)
-
-  def toJValueType (t: JErasedType): Option[JType] = t match {
+  def toJType (t: JErasedType): Option[JType] = t match {
     case c : JClass          => c.objectType(Nil)
     case p : JPrimitiveClass => Some(p.primitiveType)
-    case a : JArrayClass     => toJValueType(a.component).map(_.array)
+    case a : JArrayClass     => toJType(a.component).map(_.array)
   }
 
-  def rawTypeArguments (typeParams: List[FormalMetaParameter], env: Map[String, MetaValue], loader: JClassLoader): Map[String, MetaValue] = {
+  def rawTypeArguments (typeParams: List[FormalMetaParameter], env: Map[String, MetaValue]): Map[String, MetaValue] = {
     typeParams.foldLeft(env) { (e, param) =>
-      getRawMetaValue(param, e, loader).map(t => e + (param.name -> t)).getOrElse {
+      getRawMetaValue(param, e).map(t => e + (param.name -> t)).getOrElse {
         state.error("cannot get raw meta value for " + param.name)
         e
       }
     }
   }
 
-  private def getRawMetaValue (param: FormalMetaParameter, env: Map[String, MetaValue], loader: JClassLoader): Option[MetaValue] = {
-    if (param.metaType != TypeSignature.typeTypeSig) fromTypeSignature(param.metaType, env, loader).map(UnknownPureValue)
-    else param.bounds.headOption.flatMap(fromTypeSignature_RefType(_, env, loader)).orElse(loader.objectClass.objectType(Nil))
+  def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JType] = sig match {
+    case p: JPrimitiveTypeSignature => Some(fromPrimitiveSignature(p))
+    case s                          => fromTypeSignature_RefType(s, env)
   }
 
-  def fromTypeSignature (sig: TypeSignature, env: Map[String, MetaValue], loader: JClassLoader): Option[JType] = sig match {
-    case p: PrimitiveTypeSignature => Some(fromPrimitiveSignature(p, loader))
-    case s                         => fromTypeSignature_RefType(s, env, loader)
-  }
-
-  def fromClassTypeSignature (sig: ClassTypeSignature, env: Map[String, MetaValue], loader: JClassLoader): Option[JObjectType] = sig match {
+  def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaValue]): Option[JObjectType] = sig match {
     case SimpleClassTypeSignature(className, typeArgs) => for {
-      clazz <- loader.loadClassOption(className)
-      args  <- fromTypeArguments(typeArgs, env, loader)
+      clazz <- classLoader.loadClass_PE(className)
+      args  <- fromTypeArguments(typeArgs, env)
       jType <- clazz.objectType(args)
     } yield jType
     case MemberClassTypeSignature(outer, name, typeArgs) => ???    // not supported yet
   }
 
-  def fromPrimitiveSignature (p: PrimitiveTypeSignature, loader: JClassLoader): JPrimitiveType = p match {
-    case ByteTypeSignature   => loader.byte.primitiveType
-    case CharTypeSignature   => loader.char.primitiveType
-    case DoubleTypeSignature => loader.double.primitiveType
-    case FloatTypeSignature  => loader.float.primitiveType
-    case IntTypeSignature    => loader.int.primitiveType
-    case LongTypeSignature   => loader.long.primitiveType
-    case ShortTypeSignature  => loader.short.primitiveType
-    case BoolTypeSignature   => loader.boolean.primitiveType
-    case VoidTypeSignature   => loader.void.primitiveType
+  def fromPrimitiveSignature (p: JPrimitiveTypeSignature): JPrimitiveType = p match {
+    case ByteTypeSignature   => classLoader.byte.primitiveType
+    case CharTypeSignature   => classLoader.char.primitiveType
+    case DoubleTypeSignature => classLoader.double.primitiveType
+    case FloatTypeSignature  => classLoader.float.primitiveType
+    case IntTypeSignature    => classLoader.int.primitiveType
+    case LongTypeSignature   => classLoader.long.primitiveType
+    case ShortTypeSignature  => classLoader.short.primitiveType
+    case BoolTypeSignature   => classLoader.boolean.primitiveType
+    case VoidTypeSignature   => classLoader.void.primitiveType
   }
 
-  def fromTypeArguments (args: List[TypeArgument], env: Map[String, MetaValue], loader: JClassLoader): Option[List[MetaValue]] = {
+  def fromTypeArguments (args: List[JTypeArgument], env: Map[String, MetaValue]): Option[List[MetaValue]] = {
     import scalaz.Scalaz._
-    args.traverse(arg => argSig2JType(arg, env, loader))
+    args.traverse(arg => argSig2JType(arg, env))
   }
 
-  private def fromTypeSignature_RefType (sig: TypeSignature, env: Map[String, MetaValue], loader: JClassLoader): Option[JRefType] = sig match {
-    case cts: ClassTypeSignature       => fromClassTypeSignature(cts, env, loader)
-    case tvs: TypeVariableSignature    => fromTypeVariableSignature(tvs, env)
-    case ArrayTypeSignature(component) => fromTypeSignature(component, env, loader).map(_.array)
+  def unifyCovariant (t1: JGenericType, t2: JType): Option[Map[String, MetaValue]] = (t1.signature, t2) match {
+    case (cts: SimpleClassTypeSignature, obj: JObjectType) if classLoader.loadClass_PE(cts.clazz).contains(obj.erase) =>
+      obj.erase.signature match {
+        case Some(sig) => unifyCovariantTypeArguments(sig.metaParams, sig.metaParams.zip(cts.args), obj.env, t1.env)
+        case None => Some(t1.env)
+      }
+
+    case _ => None
+  }
+
+  def unifyCovariantTypeArguments (formalParams: List[FormalMetaParameter], metaParams1: List[(FormalMetaParameter, JTypeArgument)], metaParams2: Map[String, MetaValue], env: Map[String, MetaValue]): Option[Map[String, MetaValue]] = {
+    metaParams1 match {
+      case (formalParam, typeArg) :: rest =>
+        metaParams2.get(formalParam.name).flatMap(mv => unifyCovariantTypeArgument(typeArg, mv, env)) match {
+          case Some(e) => unifyCovariantTypeArguments(formalParams, rest, metaParams2, e)
+          case None => None
+        }
+      case Nil =>
+        if (validTypeArgs(formalParams, formalParams.map(_.name).flatMap(env.get), env)) Some(env)
+        else None
+    }
+  }
+
+  def unifyCovariantTypeArgument (arg: JTypeArgument, mv: MetaValue, env: Map[String, MetaValue]): Option[Map[String, MetaValue]] = ???
+
+/*
+  def unifyCovariant (signature: TypeSignature, t: JType, env: Map[String, MetaValue], loader: JClassLoader): Option[Map[String, MetaValue]] = (signature, t) match {
+    case (cts: SimpleClassTypeSignature, obj: JObjectType) => unifyClassTypeSignature(cts, obj, env, loader)
+    case (prm: PrimitiveTypeSignature, pt: JPrimitiveType) if fromPrimitiveSignature(prm, loader) == pt => Some(env)
+    case (arr: ArrayTypeSignature, at: JArrayType) =>
+  }
+
+  def unifyContravariant (signature: TypeSignature, t: JType, env: Map[String, MetaValue], loader: JClassLoader): Option[Map[String, MetaValue]] = (signature, t) match {
+    case (cts: SimpleClassTypeSignature, obj: JObjectType) => unifyClassTypeSignature(cts, obj, env, loader)
+  }
+
+  private def unifyInvariant (signature: TypeSignature, t: JRefType, env: Map[String, MetaValue], loader: JClassLoader): Option[Map[String, MetaValue]] = {
+
+  }
+
+  private def unifyClassTypeSignature(signature: SimpleClassTypeSignature, t: JObjectType, env: Map[String, MetaValue], loader: JClassLoader): Option[Map[String, MetaValue]] = {
+    if (loader.loadClassOption(signature.clazz).contains(t.erase)) unifyTypeArguments(t.erase.metaParameterNames.zip(signature.args), t.env, env, loader)
+    // else if () 継承
+    else None
+  }
+
+  private def unifyTypeArguments(args: List[(String, TypeArgument)], env: Map[String, MetaValue], enclosingEnv: Map[String, MetaValue], loader: JClassLoader): Option[Map[String, MetaValue]] = {
+    args.foldLeft(Option(enclosingEnv)) {
+      case (Some(e), (name, arg)) => env.get(name).flatMap(mv => unifyTypeArgument(arg, mv, e, loader))
+    }
+  }
+
+  private def unifyTypeArgument(arg: TypeArgument, mv: MetaValue, env: Map[String, MetaValue], loader: JClassLoader): Option[Map[String, MetaValue]] = (arg, mv) match {
+    case (sig: TypeSignature, t: JRefType)             => unifyInvariant(sig, t, env, loader)
+    case (ub: UpperBoundWildcardArgument, t: JRefType) => Some(env)
+    case (lb: LowerBoundWildcardArgument, t: JRefType) => Some(env)
+    case (UnboundWildcardArgument, t: JRefType)        => Some(env)
+    case (pv: PureVariable, v: PureValue)              => Some(env + (pv.name -> v))
+    case _ => None
+  }*/
+
+  private def getRawMetaValue (param: FormalMetaParameter, env: Map[String, MetaValue]): Option[MetaValue] = {
+    if (param.metaType != JTypeSignature.typeTypeSig) fromTypeSignature(param.metaType, env).map(UnknownPureValue)
+    else param.bounds.headOption.flatMap(fromTypeSignature_RefType(_, env)).orElse(classLoader.objectClass.objectType(Nil))
+  }
+
+  private def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JRefType] = sig match {
+    case cts: JClassTypeSignature       => fromClassTypeSignature(cts, env)
+    case tvs: JTypeVariableSignature    => fromTypeVariableSignature(tvs, env)
+    case JArrayTypeSignature(component) => fromTypeSignature(component, env).map(_.array)
     case _ =>
       state.error("invalid type signature : " + sig)
       None
   }
 
-  private def fromTypeVariableSignature (sig: TypeVariableSignature, env: Map[String, MetaValue]): Option[JRefType] = env.get(sig.name) match {
+  private def fromTypeVariableSignature (sig: JTypeVariableSignature, env: Map[String, MetaValue]): Option[JRefType] = env.get(sig.name) match {
     case Some(t: JRefType) => Some(t)
     case _ =>
       state.error("invalid type variable : " + sig.name)
       None
   }
 
-  private def getArrayType (component: JType with JType_Internal): JArrayType = new JArrayTypeImpl(component)
+  private def getArrayType (component: JType): JArrayType = new JArrayTypeImpl(component)
 
-  private def getLoadedClassModule (clazz: JLoadedClass): JClassModule = new JLoadedClassModule(clazz)
-
-  private def getLoadedObjectType (classAndArgs: (JLoadedClass, List[MetaValue])): Option[JObjectType] = {
+  private def getLoadedObjectType (classAndArgs: (JClass, List[MetaValue])): Option[JObjectType] = {
     val clazz = classAndArgs._1
     val args  = classAndArgs._2
 
     clazz.signature match {
       case Some(sig) =>
         val map = sig.metaParams.map(_.name).zip(args).toMap
-        if (validTypeArgs(sig.metaParams, args, map, clazz.loader)) Some(new JLoadedObjectType(clazz, map))
+        if (validTypeArgs(sig.metaParams, args, map)) Some(new JObjectTypeImpl(clazz, map))
         else {
           state.error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
           None
         }
       case None =>
-        if (args.isEmpty) Some(new JLoadedObjectType(clazz, Map.empty))
+        if (args.isEmpty) Some(new JObjectTypeImpl(clazz, Map.empty))
         else {
           state.error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
           None
@@ -104,49 +160,36 @@ class JTypePool private (state: JState) {
     }
   }
 
-  private def getSuperTypesOfArray (loader: JClassLoader): List[JObjectType] = {
-    List("java/lang/Object", "java/io/Serializable", "java/lang/Cloneable").flatMap { name =>
-      loader.loadClassOption(name).flatMap(_.objectType(Nil))
-    }
-  }
-
-  private def validTypeArgs (params: List[FormalMetaParameter], args: List[MetaValue], env: Map[String, MetaValue], loader: JClassLoader): Boolean = {
+  private def validTypeArgs (params: List[FormalMetaParameter], args: List[MetaValue], env: Map[String, MetaValue]): Boolean = {
     if (params.isEmpty || args.isEmpty) params.isEmpty && args.isEmpty
-    else if (validTypeArg(params.head, args.head, env, loader)) validTypeArgs(params.tail, args.tail, env, loader)
+    else if (validTypeArg(params.head, args.head, env)) validTypeArgs(params.tail, args.tail, env)
     else false
   }
 
-  private def validTypeArg (param: FormalMetaParameter, arg: MetaValue, env: Map[String, MetaValue], loader: JClassLoader): Boolean = arg match {
-    case arg: JRefType => param.bounds.forall(withinBound(_, arg, env, loader))
-    case pv: PureValue => fromTypeSignature(param.metaType, env, loader).exists(pv.valueType <:< _)
+  private def validTypeArg (param: FormalMetaParameter, arg: MetaValue, env: Map[String, MetaValue]): Boolean = arg match {
+    case arg: JRefType => param.bounds.forall(withinBound(_, arg, env))
+    case pv: PureValue => fromTypeSignature(param.metaType, env).exists(pv.valueType <:< _)
   }
 
-  private def withinBound (bound: TypeSignature, arg: JRefType, env: Map[String, MetaValue], loader: JClassLoader): Boolean = {
-    arg.isSubtypeOf(fromTypeSignature(bound, env, loader).get)
+  private def withinBound (bound: JTypeSignature, arg: JRefType, env: Map[String, MetaValue]): Boolean = {
+    arg.isSubtypeOf(fromTypeSignature(bound, env).get)
   }
 
-  private def argSig2JType (arg: TypeArgument, env: Map[String, MetaValue], loader: JClassLoader): Option[MetaValue] = arg match {
-    case sig: TypeSignature              =>
-      fromTypeSignature_RefType(sig, env, loader)
+  private def argSig2JType (arg: JTypeArgument, env: Map[String, MetaValue]): Option[MetaValue] = arg match {
+    case sig: JTypeSignature              =>
+      fromTypeSignature_RefType(sig, env)
     case UpperBoundWildcardArgument(sig) =>
-      fromTypeSignature(sig, env, loader).map(bound => new JWildcardTypeImpl(bound, None, loader))
+      fromTypeSignature(sig, env).map(bound => new JWildcardTypeImpl(bound, None, compiler))
     case LowerBoundWildcardArgument(sig) => for {
-      upperBound  <- loader.objectClass.objectType(Nil)
-      lowerBound  <- fromTypeSignature(sig, env, loader)
-    } yield new JWildcardTypeImpl(upperBound, Some(lowerBound), loader)
+      upperBound  <- classLoader.objectClass.objectType(Nil)
+      lowerBound  <- fromTypeSignature(sig, env)
+    } yield new JWildcardTypeImpl(upperBound, Some(lowerBound), compiler)
     case UnboundWildcardArgument         => for {
-      upperBound  <- loader.objectClass.objectType(Nil)
-    } yield new JWildcardTypeImpl(upperBound, None, loader)
+      upperBound  <- classLoader.objectClass.objectType(Nil)
+    } yield new JWildcardTypeImpl(upperBound, None, compiler)
     case PureVariable(name)              =>
       env.get(name)
   }
 
-  private implicit def st: JState = state
+  private def classLoader = compiler.classLoader
 }
-
-object JTypePool {
-  def get (implicit state: JState): JTypePool = pools(state)
-  private val pools: JState => JTypePool = mutableHashMapMemo(state => new JTypePool(state))
-}
-
-

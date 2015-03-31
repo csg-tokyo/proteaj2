@@ -7,6 +7,7 @@ import JModifier._
 
 import scala.util._
 
-class JArrayClassImpl (val component: JErasedType, val loader: JClassLoader) extends JArrayClass {
+class JArrayClassImpl (val component: JErasedType) extends JArrayClass {
   lazy val name = component.name + "[]"
+  def compiler = component.compiler
 }

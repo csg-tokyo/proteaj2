@@ -1,7 +1,11 @@
 package phenan.prj
 
+import CommonNames._
+
 sealed trait JErasedType {
   def name: String
+  def isSubclassOf (that: JErasedType): Boolean
+  def compiler: JCompiler
 }
 
 trait JClass extends JErasedType {
@@ -13,7 +17,11 @@ trait JClass extends JErasedType {
   def fields: List[JFieldDef]
   def methods: List[JMethodDef]
 
+  def signature: Option[JClassSignature]
 
+  def isSubclassOf (that: JErasedType): Boolean = {
+    this == that || superClass.exists(_.isSubclassOf(that)) || interfaces.exists(_.isSubclassOf(that))
+  }
 
   def classModule: JClassModule
   def objectType (typeArgs: List[MetaValue]): Option[JObjectType]
@@ -28,10 +36,15 @@ trait JClass extends JErasedType {
 
 trait JPrimitiveClass extends JErasedType {
   def primitiveType: JPrimitiveType
+  def isSubclassOf (that: JErasedType): Boolean = this == that
 }
 
 trait JArrayClass extends JErasedType {
   def component: JErasedType
+  def isSubclassOf (that: JErasedType): Boolean = that match {
+    case that: JArrayClass => this == that || this.component.isSubclassOf(that.component)
+    case _ => superClassesOfArray.contains(that.name)
+  }
 }
 
 trait JFieldDef {
@@ -39,6 +52,8 @@ trait JFieldDef {
   def name: String
   def fieldType: JErasedType
   def declaringClass: JClass
+
+  def signature: Option[JTypeSignature]
 
   def isStatic: Boolean = mod.check(JModifier.accStatic)
 }
@@ -52,8 +67,8 @@ trait JMethodDef {
   def declaringClass: JClass
 
   def isStatic: Boolean           = mod.check(JModifier.accStatic)
-  def isConstructor: Boolean      = name == "<init>"
-  def isClassInitializer: Boolean = name == "<clinit>"
+  def isConstructor: Boolean      = name == constructorName
+  def isClassInitializer: Boolean = name == classInitializerName
   def isInstanceMethod: Boolean   = ! (isStatic || isConstructor || isClassInitializer)
   def isStaticMethod: Boolean     = isStatic && ! (isConstructor || isClassInitializer)
 }

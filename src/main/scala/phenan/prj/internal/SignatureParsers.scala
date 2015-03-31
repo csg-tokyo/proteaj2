@@ -1,5 +1,6 @@
 package phenan.prj.internal
 
+import phenan.prj._
 import phenan.prj.state.JState
 
 import scala.util.parsing.combinator.PackratParsers
@@ -8,15 +9,15 @@ import scala.util.parsing.input.CharSequenceReader
 object SignatureParsers extends PackratParsers {
   override type Elem = Char
 
-  def parseClassSignature (sig: String)(implicit state: JState): Option[ClassSignature] = parse(sig, "class signature", classSignature)
+  def parseClassSignature (sig: String)(implicit state: JState): Option[JClassSignature] = parse(sig, "class signature", classSignature)
 
-  def parseFieldSignature (sig: String)(implicit state: JState): Option[TypeSignature] = parse(sig, "field signature", fieldType)
+  def parseFieldSignature (sig: String)(implicit state: JState): Option[JTypeSignature] = parse(sig, "field signature", fieldType)
 
-  def parseMethodSignature (sig: String)(implicit state: JState): Option[MethodSignature] = parse(sig, "method signature", methodSignature)
+  def parseMethodSignature (sig: String)(implicit state: JState): Option[JMethodSignature] = parse(sig, "method signature", methodSignature)
 
-  def parseTypeSignature (sig: String)(implicit state: JState): Option[TypeSignature] = parse(sig, "type signature", typeSignature)
+  def parseTypeSignature (sig: String)(implicit state: JState): Option[JTypeSignature] = parse(sig, "type signature", typeSignature)
 
-  def parseClassTypeSignature (sig: String)(implicit state: JState): Option[ClassTypeSignature] = parse(sig, "class type signature", classType)
+  def parseClassTypeSignature (sig: String)(implicit state: JState): Option[JClassTypeSignature] = parse(sig, "class type signature", classType)
 
   private def parse[T] (sig: String, kind: String, parser: Parser[T])(implicit state: JState): Option[T] = parser(new PackratReader[Char](new CharSequenceReader(sig))) match {
     case Success(ret, _)   => Some(ret)
@@ -26,31 +27,31 @@ object SignatureParsers extends PackratParsers {
   }
 
   private lazy val classSignature = formalTypeParamList ~ classType ~ classType.* ^^ {
-    case typeParams ~ superClass ~ interfaces => ClassSignature(typeParams, superClass, interfaces)
+    case typeParams ~ superClass ~ interfaces => JClassSignature(typeParams, superClass, interfaces)
   }
 
-  private lazy val fieldType: PackratParser[TypeSignature] = classType | arrayType | typeVariable
+  private lazy val fieldType: PackratParser[JTypeSignature] = classType | arrayType | typeVariable
 
   private lazy val methodSignature = formalTypeParamList ~ ( '(' ~> typeSignature.* <~ ')' ) ~ returnType ~ throwsType.* ^^ {
-    case typeParams ~ paramTypes ~ retType ~ throwsTypes => MethodSignature(typeParams, paramTypes, retType, throwsTypes, Nil, Nil, Nil)
+    case typeParams ~ paramTypes ~ retType ~ throwsTypes => JMethodSignature(typeParams, paramTypes, retType, throwsTypes, Nil, Nil, Nil)
   }
 
-  private lazy val typeSignature: PackratParser[TypeSignature] = fieldType | baseType
+  private lazy val typeSignature: PackratParser[JTypeSignature] = fieldType | baseType
 
   private lazy val returnType = typeSignature | 'V' ^^^ VoidTypeSignature
 
-  private lazy val baseType: PackratParser[PrimitiveTypeSignature] =
+  private lazy val baseType: PackratParser[JPrimitiveTypeSignature] =
     'B' ^^^ ByteTypeSignature | 'C' ^^^ CharTypeSignature | 'D' ^^^ DoubleTypeSignature |
       'F' ^^^ FloatTypeSignature | 'I' ^^^ IntTypeSignature  | 'J' ^^^ LongTypeSignature |
       'S' ^^^ ShortTypeSignature  | 'Z' ^^^ BoolTypeSignature
 
   private lazy val classType = 'L' ~> classTypeSigRef <~ ';'
 
-  private def classTypeSigRef: PackratParser[ClassTypeSignature] = new PackratParser[ClassTypeSignature] {
-    override def apply(in: Input): ParseResult[ClassTypeSignature] = classTypeSig(in)
+  private def classTypeSigRef: PackratParser[JClassTypeSignature] = new PackratParser[JClassTypeSignature] {
+    override def apply(in: Input): ParseResult[JClassTypeSignature] = classTypeSig(in)
   }
 
-  private lazy val classTypeSig: PackratParser[ClassTypeSignature] = nestedClassType | topLevelClassType
+  private lazy val classTypeSig: PackratParser[JClassTypeSignature] = nestedClassType | topLevelClassType
 
   private lazy val topLevelClassType = topLevelClass ~ typeArgList ^^ {
     case clazz ~ args => SimpleClassTypeSignature(clazz, args)
@@ -60,9 +61,9 @@ object SignatureParsers extends PackratParsers {
     case outer ~ name ~ args => MemberClassTypeSignature(outer, name, args)
   }
 
-  private lazy val arrayType = '[' ~> typeSignature ^^ ArrayTypeSignature
+  private lazy val arrayType = '[' ~> typeSignature ^^ JArrayTypeSignature
 
-  private lazy val typeVariable = 'T' ~> identifier <~ ';' ^^ TypeVariableSignature
+  private lazy val typeVariable = 'T' ~> identifier <~ ';' ^^ JTypeVariableSignature
 
   private lazy val topLevelClass = repsep(identifier, '/') ^^ { ids => ids.mkString("/") }
 
@@ -70,7 +71,7 @@ object SignatureParsers extends PackratParsers {
 
   private lazy val formalTypeParameter = identifier ~ ( ':' ~> fieldType.? ) ~ ( ':' ~> fieldType ).* ^^ {
     case name ~ classBound ~ interfaceBounds =>
-      FormalMetaParameter(name, TypeSignature.typeTypeSig, classBound.map(_ :: interfaceBounds).getOrElse(interfaceBounds))
+      FormalMetaParameter(name, JTypeSignature.typeTypeSig, classBound.map(_ :: interfaceBounds).getOrElse(interfaceBounds))
   }
 
   private lazy val typeArgList = '<' ~> typeArgument.+ <~ '>' | success(Nil)

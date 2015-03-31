@@ -1,8 +1,10 @@
 package phenan.prj.internal
 
-case class PrjClassAnnotations (signature: Option[ClassSignature], dsl: Option[PrjDSLAnnotation], isPure: Boolean, isContext: Boolean)
+import phenan.prj.{JTypeSignature, JMethodSignature, JClassSignature}
 
-case class PrjMethodAnnotations (signature: Option[MethodSignature], operator: Option[PrjOperatorAnnotation], isPure: Boolean, isFinalizer: Boolean)
+case class PrjClassAnnotations (signature: Option[JClassSignature], dsl: Option[PrjDSLAnnotation], isPure: Boolean, isContext: Boolean)
+
+case class PrjMethodAnnotations (signature: Option[JMethodSignature], operator: Option[PrjOperatorAnnotation], isPure: Boolean, isFinalizer: Boolean)
 
 case class PrjFieldAnnotations (isPure: Boolean)
 
@@ -32,6 +34,6 @@ case object PrjOperatorHole extends PrjOperatorElement
 case object PrjOperatorRepStarHole extends PrjOperatorElement
 case object PrjOperatorRepPlusHole extends PrjOperatorElement
 case object PrjOperatorOptionalHole extends PrjOperatorElement
-case class PrjOperatorAndPredicate (typeSig: TypeSignature) extends PrjOperatorElement
-case class PrjOperatorNotPredicate (typeSig: TypeSignature) extends PrjOperatorElement
+case class PrjOperatorAndPredicate (typeSig: JTypeSignature) extends PrjOperatorElement
+case class PrjOperatorNotPredicate (typeSig: JTypeSignature) extends PrjOperatorElement
 case class PrjOperatorPureValueRef (name: String) extends PrjOperatorElement

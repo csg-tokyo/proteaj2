@@ -1,5 +1,6 @@
 package phenan.prj.internal
 
+import phenan.prj._
 import phenan.prj.state.JState
 
 import scalaz._
@@ -39,9 +40,9 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   private lazy val classSig = annotation("ClassSig") {
     for {
       metaParams <- array("metaParameters")(metaParameter)
-      supType    <- element("superType")(classTypeSignature)(TypeSignature.objectTypeSig)
+      supType    <- element("superType")(classTypeSignature)(JTypeSignature.objectTypeSig)
       interfaces <- array("interfaces")(classTypeSignature)
-    } yield ClassSignature(metaParams, supType, interfaces)
+    } yield JClassSignature(metaParams, supType, interfaces)
   }
 
   private lazy val methodSig = annotation("MethodSig") {
@@ -53,7 +54,7 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
       activates   <- array("activates")(typeSignature)
       deactivates <- array("deactivates")(typeSignature)
       requires    <- array("requires")(typeSignature)
-    } yield MethodSignature(metaParams, paramTypes, retType, exceptions, activates, deactivates, requires)
+    } yield JMethodSignature(metaParams, paramTypes, retType, exceptions, activates, deactivates, requires)
   }
 
   private lazy val dsl = annotation("DSL") {
@@ -91,7 +92,7 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   private lazy val metaParameter = elementAnnotation("MetaParameter") {
     for {
       name      <- required("name")(string)("")
-      paramType <- element("type")(typeSignature)(TypeSignature.typeTypeSig)
+      paramType <- element("type")(typeSignature)(JTypeSignature.typeTypeSig)
       bounds    <- array("bounds")(typeSignature)
     } yield FormalMetaParameter(name, paramType, bounds)
   }
@@ -185,8 +186,8 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
       None
   }
 
-  private lazy val typeSignature: Reader[BAnnotationElement, Option[TypeSignature]] = string.map(_.flatMap(SignatureParsers.parseTypeSignature))
+  private lazy val typeSignature: Reader[BAnnotationElement, Option[JTypeSignature]] = string.map(_.flatMap(SignatureParsers.parseTypeSignature))
 
-  private lazy val classTypeSignature: Reader[BAnnotationElement, Option[ClassTypeSignature]] = string.map(_.flatMap(SignatureParsers.parseClassTypeSignature))
+  private lazy val classTypeSignature: Reader[BAnnotationElement, Option[JClassTypeSignature]] = string.map(_.flatMap(SignatureParsers.parseClassTypeSignature))
 
 }

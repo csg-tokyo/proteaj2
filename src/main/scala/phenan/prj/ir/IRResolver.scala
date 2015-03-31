@@ -3,7 +3,7 @@ package phenan.prj.ir
 import phenan.prj._
 import phenan.prj.decl._
 import phenan.prj.exception.InvalidTypeException
-import phenan.prj.internal.JClassLoader
+import phenan.prj.internal.JClassLoaderImpl
 import phenan.prj.state.JState
 import phenan.util._
 
@@ -11,7 +11,7 @@ import scala.util._
 import scalaz.Scalaz._
 import scalaz.Memo._
 
-class IRResolver (header: Header, val loader: JClassLoader)(implicit state: JState) {
+class IRResolver (header: Header, val compiler: JCompiler)(implicit state: JState) {
   def packageName: Option[String] = header.pack.map(pack => pack.name.names.mkString("."))
 
   val packageInternalName: Option[String] = header.pack.map(pack => pack.name.names.mkString("/"))
@@ -35,17 +35,17 @@ class IRResolver (header: Header, val loader: JClassLoader)(implicit state: JSta
     else tryLoadClassFromPackage(name, packages)
   }
 
-  def arrayOf (t: JErasedType): JArrayClass = loader.arrayOf(t)
+  def arrayOf (t: JErasedType): JArrayClass = compiler.classLoader.arrayOf(t)
 
   def arrayOf (t: IRGenericType, dim: Int): IRGenericType = {
     if (dim > 1) arrayOf(IRGenericArrayType(t, this), dim - 1)
     else t
   }
 
-  def voidClass = loader.void
-  def objectClass = loader.objectClass
+  def voidClass = compiler.classLoader.void
+  def objectClass = compiler.classLoader.objectClass
 
-  def primitives = loader.primitives
+  def primitives = compiler.classLoader.primitives
 
   private[ir] def declareTypeVariables (parameters: List[TypeParameter], env: Map[String, IRTypeVariable]): Map[String, IRTypeVariable] = {
     parameters.foldLeft (env) { (env, param) =>
@@ -94,7 +94,7 @@ class IRResolver (header: Header, val loader: JClassLoader)(implicit state: JSta
 
   private def tryLoadClass (name: List[String]): Try[JClass] = tryLoadClass(name.head, name.tail)
 
-  private def tryLoadClass (name: String, rest: List[String]): Try[JClass] = loader.loadClass(name) match {
+  private def tryLoadClass (name: String, rest: List[String]): Try[JClass] = compiler.classLoader.loadClass(name) match {
     case Success(c) if rest.nonEmpty => tryGetInnerClass(c, rest)
     case Failure(e) if rest.nonEmpty => tryLoadClass(name + '/' + rest.head, rest.tail)
     case Success(c) => Success(c)

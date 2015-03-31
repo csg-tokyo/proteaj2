@@ -1,9 +1,9 @@
 package phenan.prj
 
-import java.io.{FileReader, Reader}
+import java.io._
 
 import phenan.prj.decl.DeclarationCompiler
-import phenan.prj.internal.JClassLoader
+import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state.JState
 
@@ -42,8 +42,9 @@ class JCompiler (implicit state: JState) {
 
   }
 
-  val loader = new JClassLoader(this)
-  val declarationCompiler = new DeclarationCompiler(loader)
+  val classLoader: JClassLoader = new JClassLoaderImpl(this)
+  val typeLoader: JTypeLoader = new JTypePool(this)
+  val declarationCompiler = new DeclarationCompiler(this)
 
   private var modules: Map[String, IRModule] = Map.empty
   private var compiled: Map[String, IRModule] = Map.empty

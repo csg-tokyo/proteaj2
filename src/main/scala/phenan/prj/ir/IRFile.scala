@@ -1,11 +1,11 @@
 package phenan.prj.ir
 
+import phenan.prj.JCompiler
 import phenan.prj.decl._
-import phenan.prj.internal.JClassLoader
 import phenan.prj.state.JState
 
-class IRFile (compilationUnit: CompilationUnit, loader: JClassLoader)(implicit state: JState) {
-  val resolver = new IRResolver(compilationUnit.header, loader)
+class IRFile (compilationUnit: CompilationUnit, compiler: JCompiler)(implicit state: JState) {
+  val resolver = new IRResolver(compilationUnit.header, compiler)
 
   val modules = compilationUnit.modules.map(moduleToIR)
 
@@ -14,7 +14,7 @@ class IRFile (compilationUnit: CompilationUnit, loader: JClassLoader)(implicit s
   def getPackageInternalName: Option[String] = resolver.packageInternalName
 
   private def moduleToIR (module: ModuleDeclaration): IRModule = module match {
-    case cls: ClassDeclaration      => new IRClass(cls, None, this)
+    case cls: ClassDeclaration      => new IRClass(cls, None, this, compiler)
     case enm: EnumDeclaration       => ???
     case ifc: InterfaceDeclaration  => ???
     case ann: AnnotationDeclaration => ???

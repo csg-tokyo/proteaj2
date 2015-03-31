@@ -11,7 +11,7 @@ import scala.util._
 class JClassLoaderTest extends FunSuite with Matchers {
   test ("String 型をロード") {
     implicit val state  = JConfig().configure.get
-    val loader = (new JCompiler).loader
+    val loader = (new JCompiler).classLoader
 
     val clazz = loader.load("java/lang/String")
     clazz shouldBe a [Success[_]]
@@ -20,7 +20,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   test ("配列型をロード") {
     implicit val state  = JConfig().configure.get
-    val loader = (new JCompiler).loader
+    val loader = (new JCompiler).classLoader
 
     val o = loader.load("java/lang/Object")
     val os = loader.load("[Ljava/lang/Object;")
@@ -38,7 +38,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     val config = new JConfig
     config.sourcePath = "/Users/ichikawa/workspaces/Idea/prj/src/test/java"
     implicit val state = config.configure.get
-    val loader = (new JCompiler).loader
+    val loader = (new JCompiler).classLoader
 
     val clazz = loader.load("test/Hello")
     clazz shouldBe a [Success[_]]
@@ -50,7 +50,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     val config = new JConfig
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
     implicit val state = config.configure.get
-    val loader = (new JCompiler).loader
+    val loader = (new JCompiler).classLoader
 
     val clazz = loader.load("test/SimpleDSLClass")
     clazz shouldBe a [Success[_]]
@@ -68,7 +68,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     val config = new JConfig
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
     implicit val state = config.configure.get
-    val loader = (new JCompiler).loader
+    val loader = (new JCompiler).classLoader
 
     val clazz = loader.load("test/Var")
     clazz shouldBe a [Success[_]]
@@ -77,7 +77,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     val varClass = clazz.get.asInstanceOf[JLoadedClass]
 
     varClass.signature shouldBe Some(
-      ClassSignature(List(FormalMetaParameter("T", TypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), TypeSignature.objectTypeSig, Nil))
+      JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), JTypeSignature.objectTypeSig, Nil))
 
     varClass.isContext shouldBe true
   }
@@ -86,7 +86,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     val config = new JConfig
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
     implicit val state = config.configure.get
-    val loader = (new JCompiler).loader
+    val loader = (new JCompiler).classLoader
 
     val clazz = loader.load("test/Var")
     clazz shouldBe a [Success[_]]

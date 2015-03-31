@@ -3,7 +3,7 @@ package phenan.prj.internal
 import phenan.prj._
 import phenan.prj.state.JState
 
-class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader)(implicit state: JState) extends JClass {
+class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler)(implicit state: JState) extends JClass {
 
   import classFile.poolReader._
   import classFile.attrParser._
@@ -14,27 +14,29 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader)(implici
 
   lazy val name = readClassName(classFile.thisClass).replace('/', '.').replace('$', '.')
 
-  lazy val superClass = loadClassOption(classFile.superClass)
+  lazy val superClass = loadClass_PE(classFile.superClass)
 
-  lazy val interfaces = classFile.interfaces.flatMap(loadClassOption)
+  lazy val interfaces = classFile.interfaces.flatMap(loadClass_PE)
 
-  lazy val innerClasses = innerInfo.flatMap(info => loadClassOption(info.innerClassInfo).map(readUTF(info.innerName) -> _)).toMap
+  lazy val innerClasses = innerInfo.flatMap(info => loadClass_PE(info.innerClassInfo).map(readUTF(info.innerName) -> _)).toMap
 
-  lazy val outerClass = outerInfo.flatMap(info => loadClassOption(info.outerClassInfo))
+  lazy val outerClass = outerInfo.flatMap(info => loadClass_PE(info.outerClassInfo))
 
   lazy val fields = classFile.fields.flatMap { field =>
-    loader.fieldDescriptor(readUTF(field.desc)).map(new JLoadedFieldDef(field, this, _))
+    compiler.classLoader.fieldDescriptor(readUTF(field.desc)).map(new JLoadedFieldDef(field, this, _))
   }
 
   lazy val methods = classFile.methods.flatMap { method =>
-    loader.methodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
+    compiler.classLoader.methodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
   }
 
-  def classModule: JClassModule = JTypePool.get.getClassModule(this)
+  lazy val classModule: JClassModule = new JLoadedClassModule(this)
 
-  def objectType (typeArgs: List[MetaValue]): Option[JObjectType] = JTypePool.get.getObjectType(this, typeArgs)
+  def objectType (typeArgs: List[MetaValue]): Option[JObjectType] = compiler.typeLoader.getObjectType(this, typeArgs)
 
   def isContext = annotations.isContext
+
+  lazy val metaParameterNames: List[String] = signature.map(_.metaParams.map(_.name)).getOrElse(Nil)
 
   lazy val signature =
     annotations.signature.orElse(attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature))))
@@ -49,7 +51,7 @@ class JLoadedClass (val classFile: BClassFile, val loader: JClassLoader)(implici
   private def innerInfo =
     attributes.innerClasses.toList.flatMap(_.classes.filter(info => info.outerClassInfo == classFile.thisClass && info.innerName != 0))
 
-  private def loadClassOption (ref: Int): Option[JClass] = readClassNameOption(ref).flatMap(cls => loader.loadClassOption(cls))
+  private def loadClass_PE (ref: Int): Option[JClass] = readClassNameOption(ref).flatMap(cls => compiler.classLoader.loadClass_PE(cls))
 }
 
 class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val fieldType: JErasedType)(implicit state: JState) extends JFieldDef {
@@ -85,7 +87,7 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
 
   override def returnType = descriptor._2
 
-  lazy val exceptions: List[JClass] = exceptionNames.flatMap(name => declaringClass.loader.loadClassOption(name))
+  lazy val exceptions: List[JClass] = exceptionNames.flatMap(name => declaringClass.compiler.classLoader.loadClass_PE(name))
 
   lazy val signature =
     annotations.signature.orElse(attributes.signature.flatMap(sig => parseMethodSignature(readUTF(sig.signature))))
