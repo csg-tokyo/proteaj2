@@ -167,6 +167,8 @@ case class IRMethodDef (modifiers: IRModifiers, typeParameters: List[IRTypeParam
   override def returnType: JErasedType = genericReturnType.erase
   override def paramTypes: List[JErasedType] = formalParameters.map(_.genericType.erase)
   override def exceptions: List[JClass] = throws.map(_.erase)
+
+  override def signature: Option[JMethodSignature] = ???
 }
 
 case class IRConstructorDef (modifiers: IRModifiers, typeParameters: List[IRTypeParameter], typeVariables: Map[String, IRTypeVariable], formalParameters: List[IRFormalParameter], throws: List[IRGenericRefType], bodySnippet: BlockSnippet, declaringClass: IRClass) extends IRProcedureDef {
@@ -177,6 +179,8 @@ case class IRConstructorDef (modifiers: IRModifiers, typeParameters: List[IRType
   override def name: String = CommonNames.constructorName
   override def paramTypes: List[JErasedType] = formalParameters.map(_.genericType.erase)
   override def exceptions: List[JClass] = throws.map(_.erase)
+
+  override def signature: Option[JMethodSignature] = ???
 }
 
 case class IRFormalParameter (modifiers: IRModifiers, genericType: IRGenericType, name: String, varArgs: Boolean, initializerSnippet: Option[ExpressionSnippet]) {
@@ -191,6 +195,8 @@ case class IRInstanceInitializerDef (blockSnippet: BlockSnippet, declaringClass:
   override def name: String = ""
   override def paramTypes: List[JErasedType] = Nil
   override def exceptions: List[JClass] = Nil
+
+  override def signature: Option[JMethodSignature] = None
 }
 
 case class IRStaticInitializerDef (blockSnippet: BlockSnippet, declaringClass: IRClass) extends IRProcedureDef {
@@ -201,4 +207,6 @@ case class IRStaticInitializerDef (blockSnippet: BlockSnippet, declaringClass: I
   override def name: String = CommonNames.classInitializerName
   override def paramTypes: List[JErasedType] = Nil
   override def exceptions: List[JClass] = Nil
+
+  override def signature: Option[JMethodSignature] = None
 }

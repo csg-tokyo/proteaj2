@@ -7,26 +7,27 @@ trait JMember {
   def isPrivate: Boolean = modifier.check(JModifier.accPrivate)
 }
 
-trait JField extends JMember {
-  def name: String
-  def fieldType: JType
+class JField (fieldDef: JFieldDef, val fieldType: JType, val declaring: JObjectType) extends JMember {
+  def modifier: JModifier = fieldDef.mod
+  def name: String = fieldDef.name
 }
 
-trait JMethod extends JMember {
-  def name: String
+class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val declaring: JObjectType) extends JMember {
+  def modifier: JModifier = methodDef.mod
+  def name: String = methodDef.name
 
-  def erasedReturnType: JErasedType
-  def erasedParameterTypes: List[JErasedType]
+  def erasedReturnType: JErasedType = methodDef.returnType
+  def erasedParameterTypes: List[JErasedType] = methodDef.paramTypes
 
-  def returnType: JGenericType
-  def parameterTypes: List[JGenericType]
-  def exceptionTypes: List[JGenericType]
+  def returnType: JGenericType = ???
+  def parameterTypes: List[JGenericType] = ???
+  def exceptionTypes: List[JGenericType] = ???
 
   def overrides (that: JMethod): Boolean = {
     this.name == that.name && this.erasedReturnType.isSubclassOf(that.erasedReturnType) && this.erasedParameterTypes == that.erasedParameterTypes
   }
 }
 
-trait JConstructor extends JMember {
-
+class JConstructor (val methodDef: JMethodDef, val enclosingEnv: Map[String, MetaValue], val declaring: JObjectType) extends JMember {
+  def modifier: JModifier = methodDef.mod
 }

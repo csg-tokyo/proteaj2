@@ -33,11 +33,16 @@ trait JGenericType {
   def <=> (t: JType): Option[Map[String, MetaValue]]
 }
 
-trait JClassModule extends JModule
+case class JClassModule (clazz: JClass) extends JModule {
+  def fields: Map[String, JField] = ???
+  def methods: Map[String, List[JMethod]] = ???
+
+  def compiler = clazz.compiler
+}
 
 sealed trait JType extends JModule {
   def name: String
-  def array: JArrayType
+  def array: JArrayType = compiler.typeLoader.arrayOf(this)
 
   def isSubtypeOf (that: JType): Boolean
   def isAssignableTo (that: JType): Boolean
@@ -48,18 +53,37 @@ sealed trait JType extends JModule {
 
 sealed trait JRefType extends JType with MetaValue
 
-trait JObjectType extends JRefType {
-  def erase: JClass
+case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRefType {
+  def compiler = erase.compiler
 
-  def env: Map[String, MetaValue]
+  override def name: String = {
+    if (env.isEmpty) erase.name
+    else erase.name + env.map(kv => kv._1 + "=" + kv._2).mkString("<", ",", ">")
+  }
 
-  def superType: Option[JObjectType]
-  def interfaceTypes: List[JObjectType]
+  lazy val superType: Option[JObjectType] = erase.signature match {
+    case Some(sig) => compiler.typeLoader.fromClassTypeSignature(sig.superClass, env)
+    case None      => erase.superClass.flatMap(_.objectType(Nil))
+  }
 
-  def declaredFields: List[JField]
-  def declaredMethods: List[JMethod]
+  lazy val interfaceTypes: List[JObjectType] = erase.signature match {
+    case Some(sig) => sig.interfaces.flatMap(compiler.typeLoader.fromClassTypeSignature(_, env))
+    case None      => erase.interfaces.flatMap(_.objectType(Nil))
+  }
 
-  def constructors: List[JConstructor]
+  lazy val constructors: List[JConstructor] = {
+    erase.methods.filter(_.isConstructor).map { constructorDef => new JConstructor(constructorDef, env, this) }
+  }
+
+  lazy val declaredFields: List[JField] = {
+    erase.fields.filterNot(_.isStatic).flatMap { fieldDef =>
+      fieldDef.signature.flatMap(sig => compiler.typeLoader.fromTypeSignature(sig, env)).map(fieldType => new JField(fieldDef, fieldType, this))
+    }
+  }
+
+  lazy val declaredMethods: List[JMethod] = {
+    erase.methods.filter(_.isInstanceMethod).map { methodDef => new JMethod(methodDef, env, this) }
+  }
 
   lazy val privateFields: Map[String, JField] = declaredFields.filter(_.isPrivate).map(f => f.name -> f).toMap
   lazy val privateMethods: Map[String, List[JMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
@@ -77,6 +101,8 @@ trait JObjectType extends JRefType {
   def isSubtypeOf (that: JObjectType): Boolean = {
     (this.erase == that.erase && matchTypeArgs(that.env)) || superType.exists(_.isSubtypeOf(that)) || interfaceTypes.exists(_.isSubtypeOf(that))
   }
+
+  override def isAssignableTo(that: JType): Boolean = ???
 
   def matches (that: MetaValue): Boolean = this == that
 
@@ -106,16 +132,28 @@ trait JObjectType extends JRefType {
   }
 }
 
-trait JPrimitiveType extends JType {
+case class JPrimitiveType (clazz: JPrimitiveClass) extends JType {
+  def name = clazz.name
+
+  lazy val wrapperType: Option[JType] = clazz.wrapperClass.flatMap(_.objectType(Nil))
+
   def fields: Map[String, JField] = Map.empty
   def methods: Map[String, List[JMethod]] = Map.empty
 
   def isSubtypeOf (that: JType): Boolean = this == that
+
+  def isAssignableTo(that: JType): Boolean = ???
+
+  def compiler = clazz.compiler
 }
 
-trait JArrayType extends JRefType {
-  def componentType: JType
-  def superTypes: List[JObjectType]
+case class JArrayType (componentType: JType) extends JRefType {
+  def name: String = componentType.name + "[]"
+
+  def superTypes: List[JObjectType] = compiler.typeLoader.superTypesOfArray
+
+  def fields: Map[String, JField] = ???
+  def methods: Map[String, List[JMethod]] = ???
 
   def isSubtypeOf (that: JType): Boolean = that match {
     case _ if this == that   => true
@@ -128,11 +166,19 @@ trait JArrayType extends JRefType {
   def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
 
   def matches (that: MetaValue): Boolean = this == that
+
+  def compiler: JCompiler = componentType.compiler
 }
 
-trait JWildcardType extends JRefType {
-  def upperBound: JType
-  def lowerBound: Option[JType]
+class JWildcardType (val upperBound: JType, val lowerBound: Option[JType], val compiler: JCompiler) extends JRefType {
+  def name = lowerBound match {
+    case Some(lb) => "? super " + lb.name
+    case None     => "? extends " + upperBound.name
+  }
+
+  def methods: Map[String, List[JMethod]] = ???
+  def fields: Map[String, JField] = ???
+
 
   def isSubtypeOf (that: JType): Boolean = upperBound.isSubtypeOf(that)
   def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)

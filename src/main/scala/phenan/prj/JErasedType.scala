@@ -23,7 +23,7 @@ trait JClass extends JErasedType {
     this == that || superClass.exists(_.isSubclassOf(that)) || interfaces.exists(_.isSubclassOf(that))
   }
 
-  def classModule: JClassModule
+  def classModule: JClassModule = JClassModule(this)
   def objectType (typeArgs: List[MetaValue]): Option[JObjectType]
 
   lazy val classInitializer = methods.find(_.isClassInitializer)
@@ -35,8 +35,9 @@ trait JClass extends JErasedType {
 }
 
 trait JPrimitiveClass extends JErasedType {
-  def primitiveType: JPrimitiveType
+  def wrapperClass: Option[JClass]
   def isSubclassOf (that: JErasedType): Boolean = this == that
+  lazy val primitiveType: JPrimitiveType = JPrimitiveType(this)
 }
 
 trait JArrayClass extends JErasedType {
@@ -65,6 +66,8 @@ trait JMethodDef {
   def paramTypes: List[JErasedType]
   def exceptions: List[JClass]
   def declaringClass: JClass
+
+  def signature: Option[JMethodSignature]
 
   def isStatic: Boolean           = mod.check(JModifier.accStatic)
   def isConstructor: Boolean      = name == constructorName

@@ -5,7 +5,7 @@ import phenan.prj.state.JState
 
 import scalaz.Memo._
 
-class JTypePool (val compiler: JCompiler)(implicit state: JState) extends JTypeLoader {
+class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends JTypeLoader {
   val arrayOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
   val getObjectType: (JClass, List[MetaValue]) => Option[JObjectType] = Function.untupled(mutableHashMapMemo(getLoadedObjectType))
 
@@ -137,7 +137,7 @@ class JTypePool (val compiler: JCompiler)(implicit state: JState) extends JTypeL
       None
   }
 
-  private def getArrayType (component: JType): JArrayType = new JArrayTypeImpl(component)
+  private def getArrayType (component: JType): JArrayType = JArrayType(component)
 
   private def getLoadedObjectType (classAndArgs: (JClass, List[MetaValue])): Option[JObjectType] = {
     val clazz = classAndArgs._1
@@ -146,13 +146,13 @@ class JTypePool (val compiler: JCompiler)(implicit state: JState) extends JTypeL
     clazz.signature match {
       case Some(sig) =>
         val map = sig.metaParams.map(_.name).zip(args).toMap
-        if (validTypeArgs(sig.metaParams, args, map)) Some(new JObjectTypeImpl(clazz, map))
+        if (validTypeArgs(sig.metaParams, args, map)) Some(new JObjectType(clazz, map))
         else {
           state.error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
           None
         }
       case None =>
-        if (args.isEmpty) Some(new JObjectTypeImpl(clazz, Map.empty))
+        if (args.isEmpty) Some(new JObjectType(clazz, Map.empty))
         else {
           state.error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
           None
@@ -179,14 +179,14 @@ class JTypePool (val compiler: JCompiler)(implicit state: JState) extends JTypeL
     case sig: JTypeSignature              =>
       fromTypeSignature_RefType(sig, env)
     case UpperBoundWildcardArgument(sig) =>
-      fromTypeSignature(sig, env).map(bound => new JWildcardTypeImpl(bound, None, compiler))
+      fromTypeSignature(sig, env).map(bound => new JWildcardType(bound, None, compiler))
     case LowerBoundWildcardArgument(sig) => for {
       upperBound  <- classLoader.objectClass.objectType(Nil)
       lowerBound  <- fromTypeSignature(sig, env)
-    } yield new JWildcardTypeImpl(upperBound, Some(lowerBound), compiler)
+    } yield new JWildcardType(upperBound, Some(lowerBound), compiler)
     case UnboundWildcardArgument         => for {
       upperBound  <- classLoader.objectClass.objectType(Nil)
-    } yield new JWildcardTypeImpl(upperBound, None, compiler)
+    } yield new JWildcardType(upperBound, None, compiler)
     case PureVariable(name)              =>
       env.get(name)
   }

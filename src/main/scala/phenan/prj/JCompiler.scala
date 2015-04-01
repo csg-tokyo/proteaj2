@@ -7,7 +7,7 @@ import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state.JState
 
-import scala.util._
+//import scala.util._
 
 class JCompiler (implicit state: JState) {
 
@@ -43,7 +43,7 @@ class JCompiler (implicit state: JState) {
   }
 
   val classLoader: JClassLoader = new JClassLoaderImpl(this)
-  val typeLoader: JTypeLoader = new JTypePool(this)
+  val typeLoader: JTypeLoader = new JTypeLoaderImpl(this)
   val declarationCompiler = new DeclarationCompiler(this)
 
   private var modules: Map[String, IRModule] = Map.empty

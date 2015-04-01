@@ -30,8 +30,6 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler)(implicit
     compiler.classLoader.methodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
   }
 
-  lazy val classModule: JClassModule = new JLoadedClassModule(this)
-
   def objectType (typeArgs: List[MetaValue]): Option[JObjectType] = compiler.typeLoader.getObjectType(this, typeArgs)
 
   def isContext = annotations.isContext
