@@ -6,6 +6,8 @@ trait JTypeLoader {
   val arrayOf: JType => JArrayType
   val getObjectType: (JClass, List[MetaValue]) => Option[JObjectType]
 
+  lazy val objectType = compiler.classLoader.objectClass.flatMap(_.objectType(Nil))
+
   def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JType]
   def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaValue]): Option[JObjectType]
 

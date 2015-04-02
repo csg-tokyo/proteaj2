@@ -3,7 +3,6 @@ package phenan.prj.ir
 import phenan.prj._
 import phenan.prj.decl._
 import phenan.prj.exception.InvalidTypeException
-import phenan.prj.internal.JClassLoaderImpl
 import phenan.prj.state.JState
 import phenan.util._
 
@@ -36,17 +35,16 @@ class IRResolver (header: Header, val compiler: JCompiler)(implicit state: JStat
   }
 
   def arrayOf (t: JErasedType): JArrayClass = compiler.classLoader.arrayOf(t)
-
+/*
   def arrayOf (t: IRGenericType, dim: Int): IRGenericType = {
     if (dim > 1) arrayOf(IRGenericArrayType(t, this), dim - 1)
     else t
   }
-
+*/
   def voidClass = compiler.classLoader.void
-  def objectClass = compiler.classLoader.objectClass
 
   def primitives = compiler.classLoader.primitives
-
+/*
   private[ir] def declareTypeVariables (parameters: List[TypeParameter], env: Map[String, IRTypeVariable]): Map[String, IRTypeVariable] = {
     parameters.foldLeft (env) { (env, param) =>
       env + (param.name -> IRTypeParameter(param, env, this).typeVariable)
@@ -90,7 +88,7 @@ class IRResolver (header: Header, val compiler: JCompiler)(implicit state: JStat
       u <- upper.traverse(typeName(_, typeVariables))
       l <- lower.traverse(typeName(_, typeVariables))
     } yield IRGenericWildcardType(u, l)
-  }
+  }*/
 
   private def tryLoadClass (name: List[String]): Try[JClass] = tryLoadClass(name.head, name.tail)
 
@@ -101,10 +99,12 @@ class IRResolver (header: Header, val compiler: JCompiler)(implicit state: JStat
     case Failure(e) => Failure(e)
   }
 
-  private def tryGetInnerClass (clazz: JClass, name: List[String]): Try[JClass] = {
-    if (name.isEmpty) Success(clazz)
-    else if (clazz.innerClasses.contains(name.head)) tryGetInnerClass(clazz.innerClasses(name.head), name.tail)
-    else Failure(InvalidTypeException("inner class " + name.head + " is not found"))
+  private def tryGetInnerClass (clazz: JClass, name: List[String]): Try[JClass] = name match {
+    case head :: tail => compiler.classLoader.loadInnerClass(clazz, name.head) match {
+      case Success(inner) => tryGetInnerClass(inner, tail)
+      case failure => failure
+    }
+    case Nil => Success(clazz)
   }
 
   private def tryLoadClassFromPackage (name: List[String], packages: List[List[String]]): Try[JClass] = packages match {

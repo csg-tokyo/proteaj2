@@ -1,5 +1,6 @@
 package phenan.prj
 
+import phenan.prj.exception.ClassFileNotFoundException
 import phenan.prj.state.JState
 
 import scala.util._
@@ -16,11 +17,12 @@ trait JClassLoader {
       None
   }
 
+  def loadInnerClass(outer: JClass, name: String): Try[JClass] = outer.innerClasses.get(name).map(loadClass) getOrElse {
+    Failure(ClassFileNotFoundException("class " + outer.name + "$" + name + " is not found"))
+  }
+
   def arrayOf: JErasedType => JArrayClass
   def arrayOf(clazz: JErasedType, dim: Int): JErasedType
-
-  def methodDescriptor(desc: String): Option[(List[JErasedType], JErasedType)]
-  def fieldDescriptor(desc: String): Option[JErasedType]
 
   def boolean: JPrimitiveClass
   def byte: JPrimitiveClass
@@ -37,7 +39,48 @@ trait JClassLoader {
     "long" -> long, "float" -> float, "double" -> double, "void" -> void
   )
 
-  lazy val objectClass: JClass = loadClass("java/lang/Object").get
+  lazy val objectClass: Option[JClass] = loadClass_PE("java/lang/Object")
+
+  def erase (signature: JTypeSignature, metaParams: List[FormalMetaParameter]): Try[JErasedType] = signature match {
+    case prm: JPrimitiveTypeSignature => Success(erase(prm))
+    case arr: JArrayTypeSignature     => erase(arr, metaParams)
+    case cls: JClassTypeSignature     => erase(cls)
+    case cap: JCapturedWildcardSignature => cap.upperBound.map(erase(_, metaParams)).getOrElse(loadClass("java/lang/Object"))
+    case tvr: JTypeVariableSignature     => metaParams.find(_.name == tvr.name).flatMap(_.bounds.headOption).map(erase(_, metaParams)).getOrElse(loadClass("java/lang/Object"))
+  }
+
+  def erase (signature: JPrimitiveTypeSignature): JPrimitiveClass = signature match {
+    case ByteTypeSignature   => byte
+    case CharTypeSignature   => char
+    case DoubleTypeSignature => double
+    case FloatTypeSignature  => float
+    case IntTypeSignature    => int
+    case LongTypeSignature   => long
+    case ShortTypeSignature  => short
+    case BoolTypeSignature   => boolean
+    case VoidTypeSignature   => void
+  }
+
+  def erase (signature: JArrayTypeSignature, metaParams: List[FormalMetaParameter]): Try[JArrayClass] = erase(signature.component, metaParams).map(arrayOf)
+
+  def erase (signature: JClassTypeSignature): Try[JClass] = signature match {
+    case SimpleClassTypeSignature(clazz, args)        => loadClass(clazz)
+    case MemberClassTypeSignature(outer, clazz, args) => erase(outer).flatMap(loadInnerClass(_, clazz))
+  }
+
+  def erase_PE (signature: JClassTypeSignature): Option[JClass] = erase(signature) match {
+    case Success(t) => Some(t)
+    case Failure(e) =>
+      state.error("class type not found : " + signature, e)
+      None
+  }
+
+  def erase_Force (signature: JTypeSignature, metaParams: List[FormalMetaParameter]): JErasedType = erase(signature, metaParams) match {
+    case Success(t) => t
+    case Failure(e) =>
+      state.error("type not found : " + signature, e)
+      loadClass("java/lang/Object").get
+  }
 
   implicit def state: JState
 }

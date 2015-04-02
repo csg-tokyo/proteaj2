@@ -14,32 +14,38 @@ sealed trait IRModule extends JClass with IRClassMemberDef {
   protected val declaration: ModuleDeclaration
 
   def name: String = outerClass match {
-    case Some(outer) => outer.name + '.' + declaration.name
+    case Some(outer) => outer + '.' + declaration.name
     case None        => file.getPackageName.map(_ + '.').getOrElse("") + declaration.name
   }
 
   def simpleName: String = declaration.name
 
   val internalName: String = outerClass match {
-    case Some(outer) => outer.internalName + '$' + declaration.name
+    case Some(outer) => outer + '$' + declaration.name
     case None => file.getPackageInternalName.map(_ + '/').getOrElse("") + declaration.name
   }
 
   def file: IRFile
-  def outerClass: Option[IRModule]
 }
 
-class IRClass (protected val declaration: ClassDeclaration, val outerClass: Option[IRModule], val file: IRFile, val compiler: JCompiler)(implicit state: JState) extends IRModule {
+class IRClass (protected val declaration: ClassDeclaration, val outerClass: Option[String], val file: IRFile, val compiler: JCompiler)(implicit state: JState) extends IRModule {
   lazy val modifiers = IRModifiers(declaration.modifiers)
 
   lazy val signature = ???
 
-  lazy val typeVariables = resolver.declareTypeVariables(declaration.typeParameters, Map.empty)
 
-  lazy val typeParameters = declaration.typeParameters.map(param => typeVariables(param.name).parameter)
+  //lazy val typeVariables = resolver.declareTypeVariables(declaration.typeParameters, Map.empty)
 
-  lazy val metaParameterNames: List[String] = typeParameters.map(_.name)
+  //lazy val typeParameters = declaration.typeParameters.map(param => typeVariables(param.name).parameter)
 
+  override def methods: List[JMethodDef] = ???
+
+  override def fields: List[JFieldDef] = ???
+
+  override def innerClasses: Map[String, String] = ???
+
+  //lazy val metaParameterNames: List[String] = typeParameters.map(_.name)
+/*
   lazy val superType: Option[IRGenericClassType] = declaration.superClass.flatMap { sup =>
     resolver.classTypeName(sup, typeVariables) match {
       case Success(t) => Some(t)
@@ -59,22 +65,19 @@ class IRClass (protected val declaration: ClassDeclaration, val outerClass: Opti
   }
 
   lazy val members: List[IRClassMemberDef] = declaration.members.flatMap(getIRMember)
-
+*/
   override def mod: JModifier = modifiers.flags | accSuper
 
-  override def superClass: Option[JClass] = superType.map(_.erase)
-  override def interfaces: List[JClass] = interfaceTypes.map(_.erase)
+  //override def superClass: Option[JClass] = superType.map(_.erase)
+  //override def interfaces: List[JClass] = interfaceTypes.map(_.erase)
 
-  override def innerClasses: Map[String, IRModule] = members.collect { case c: IRModule => c.simpleName -> c }.toMap
+  //override def innerClasses: Map[String, IRModule] = members.collect { case c: IRModule => c.simpleName -> c }.toMap
 
-  override def methods: List[IRMethodDef] = members.collect { case m: IRMethodDef => m }
-  override def fields: List[IRFieldDef] = members.collect { case f: IRFieldDef => f }
-
-  override def classModule: JClassModule = ???
-  override def objectType(typeArgs: List[MetaValue]): Option[JObjectType] = ???
+  //override def methods: List[IRMethodDef] = members.collect { case m: IRMethodDef => m }
+  //override def fields: List[IRFieldDef] = members.collect { case f: IRFieldDef => f }
 
   def resolver = file.resolver
-
+/*
   private def getIRMember (member: ClassMember): List[IRClassMemberDef] = member match {
     case InstanceInitializer(block) =>
       List(IRInstanceInitializerDef(block, this))
@@ -146,16 +149,16 @@ class IRClass (protected val declaration: ClassDeclaration, val outerClass: Opti
       case Failure(e) => Failure(e)
     }
     case Nil => Success(result)
-  }
+  }*/
 }
-
+/*
 case class IRFieldDef (modifiers: IRModifiers, name: String, genericType: IRGenericType, initializerSnippet: Option[ExpressionSnippet], declaringClass: IRClass) extends JFieldDef with IRClassMemberDef {
   lazy val initializer: Option[IRExpression] = ???
 
   override def mod: JModifier = modifiers.flags
-  override def fieldType: JErasedType = genericType.erase
+  //override def fieldType: JErasedType = genericType.erase
 
-  override def signature: Option[JTypeSignature] = ???
+  override def signature: JTypeSignature = ???
 }
 
 sealed trait IRProcedureDef extends JMethodDef with IRClassMemberDef
@@ -210,3 +213,4 @@ case class IRStaticInitializerDef (blockSnippet: BlockSnippet, declaringClass: I
 
   override def signature: Option[JMethodSignature] = None
 }
+*/

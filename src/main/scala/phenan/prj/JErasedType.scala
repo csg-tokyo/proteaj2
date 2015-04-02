@@ -10,21 +10,25 @@ sealed trait JErasedType {
 
 trait JClass extends JErasedType {
   def mod: JModifier
-  def superClass: Option[JClass]
-  def interfaces: List[JClass]
-  def innerClasses: Map[String, JClass]
-  def outerClass: Option[JClass]
+
   def fields: List[JFieldDef]
   def methods: List[JMethodDef]
 
-  def signature: Option[JClassSignature]
+  def internalName: String
+  def innerClasses: Map[String, String]
+  def outerClass: Option[String]
+
+  def signature: JClassSignature
+
+  lazy val superClass: Option[JClass] = compiler.classLoader.erase_PE(signature.superClass)
+  lazy val interfaces: List[JClass] = signature.interfaces.flatMap(compiler.classLoader.erase_PE)
 
   def isSubclassOf (that: JErasedType): Boolean = {
     this == that || superClass.exists(_.isSubclassOf(that)) || interfaces.exists(_.isSubclassOf(that))
   }
 
   def classModule: JClassModule = JClassModule(this)
-  def objectType (typeArgs: List[MetaValue]): Option[JObjectType]
+  def objectType (typeArgs: List[MetaValue]): Option[JObjectType] = compiler.typeLoader.getObjectType(this, typeArgs)
 
   lazy val classInitializer = methods.find(_.isClassInitializer)
   lazy val constructors     = methods.filter(_.isConstructor)
@@ -51,10 +55,9 @@ trait JArrayClass extends JErasedType {
 trait JFieldDef {
   def mod: JModifier
   def name: String
-  def fieldType: JErasedType
   def declaringClass: JClass
 
-  def signature: Option[JTypeSignature]
+  def signature: JTypeSignature
 
   def isStatic: Boolean = mod.check(JModifier.accStatic)
 }
@@ -62,12 +65,9 @@ trait JFieldDef {
 trait JMethodDef {
   def mod: JModifier
   def name: String
-  def returnType: JErasedType
-  def paramTypes: List[JErasedType]
-  def exceptions: List[JClass]
   def declaringClass: JClass
 
-  def signature: Option[JMethodSignature]
+  def signature: JMethodSignature
 
   def isStatic: Boolean           = mod.check(JModifier.accStatic)
   def isConstructor: Boolean      = name == constructorName

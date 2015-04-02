@@ -40,7 +40,5 @@ class JCompilerTest extends FunSuite with Matchers {
 
     val hir = hello.get.asInstanceOf[IRClass]
     hir.methods should have (size (2))
-
-    field.fieldType shouldBe hir
   }
 }

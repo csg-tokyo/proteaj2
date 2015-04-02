@@ -13,7 +13,7 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   def readMethodAnnotations (attribute: Option[RuntimeVisibleAnnotationsAttribute]): PrjMethodAnnotations =
     attribute.map(methodAnnotations).getOrElse(PrjMethodAnnotations(None, None, false, false))
   def readFieldAnnotations (attribute: Option[RuntimeVisibleAnnotationsAttribute]): PrjFieldAnnotations =
-    attribute.map(fieldAnnotations).getOrElse(PrjFieldAnnotations(false))
+    attribute.map(fieldAnnotations).getOrElse(PrjFieldAnnotations(None, false))
 
   private lazy val classAnnotations = annotations >=> {
     for {
@@ -34,7 +34,10 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   }
 
   private lazy val fieldAnnotations = annotations >=> {
-    pure >==> PrjFieldAnnotations
+    for {
+      sig <- fieldSig
+      pr  <- pure
+    } yield PrjFieldAnnotations(sig, pr)
   }
 
   private lazy val classSig = annotation("ClassSig") {
@@ -55,6 +58,10 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
       deactivates <- array("deactivates")(typeSignature)
       requires    <- array("requires")(typeSignature)
     } yield JMethodSignature(metaParams, paramTypes, retType, exceptions, activates, deactivates, requires)
+  }
+
+  private lazy val fieldSig = annotation("FieldSig") {
+    required("value")(typeSignature)(JTypeSignature.objectTypeSig)
   }
 
   private lazy val dsl = annotation("DSL") {

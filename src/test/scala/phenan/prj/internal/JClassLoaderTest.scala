@@ -46,24 +46,6 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   }
 
-  test("SimpleDSLClass") {
-    val config = new JConfig
-    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
-    implicit val state = config.configure.get
-    val loader = (new JCompiler).classLoader
-
-    val clazz = loader.load("test/SimpleDSLClass")
-    clazz shouldBe a [Success[_]]
-    clazz.get shouldBe a [JLoadedClass]
-
-    val annotations = clazz.get.asInstanceOf[JLoadedClass].annotations
-    annotations.dsl shouldBe a [Some[_]]
-    annotations.signature shouldBe None
-
-    annotations.dsl.get.priorities shouldBe Nil
-    annotations.dsl.get.withDSLs shouldBe Nil
-  }
-
   test("ClassSigが読めるか") {
     val config = new JConfig
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
@@ -76,8 +58,8 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
     val varClass = clazz.get.asInstanceOf[JLoadedClass]
 
-    varClass.signature shouldBe Some(
-      JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), JTypeSignature.objectTypeSig, Nil))
+    varClass.signature shouldBe
+      JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), JTypeSignature.objectTypeSig, Nil)
 
     varClass.isContext shouldBe true
   }

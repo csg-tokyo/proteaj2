@@ -8,38 +8,36 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler)(implicit
   import classFile.poolReader._
   import classFile.attrParser._
   import classFile.annReader._
+  import DescriptorParsers._
   import SignatureParsers._
 
   lazy val mod = JModifier(outerInfo.map(_.mod).getOrElse(0) | classFile.mod)
 
-  lazy val name = readClassName(classFile.thisClass).replace('/', '.').replace('$', '.')
-
-  lazy val superClass = loadClass_PE(classFile.superClass)
-
-  lazy val interfaces = classFile.interfaces.flatMap(loadClass_PE)
-
-  lazy val innerClasses = innerInfo.flatMap(info => loadClass_PE(info.innerClassInfo).map(readUTF(info.innerName) -> _)).toMap
-
-  lazy val outerClass = outerInfo.flatMap(info => loadClass_PE(info.outerClassInfo))
+  lazy val name = internalName.replace('/', '.').replace('$', '.')
 
   lazy val fields = classFile.fields.flatMap { field =>
-    compiler.classLoader.fieldDescriptor(readUTF(field.desc)).map(new JLoadedFieldDef(field, this, _))
+    parseFieldDescriptor(readUTF(field.desc)).map(new JLoadedFieldDef(field, this, _))
   }
 
   lazy val methods = classFile.methods.flatMap { method =>
-    compiler.classLoader.methodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
+    parseMethodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
   }
-
-  def objectType (typeArgs: List[MetaValue]): Option[JObjectType] = compiler.typeLoader.getObjectType(this, typeArgs)
 
   def isContext = annotations.isContext
 
-  lazy val metaParameterNames: List[String] = signature.map(_.metaParams.map(_.name)).getOrElse(Nil)
+  lazy val signature = annotations.signature.orElse {
+    attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature)))
+  } getOrElse {
+    JClassSignature(readClassNameOption(classFile.superClass), classFile.interfaces.flatMap(readClassNameOption))
+  }
 
-  lazy val signature =
-    annotations.signature.orElse(attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature))))
+  lazy val internalName = readClassName(classFile.thisClass)
 
-  lazy val annotations = readClassAnnotations(attributes.annotations)
+  lazy val innerClasses = innerInfo.flatMap(info => readClassNameOption(info.innerClassInfo).map(readUTF(info.innerName) -> _)).toMap
+
+  lazy val outerClass = outerInfo.flatMap(info => readClassNameOption(info.outerClassInfo))
+
+  private lazy val annotations = readClassAnnotations(attributes.annotations)
 
   private lazy val attributes = parseClassAttributes(classFile.attributes)
 
@@ -48,11 +46,9 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler)(implicit
 
   private def innerInfo =
     attributes.innerClasses.toList.flatMap(_.classes.filter(info => info.outerClassInfo == classFile.thisClass && info.innerName != 0))
-
-  private def loadClass_PE (ref: Int): Option[JClass] = readClassNameOption(ref).flatMap(cls => compiler.classLoader.loadClass_PE(cls))
 }
 
-class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val fieldType: JErasedType)(implicit state: JState) extends JFieldDef {
+class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val descriptor: JTypeSignature)(implicit state: JState) extends JFieldDef {
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._
@@ -63,14 +59,16 @@ class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val 
 
   lazy val name = readUTF(field.name)
 
-  lazy val signature = attributes.signature.flatMap(sig => parseFieldSignature(readUTF(sig.signature)))
+  lazy val signature = annotations.signature.orElse {
+    attributes.signature.flatMap(sig => parseFieldSignature(readUTF(sig.signature)))
+  } getOrElse descriptor
 
-  lazy val annotations = readFieldAnnotations(attributes.annotations)
+  private lazy val annotations = readFieldAnnotations(attributes.annotations)
 
   private lazy val attributes = parseFieldAttribute(field.attributes)
 }
 
-class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, val descriptor: (List[JErasedType], JErasedType))(implicit state: JState) extends JMethodDef {
+class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, val descriptor: JMethodSignature)(implicit state: JState) extends JMethodDef {
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._
@@ -81,18 +79,13 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
 
   lazy val name = readUTF(method.name)
 
-  override def paramTypes = descriptor._1
-
-  override def returnType = descriptor._2
-
-  lazy val exceptions: List[JClass] = exceptionNames.flatMap(name => declaringClass.compiler.classLoader.loadClass_PE(name))
-
-  lazy val signature =
-    annotations.signature.orElse(attributes.signature.flatMap(sig => parseMethodSignature(readUTF(sig.signature))))
+  lazy val signature = annotations.signature.orElse {
+    attributes.signature.flatMap(sig => parseMethodSignature(readUTF(sig.signature)))
+  } getOrElse {
+    descriptor.throws(attributes.exceptions.toList.flatMap(_.exceptions.map(readClassName)))
+  }
 
   lazy val annotations = readMethodAnnotations(attributes.annotations)
-
-  private def exceptionNames = attributes.exceptions.toList.flatMap(attr => attr.exceptions.map(readClassName))
 
   private lazy val attributes = parseMethodAttribute(method.attributes)
 }

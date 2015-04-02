@@ -1,9 +1,34 @@
 package test;
 
+import java.io.Serializable;
+import java.util.*;
+
 public class Foo {
   void foo () {
     hello.greet();
   }
 
   private Hello hello = new Hello();
+}
+
+class Hoge<A> {
+  <T> List<? extends A> foo (T t, List<A> a) { return a; }
+}
+
+class Box<T> {
+  void put (T t) {}
+}
+
+class Piyo {
+  static void hoge() {
+    Hoge<?> hoge = new Hoge<String>();
+    //hoge.<String>foo("hoge", new ArrayList<String>());
+
+    Hoge<? extends Object> a = null;
+    Hoge<? super String> b = null;
+    a = b;
+
+    Box<? super String> box = new Box<>();
+    box.put("hoge");
+  }
 }
