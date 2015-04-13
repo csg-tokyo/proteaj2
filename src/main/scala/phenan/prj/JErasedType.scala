@@ -47,8 +47,9 @@ trait JPrimitiveClass extends JErasedType {
 trait JArrayClass extends JErasedType {
   def component: JErasedType
   def isSubclassOf (that: JErasedType): Boolean = that match {
-    case that: JArrayClass => this == that || this.component.isSubclassOf(that.component)
-    case _ => superClassesOfArray.contains(that.name)
+    case that: JArrayClass  => this == that || this.component.isSubclassOf(that.component)
+    case that: JClass       => superClassesOfArray.contains(that.internalName)
+    case _: JPrimitiveClass => false
   }
 }
 
@@ -68,6 +69,9 @@ trait JMethodDef {
   def declaringClass: JClass
 
   def signature: JMethodSignature
+
+  def erasedReturnType: JErasedType
+  def erasedParameterTypes: List[JErasedType]
 
   def isStatic: Boolean           = mod.check(JModifier.accStatic)
   def isConstructor: Boolean      = name == constructorName

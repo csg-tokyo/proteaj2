@@ -87,5 +87,9 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
 
   lazy val annotations = readMethodAnnotations(attributes.annotations)
 
+  lazy val erasedReturnType: JErasedType = declaringClass.compiler.classLoader.erase_Force(descriptor.returnType, Nil)
+
+  lazy val erasedParameterTypes: List[JErasedType] = descriptor.paramTypes.map(sig => declaringClass.compiler.classLoader.erase_Force(sig, Nil))
+
   private lazy val attributes = parseMethodAttribute(method.attributes)
 }

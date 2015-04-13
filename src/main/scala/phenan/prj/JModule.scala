@@ -16,7 +16,7 @@ case class ConcretePureValue (value: Any, valueType: JType) extends PureValue {
   override def matches(v: MetaValue): Boolean = this == v
 }
 
-class JWildcard (val upperBound: Option[JRefType], val lowerBound: Option[JRefType]) extends MetaValue {
+case class JWildcard (upperBound: Option[JRefType], lowerBound: Option[JRefType]) extends MetaValue {
   def name = upperBound.map(ub => "? extends " + ub.name).orElse(lowerBound.map(lb => "? super " + lb.name)).getOrElse("?")
 
   def matches (that: MetaValue): Boolean = that match {
@@ -29,40 +29,6 @@ class JWildcard (val upperBound: Option[JRefType], val lowerBound: Option[JRefTy
 case class JGenericType (signature: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler) {
   def bind (args: Map[String, MetaValue]): Option[JType] = {
     compiler.typeLoader.fromTypeSignature(signature, env ++ args)
-  }
-}
-
-object JGenericType {/*
-  def apply (metaParams: List[FormalMetaParameter], signature: JClassTypeSignature, args: List[JTypeArgument], env: Map[String, MetaValue]): JGenericType = signature match {
-    case SimpleClassTypeSignature(clazz, as) =>
-      SimpleClassTypeSignature(clazz, )
-    ???
-  }*/
-
-  private def assignTypeArgument (a: JTypeArgument, map: Map[FormalMetaParameter, JTypeArgument]): Option[JTypeArgument] = a match {
-    case sig: JTypeSignature => assignTypeSignature(sig, map)
-    case PureVariable(name)  => map.find(_._1.name == name).map(_._2)
-    case UpperBoundWildcardArgument(sig) => assignTypeSignature(sig, map).map(UpperBoundWildcardArgument)
-    case LowerBoundWildcardArgument(sig) => assignTypeSignature(sig, map).map(LowerBoundWildcardArgument)
-    case UnboundWildcardArgument => Some(UnboundWildcardArgument)
-  }
-
-  import scalaz.Scalaz._
-
-  private def assignTypeSignature (sig: JTypeSignature, map: Map[FormalMetaParameter, JTypeArgument]): Option[JTypeSignature] = sig match {
-    case prm: JPrimitiveTypeSignature => Some(prm)
-    case JArrayTypeSignature(c)       => assignTypeSignature(c, map).map(JArrayTypeSignature)
-    case JTypeVariableSignature(name) => map.find(_._1.name == name).map(_._2).flatMap {
-      case sig: JTypeSignature               => Some(sig)
-      case _: PureVariable                   => None
-      case UpperBoundWildcardArgument(bound) => Some(JCapturedWildcardSignature(Some(bound), None))
-      case LowerBoundWildcardArgument(bound) => Some(JCapturedWildcardSignature(None, Some(bound)))
-      case UnboundWildcardArgument           => Some(JCapturedWildcardSignature(None, None))
-    }
-    case SimpleClassTypeSignature(clazz, args) =>
-      args.traverse[Option, JTypeArgument](assignTypeArgument(_, map)).map(SimpleClassTypeSignature(clazz, _))
-    case cap: JCapturedWildcardSignature       => Some(cap)
-    case MemberClassTypeSignature(outer, clazz, args) => ???
   }
 }
 
@@ -82,7 +48,12 @@ case class JClassModule (clazz: JClass) extends JModule {
   lazy val fields: Map[String, JField] = declaredFields.filterNot(_.isPrivate).map(f => f.name -> f).toMap
   lazy val privateFields: Map[String, JField] = declaredFields.filter(_.isPrivate).map(f => f.name -> f).toMap
 
-  def methods: Map[String, List[JMethod]] = ???
+  lazy val declaredMethods: List[JMethod] = clazz.methods.filter(_.isStaticMethod).map { methodDef =>
+    new JMethod(methodDef, Map.empty, this, clazz)
+  }
+
+  lazy val methods: Map[String, List[JMethod]] = declaredMethods.filterNot(_.isPrivate).groupBy(_.name)
+  lazy val privateMethods: Map[String, List[JMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
 
   def compiler = clazz.compiler
 }
@@ -94,10 +65,14 @@ sealed trait JType extends JModule {
   def isSubtypeOf (that: JType): Boolean
   def isAssignableTo (that: JType): Boolean
 
+  def unifyG (t: JGenericType): Option[Map[String, MetaValue]]
+  def unifyL (t: JGenericType): Option[Map[String, MetaValue]]
+
   def <:< (t: JType): Boolean = this.isSubtypeOf(t)
   def >:> (t: JType): Boolean = t.isSubtypeOf(this)
 
-  def <=< (t: JGenericType): Option[Map[String, MetaValue]]
+  def <=< (t: JGenericType) = unifyG(t)
+  def >=> (t: JGenericType) = unifyL(t)
 }
 
 sealed trait JRefType extends JType with MetaValue
@@ -145,22 +120,66 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
 
   def isAssignableTo(that: JType): Boolean = ???
 
-  def <=< (t: JGenericType): Option[Map[String, MetaValue]] = t.signature match {
-    case SimpleClassTypeSignature(clazz, args) if clazz == erase.name => ???
-    case SimpleClassTypeSignature(clazz, args) => ???
-/*      val x = compiler.classLoader.loadClass_PE(clazz).map { c =>
-        val supers = c.signature.superClass :: c.signature.interfaces
+  // List<String>.unifyG(ArrayList<T>) = Some(Map(T -> String))
+  def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = t.signature match {
+    case cls : JClassTypeSignature        => unifyG(cls, t.env)
+    case arr : JArrayTypeSignature        => unifyG(arr, t.env)
+    case wil : JCapturedWildcardSignature => unifyG(wil, t.env)
+    case tvr : JTypeVariableSignature     => JTypeUnification.unifyG(this, tvr, t.env)
+    case prm : JPrimitiveTypeSignature    => None
+  }
 
-      }
-*/
-    case JArrayTypeSignature(_) if compiler.typeLoader.superTypesOfArray.contains(this) => Some(t.env)
-    case JTypeVariableSignature(name) if t.env.contains(name) => this <=< t.env(name)
+  // List<String>.unifyL(Collection<T>) = Some(Map(T -> String))
+  def unifyL (t: JGenericType): Option[Map[String, MetaValue]] = t.signature match {
+    case cls : JClassTypeSignature        => ???
+    case arr : JArrayTypeSignature        => ???
+    case tvr : JTypeVariableSignature     => ???
+    case wil : JCapturedWildcardSignature => ???
+    case prm : JPrimitiveTypeSignature    => ???
+  }
+
+  def matches (that: MetaValue): Boolean = this == that
+
+  /* unification methods */
+
+  private def unifyG (sig: JClassTypeSignature, e: Map[String, MetaValue]): Option[Map[String, MetaValue]] = unifyClassG(List(sig), Set.empty, e).flatMap {
+    case SimpleClassTypeSignature(clazz, args) if erase.signature.metaParams.size == args.size => unifyArgsG(erase.signature.metaParams.zip(args), e)
     case _ => None
   }
 
-  def <=< (m: MetaValue): Option[Map[String, MetaValue]] = ???
+  private def unifyG (sig: JArrayTypeSignature, e: Map[String, MetaValue]): Option[Map[String, MetaValue]] = {
+    if (compiler.typeLoader.superTypesOfArray.contains(this)) Some(e)
+    else None
+  }
 
-  def matches (that: MetaValue): Boolean = this == that
+  private def unifyG (sig: JCapturedWildcardSignature, e: Map[String, MetaValue]): Option[Map[String, MetaValue]] = {
+    unifyG(JGenericType(sig.upperBound.getOrElse(JTypeSignature.objectTypeSig), e, compiler))
+  }
+
+  private def unifyClassG (sigs: List[JClassTypeSignature], checked: Set[JClassTypeSignature], e: Map[String, MetaValue]): Option[JClassTypeSignature] = sigs match {
+    case sig :: rest => sig match {
+      case SimpleClassTypeSignature(clazz, _) if clazz == erase.internalName => Some(sig)
+      case SimpleClassTypeSignature(clazz, args) => compiler.classLoader.loadClass_PE(clazz) match {
+        case Some(cls) =>
+          val cs = checked + sig
+          val supers = directSuperTypes(cls, args, e).filterNot(cs.contains)
+          unifyClassG(rest ++ supers, cs, e)
+        case None => None
+      }
+      case MemberClassTypeSignature(_, clazz, _) if clazz == erase.internalName => Some(sig)
+      case MemberClassTypeSignature(outer, clazz, args) => ???
+    }
+    case Nil => None
+  }
+
+
+  private def unifyArgsG (args: List[(FormalMetaParameter, JTypeArgument)], env: Map[String, MetaValue]): Option[Map[String, MetaValue]] = args match {
+    case (param, arg) :: rest => this.env.get(param.name).flatMap(JTypeUnification.unifyG(_, arg, env, compiler)) match {
+      case Some(e) => unifyArgsG(rest, e)
+      case None => None
+    }
+    case Nil => Some(env)
+  }
 
   /* helper methods for collecting non-private inherited members */
 
@@ -186,6 +205,139 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
   private def matchTypeArgs (args: Map[String, MetaValue]): Boolean = env.forall { case (key, value) =>
     args.get(key).exists { arg => arg.matches(value) }
   }
+
+  /* */
+
+  private def directSuperTypes (clazz: JClass, args: List[JTypeArgument], env: Map[String, MetaValue]): List[JClassTypeSignature] = {
+    if (clazz.signature.metaParams.size == args.size && ! compiler.classLoader.objectClass.contains(clazz)) {
+      val map = clazz.signature.metaParams.zip(args).toMap
+      (clazz.signature.superClass :: clazz.signature.interfaces).flatMap(assignClassTypeSignature(_, map))
+    }
+    else Nil
+  }
+
+  private def assignTypeArgument (a: JTypeArgument, map: Map[FormalMetaParameter, JTypeArgument]): Option[JTypeArgument] = a match {
+    case sig: JTypeSignature => assignTypeSignature(sig, map)
+    case PureVariable(name)  => map.find(_._1.name == name).map(_._2)
+    case UpperBoundWildcardArgument(sig) => assignTypeSignature(sig, map).map(UpperBoundWildcardArgument)
+    case LowerBoundWildcardArgument(sig) => assignTypeSignature(sig, map).map(LowerBoundWildcardArgument)
+    case UnboundWildcardArgument => Some(UnboundWildcardArgument)
+  }
+
+  private def assignTypeSignature (sig: JTypeSignature, map: Map[FormalMetaParameter, JTypeArgument]): Option[JTypeSignature] = sig match {
+    case prm: JPrimitiveTypeSignature => Some(prm)
+    case cts: JClassTypeSignature     => assignClassTypeSignature(cts, map)
+    case JArrayTypeSignature(c)       => assignTypeSignature(c, map).map(JArrayTypeSignature)
+    case JTypeVariableSignature(name) => map.find(_._1.name == name).map(_._2).flatMap {
+      case sig: JTypeSignature               => Some(sig)
+      case _: PureVariable                   => None
+      case UpperBoundWildcardArgument(bound) => Some(JCapturedWildcardSignature(Some(bound), None))
+      case LowerBoundWildcardArgument(bound) => Some(JCapturedWildcardSignature(None, Some(bound)))
+      case UnboundWildcardArgument           => Some(JCapturedWildcardSignature(None, None))
+    }
+    case cap: JCapturedWildcardSignature     => Some(cap)
+  }
+
+  import scalaz.Scalaz._
+
+  private def assignClassTypeSignature (sig: JClassTypeSignature, map: Map[FormalMetaParameter, JTypeArgument]): Option[JClassTypeSignature] = sig match {
+    case SimpleClassTypeSignature(clazz, args) =>
+      args.traverse[Option, JTypeArgument](assignTypeArgument(_, map)).map(SimpleClassTypeSignature(clazz, _))
+    case MemberClassTypeSignature(outer, clazz, args) =>
+      assignClassTypeSignature(outer, map).flatMap(o => args.traverse[Option, JTypeArgument](assignTypeArgument(_, map)).map(MemberClassTypeSignature(o, clazz, _)))
+  }
+}
+
+object JTypeUnification {
+
+  // unifyG (String, T, e) = Some(e + (T -> String))
+  def unifyG (mv: MetaValue, arg: JTypeArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = arg match {
+    case sig: JTypeSignature             => unifyG(mv, sig, env, compiler)
+    case pvr: PureVariable               => unifyG(mv, pvr, env, compiler)
+    case ubw: UpperBoundWildcardArgument => unifyG(mv, ubw, env, compiler)
+    case lbw: LowerBoundWildcardArgument => unifyG(mv, lbw, env, compiler)
+    case UnboundWildcardArgument         => mv match {
+      case JWildcard(None, None) => Some(env)
+      case _ => None
+    }
+  }
+
+  def unifyG (mv: MetaValue, tv: JTypeVariableSignature, env: Map[String, MetaValue]): Option[Map[String, MetaValue]] = {
+    if (env.contains(tv.name)) {
+      if (env(tv.name) == mv) Some(env)
+      else None
+    }
+    else Some(env + (tv.name -> mv))
+  }
+
+  private def unifyG (mv: MetaValue, sig: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = mv match {
+    case obj: JObjectType           => unifyG(obj, sig, env, compiler)
+    case arr: JArrayType            => unifyG(arr, sig, env, compiler)
+    case cap: JCapturedWildcardType => unifyG(cap, sig, env, compiler)
+    case wil: JWildcard             => unifyG(wil, sig, env, compiler)
+    case prv: PureValue             => None
+  }
+
+  private def unifyG (t: JType, sig: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = t match {
+    case obj: JObjectType           => unifyG(obj, sig, env, compiler)
+    case arr: JArrayType            => unifyG(arr, sig, env, compiler)
+    case cap: JCapturedWildcardType => unifyG(cap, sig, env, compiler)
+    case prm: JPrimitiveType        => prm.unifyG(JGenericType(sig, env, compiler))
+  }
+
+  private def unifyG (mv: MetaValue, pvr: PureVariable, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = {
+    if (env.contains(pvr.name)) {
+      if (env(pvr.name) == mv) Some(env)
+      else None
+    }
+    else Some(env + (pvr.name -> mv))
+  }
+
+  private def unifyG (mv: MetaValue, ub: UpperBoundWildcardArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = mv match {
+    case _: PureValue | _: JRefType | JWildcard(_, Some(_)) => None
+    case JWildcard(None, None) => Some(env)
+    case JWildcard(Some(u), None) => u.unifyG(JGenericType(ub.signature, env, compiler))
+  }
+
+  private def unifyG (mv: MetaValue, lb: LowerBoundWildcardArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = mv match {
+    case _: PureValue | _: JRefType | JWildcard(Some(_), _) => None
+    case JWildcard(None, None) => Some(env)
+    case JWildcard(None, Some(l)) => l.unifyL(JGenericType(lb.signature, env, compiler))
+  }
+
+  private def unifyG (obj: JObjectType, sig: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = sig match {
+    case SimpleClassTypeSignature(clazz, args) if obj.erase.internalName == clazz && obj.erase.signature.metaParams.size == args.size =>
+      unifyArgsN(obj, obj.erase.signature.metaParams.zip(args), env, compiler)
+    case MemberClassTypeSignature(outer, clazz, args) => ???
+    case tv: JTypeVariableSignature => unifyG(obj, tv, env)
+    case _: SimpleClassTypeSignature | _: JArrayTypeSignature | _: JCapturedWildcardSignature | _: JPrimitiveTypeSignature => None
+  }
+
+  private def unifyG (arr: JArrayType, sig: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = sig match {
+    case JArrayTypeSignature(component) => unifyG(arr.componentType, component, env, compiler)
+    case tv: JTypeVariableSignature     => unifyG(arr, tv, env)
+    case _: JClassTypeSignature | _: JPrimitiveTypeSignature | _: JCapturedWildcardSignature => None
+  }
+
+  private def unifyG (cap: JCapturedWildcardType, sig: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = sig match {
+    case tv: JTypeVariableSignature => unifyG(cap, tv, env)
+    case _: JClassTypeSignature | _: JArrayTypeSignature | _: JCapturedWildcardSignature | _: JPrimitiveTypeSignature => None
+  }
+
+  private def unifyG (wild: JWildcard, sig: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = {
+    wild.upperBound.orElse(compiler.typeLoader.objectType).flatMap(_.unifyG(JGenericType(sig, env, compiler)))
+  }
+
+  private def unifyArgsN (obj: JObjectType, args: List[(FormalMetaParameter, JTypeArgument)], env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = args match {
+    case (param, arg) :: rest => obj.env.get(param.name).flatMap(unifyN(_, arg, env, compiler)) match {
+      case Some(e) => unifyArgsN(obj, rest, e, compiler)
+      case None => None
+    }
+    case Nil => Some(env)
+  }
+
+  // TODO
+  private def unifyN (mv: MetaValue, arg: JTypeArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = unifyG(mv, arg, env, compiler)
 }
 
 case class JPrimitiveType (clazz: JPrimitiveClass) extends JType {
@@ -200,7 +352,8 @@ case class JPrimitiveType (clazz: JPrimitiveClass) extends JType {
 
   def isAssignableTo(that: JType): Boolean = ???
 
-  override def <=<(t: JGenericType): Option[Map[String, MetaValue]] = ???
+  def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = ???
+  def unifyL (t: JGenericType): Option[Map[String, MetaValue]] = ???
 
   def compiler = clazz.compiler
 }
@@ -223,7 +376,8 @@ case class JArrayType (componentType: JType) extends JRefType {
 
   def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
 
-  override def <=<(t: JGenericType): Option[Map[String, MetaValue]] = ???
+  def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = ???
+  def unifyL (t: JGenericType): Option[Map[String, MetaValue]] = ???
 
   def matches (that: MetaValue): Boolean = this == that
 
@@ -233,7 +387,8 @@ case class JArrayType (componentType: JType) extends JRefType {
 case class JCapturedWildcardType private (upperBound: JRefType, lowerBound: Option[JRefType], id: Int) extends JRefType {
   override def name: String = "capture#" + id
 
-  override def <=<(t: JGenericType): Option[Map[String, MetaValue]] = ???
+  def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = ???
+  def unifyL (t: JGenericType): Option[Map[String, MetaValue]] = ???
 
   override def isSubtypeOf(that: JType): Boolean = upperBound.isSubtypeOf(that)
   override def isAssignableTo(that: JType): Boolean = isSubtypeOf(that)

@@ -7,7 +7,7 @@ import scalaz.Memo._
 
 class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends JTypeLoader {
   val arrayOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
-  val getObjectType: (JClass, List[MetaValue]) => Option[JObjectType] = Function.untupled(mutableHashMapMemo(getLoadedObjectType))
+  val getObjectType: (JClass, List[MetaValue]) => Option[JObjectType] = Function.untupled(mutableHashMapMemo(Function.tupled(getLoadedObjectType)))
 
   def toJType (t: JErasedType): Option[JType] = t match {
     case c : JClass          => c.objectType(Nil)
@@ -76,10 +76,7 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
 
   private def getArrayType (component: JType): JArrayType = JArrayType(component)
 
-  private def getLoadedObjectType (classAndArgs: (JClass, List[MetaValue])): Option[JObjectType] = {
-    val clazz = classAndArgs._1
-    val args  = classAndArgs._2
-
+  private def getLoadedObjectType: (JClass, List[MetaValue]) => Option[JObjectType] = { case (clazz, args) =>
     val map = clazz.signature.metaParams.map(_.name).zip(args).toMap
     if (validTypeArgs(clazz.signature.metaParams, args, map)) Some(new JObjectType(clazz, map))
     else {
@@ -107,11 +104,11 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
   private def argSig2JType (arg: JTypeArgument, env: Map[String, MetaValue]): Option[MetaValue] = arg match {
     case sig: JTypeSignature             => fromTypeSignature_RefType(sig, env)
     case UpperBoundWildcardArgument(sig) => fromTypeSignature_RefType(sig, env).map { bound =>
-      if (objectType.contains(bound)) new JWildcard(None, None)
-      else new JWildcard(Some(bound), None)
+      if (objectType.contains(bound)) JWildcard(None, None)
+      else JWildcard(Some(bound), None)
     }
-    case LowerBoundWildcardArgument(sig) => fromTypeSignature_RefType(sig, env).map(lb => new JWildcard(None, Some(lb)))
-    case UnboundWildcardArgument         => Some(new JWildcard(None, None))
+    case LowerBoundWildcardArgument(sig) => fromTypeSignature_RefType(sig, env).map(lb => JWildcard(None, Some(lb)))
+    case UnboundWildcardArgument         => Some(JWildcard(None, None))
     case PureVariable(name)              => env.get(name)
   }
 

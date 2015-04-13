@@ -16,22 +16,26 @@ class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val d
   def modifier: JModifier = methodDef.mod
   def name: String = methodDef.name
 
-  def erasedReturnType: JErasedType = compiler.classLoader.erase_Force(methodDef.signature.returnType, metaParams)
-  def erasedParameterTypes: List[JErasedType] = methodDef.signature.paramTypes.map(compiler.classLoader.erase_Force(_, metaParams))
+  def erasedReturnType: JErasedType = methodDef.erasedReturnType
+  def erasedParameterTypes: List[JErasedType] = methodDef.erasedParameterTypes
 
-  def returnType: JGenericType = ???
-  def parameterTypes: List[JGenericType] = ???
-  def exceptionTypes: List[JGenericType] = ???
+  def returnType: JGenericType = JGenericType(methodDef.signature.returnType, env, compiler)
+  def parameterTypes: List[JGenericType] = methodDef.signature.paramTypes.map(sig => JGenericType(sig, env, compiler))
+  def exceptionTypes: List[JGenericType] = methodDef.signature.throwTypes.map(sig => JGenericType(sig, env, compiler))
 
   def overrides (that: JMethod): Boolean = {
     this.name == that.name && this.erasedReturnType.isSubclassOf(that.erasedReturnType) && this.erasedParameterTypes == that.erasedParameterTypes
   }
 
   def compiler = declaring.compiler
-
-  private lazy val metaParams = methodDef.signature.metaParams ++ clazz.signature.metaParams
 }
 
-class JConstructor (val methodDef: JMethodDef, val enclosingEnv: Map[String, MetaValue], val declaring: JObjectType) extends JMember {
+class JConstructor (val methodDef: JMethodDef, val env: Map[String, MetaValue], val declaring: JObjectType) extends JMember {
   def modifier: JModifier = methodDef.mod
+
+  def returnType: JGenericType = JGenericType(methodDef.signature.returnType, env, compiler)
+  def parameterTypes: List[JGenericType] = methodDef.signature.paramTypes.map(sig => JGenericType(sig, env, compiler))
+  def exceptionTypes: List[JGenericType] = methodDef.signature.throwTypes.map(sig => JGenericType(sig, env, compiler))
+
+  def compiler = declaring.compiler
 }
