@@ -34,3 +34,7 @@ case class BNameTypeRef (nameRef: Int, typeRef: Int) extends BConstant
 case class BFieldRef (classRef: Int, sigRef: Int) extends BConstant
 case class BMethodRef (classRef: Int, sigRef: Int) extends BConstant
 case class BIMethodRef (classRef: Int, sigRef: Int) extends BConstant
+
+case class BMethodHandleInfo (kind: Int, index: Int) extends BConstant
+case class BMethodTypeInfo (descriptor: Int) extends BConstant
+case class BInvokeDynamicInfo (bootstrap: Int, sigRef: Int) extends BConstant

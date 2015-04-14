@@ -4,7 +4,8 @@ trait JTypeLoader {
   def compiler: JCompiler
 
   val arrayOf: JType => JArrayType
-  val getObjectType: (JClass, List[MetaValue]) => Option[JObjectType]
+
+  def getObjectType (clazz: JClass, args: List[MetaValue]): Option[JObjectType]
 
   lazy val objectType = compiler.classLoader.objectClass.flatMap(_.objectType(Nil))
 

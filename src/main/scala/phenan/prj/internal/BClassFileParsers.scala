@@ -55,6 +55,9 @@ class BClassFileParsers (implicit state: JState) extends ByteParsers {
     case 0x0a => for (cls <- u2; sig <- u2) yield BMethodRef(cls, sig)
     case 0x0b => for (cls <- u2; sig <- u2) yield BIMethodRef(cls, sig)
     case 0x0c => for (nam <- u2; typ <- u2) yield BNameTypeRef(nam, typ)
+    case 0x0f => for (knd <- u1; ind <- u2) yield BMethodHandleInfo(knd, ind)
+    case 0x10 => for (dsc <- u2)            yield BMethodTypeInfo(dsc)
+    case 0x12 => for (bst <- u2; sig <- u2) yield BInvokeDynamicInfo(bst, sig)
     case n    => failure(InvalidClassFileException("wrong constant tag: " + n))
   }
 

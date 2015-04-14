@@ -7,7 +7,15 @@ import scalaz.Memo._
 
 class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends JTypeLoader {
   val arrayOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
-  val getObjectType: (JClass, List[MetaValue]) => Option[JObjectType] = Function.untupled(mutableHashMapMemo(Function.tupled(getLoadedObjectType)))
+
+  def getObjectType (clazz: JClass, args: List[MetaValue]): Option[JObjectType] = {
+    val result = getLoadedObjectType(clazz, args)
+    if (validTypeArgs(clazz.signature.metaParams, args, result.env)) Some(result)
+    else {
+      state.error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
+      None
+    }
+  }
 
   def toJType (t: JErasedType): Option[JType] = t match {
     case c : JClass          => c.objectType(Nil)
@@ -33,8 +41,7 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
     case SimpleClassTypeSignature(className, typeArgs) => for {
       clazz <- classLoader.loadClass_PE(className)
       args  <- fromTypeArguments(typeArgs, env)
-      jType <- clazz.objectType(args)
-    } yield jType
+    } yield getLoadedObjectType(clazz, args)
     case MemberClassTypeSignature(outer, name, typeArgs) => ???    // not supported yet
   }
 
@@ -75,15 +82,22 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
   }
 
   private def getArrayType (component: JType): JArrayType = JArrayType(component)
-
-  private def getLoadedObjectType: (JClass, List[MetaValue]) => Option[JObjectType] = { case (clazz, args) =>
+  /*
+  private def getLoadedObjectType (clazz: JClass, args: List[MetaValue]): Option[JObjectType] = { case (clazz, args) =>
     val map = clazz.signature.metaParams.map(_.name).zip(args).toMap
-    if (validTypeArgs(clazz.signature.metaParams, args, map)) Some(new JObjectType(clazz, map))
+    val result = memoizedGetObjectType((clazz, map))
+    if (validTypeArgs(clazz.signature.metaParams, args, map)) Some(result)
     else {
       state.error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
       None
     }
+  }*/
+
+  private def getLoadedObjectType (clazz: JClass, args: List[MetaValue]): JObjectType = {
+    memoizedGetObjectType((clazz, clazz.signature.metaParams.map(_.name).zip(args).toMap))
   }
+
+  private val memoizedGetObjectType: ((JClass, Map[String, MetaValue])) => JObjectType = mutableHashMapMemo { pair => new JObjectType(pair._1, pair._2) }
 
   private def validTypeArgs (params: List[FormalMetaParameter], args: List[MetaValue], env: Map[String, MetaValue]): Boolean = {
     if (params.isEmpty || args.isEmpty) params.isEmpty && args.isEmpty
@@ -94,7 +108,7 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
   private def validTypeArg (param: FormalMetaParameter, arg: MetaValue, env: Map[String, MetaValue]): Boolean = arg match {
     case arg: JRefType => param.bounds.forall(withinBound(_, arg, env))
     case pv: PureValue => fromTypeSignature(param.metaType, env).exists(pv.valueType <:< _)
-    case wc: JWildcard => param.bounds.forall(bound => wc.lowerBound.exists(lower => withinBound(bound, lower, env)))
+    case wc: JWildcard => param.bounds.forall(bound => wc.upperBound.orElse(objectType).exists(upper => withinBound(bound, upper, env)))
   }
 
   private def withinBound (bound: JTypeSignature, arg: JRefType, env: Map[String, MetaValue]): Boolean = {
