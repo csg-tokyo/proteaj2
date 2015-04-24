@@ -50,7 +50,7 @@ class UnificationTest extends FunSuite with Matchers {
     map shouldBe Some(ssMap.env)
   }
 
-  test ("Stream<String> s; List<String> list = s.map(...);") {
+  test ("Stream<String> s; Stream<List<String>> list = s.map(...);") {
     val stringType = compiler.classLoader.loadClass("java/lang/String").get.objectType(Nil).get
     val sStream = compiler.classLoader.loadClass("java/util/stream/Stream").get.objectType(List(stringType)).get
     sStream.methods.get("map") shouldBe a [Some[_]]

@@ -13,6 +13,7 @@ object DeclarationParser {
   }
 }
 
+@Deprecated
 class DeclarationParser private (private val reader: SourceReader, private val fileName: String)(implicit state: JState) {
   lazy val parseAll: CompilationUnit = {
     val cu = parseCompilationUnit
@@ -35,7 +36,7 @@ class DeclarationParser private (private val reader: SourceReader, private val f
   private def parseCompilationUnit: CompilationUnit = {
     val header  = parseHeader
     val modules = parseModuleDeclarations(Nil)
-    CompilationUnit(header, modules, fileName)
+    CompilationUnit(header, modules)
   }
 
   /* Header
@@ -100,9 +101,9 @@ class DeclarationParser private (private val reader: SourceReader, private val f
   private def parseStaticImportDeclaration: Try[StaticImportDeclaration] = parseQualifiedName.flatMap { name =>
     if (reader.look(0).is('.') && reader.look(1).is('*') && reader.look(2).is(';')) {
       reader.next(2)
-      Success(AllStaticMembersImportDeclaration(name))
+      Success(ImportStaticStarDeclaration(name))
     }
-    else if (read(';')) Success(StaticMemberImportDeclaration(name))
+    else if (read(';')) Success(ImportStaticMemberDeclaration(name))
     else Failure(parseError("'.*' or ';'"))
   }
 

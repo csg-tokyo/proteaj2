@@ -31,4 +31,5 @@ case object EndOfSource extends SourceToken {
 
 case class InvalidToken (e: ParseException, line: Int) extends SourceToken
 
+@Deprecated
 case class Snippet (src: String, line: Int)

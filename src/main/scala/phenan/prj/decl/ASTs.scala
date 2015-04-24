@@ -1,6 +1,6 @@
 package phenan.prj.decl
 
-case class CompilationUnit (header: Header, modules: List[ModuleDeclaration], fileName: String)
+case class CompilationUnit (header: Header, modules: List[ModuleDeclaration])
 
 case class Header (pack: Option[PackageDeclaration], imports: List[ImportDeclaration])
 
@@ -8,6 +8,7 @@ case class PackageDeclaration (name: QualifiedName)
 
 sealed trait ImportDeclaration
 
+@Deprecated
 sealed trait ClassImportDeclaration extends ImportDeclaration
 
 case class SingleClassImportDeclaration (name: QualifiedName) extends ClassImportDeclaration
@@ -16,16 +17,23 @@ case class PackageImportDeclaration (name: QualifiedName) extends ClassImportDec
 
 sealed trait StaticImportDeclaration extends ImportDeclaration
 
-case class StaticMemberImportDeclaration (name: QualifiedName) extends StaticImportDeclaration
+case class ImportStaticMemberDeclaration (name: QualifiedName) extends StaticImportDeclaration
 
-case class AllStaticMembersImportDeclaration (name: QualifiedName) extends StaticImportDeclaration
+case class ImportStaticStarDeclaration (name: QualifiedName) extends StaticImportDeclaration
 
+// ascending order
+case class ImportDSLsDeclaration (dsls: List[QualifiedName]) extends ImportDeclaration
+
+@Deprecated
 case class DSLImportDeclaration (name: QualifiedName, precedence: Option[DSLPrecedence]) extends ImportDeclaration
 
+@Deprecated
 sealed trait DSLPrecedence
 
+@Deprecated
 case class AscendingDSLPrecedence (names: List[QualifiedName]) extends DSLPrecedence
 
+@Deprecated
 case class DescendingDSLPrecedence (names: List[QualifiedName]) extends DSLPrecedence
 
 sealed trait ModuleDeclaration extends ClassMember {
@@ -91,6 +99,7 @@ case class SingleElementAnnotation (name: QualifiedName, arg: AnnotationElement)
 case class MarkerAnnotation (name: QualifiedName) extends Annotation
 
 case class ArrayOfAnnotationElement (array: List[AnnotationElement]) extends AnnotationElement
+
 case class ExpressionSnippet (snippet: Snippet) extends AnnotationElement
 
 case class BlockSnippet (snippet: Snippet)

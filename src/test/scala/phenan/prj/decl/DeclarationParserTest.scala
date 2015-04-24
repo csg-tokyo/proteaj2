@@ -13,7 +13,7 @@ class DeclarationParserTest extends FunSuite with Matchers with ASTUtil {
     val src = ""
     val ast = parse(src)
 
-    ast shouldBe CompilationUnit(Header(None, Nil), Nil, "test_source")
+    ast shouldBe CompilationUnit(Header(None, Nil), Nil)
   }
 
   test ("パッケージ宣言") {
