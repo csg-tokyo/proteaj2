@@ -6,10 +6,10 @@ import scala.language.implicitConversions
 import scala.util.parsing.combinator.lexical.Scanners
 import scala.util.parsing.input.CharArrayReader.EofCh
 
-import scalaz.Memo._
-
 object DeclarationParsers extends TwoLevelParsers {
   override type Elem = DToken
+
+  def parse [T] (parser: HParser[T], src: String) = parser.apply(new DeclarationScanners.Scanner(new DeclarationPreprocessor.Scanner(src)))
 
   lazy val compilationUnit = header ~ moduleDeclaration.* ^^ {
     case head ~ body => CompilationUnit(head, body)
@@ -44,8 +44,8 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val moduleDeclaration: HParser[ModuleDeclaration] = classDeclaration | enumDeclaration | interfaceDeclaration | annotationDeclaration | dslDeclaration
 
-  lazy val classDeclaration = modifiers ~ ( "class" ~> identifier ) ~ typeParameters ~ ( "extends" ~> typeName ).? ~ implementsInterfaces >> {
-    case mods ~ name ~ tps ~ sup ~ ifs => ClassMemberParsers(name).classBody ^^ { body => ClassDeclaration(mods, name, tps, sup, ifs, body) }
+  lazy val classDeclaration = modifiers ~ ( "class" ~> identifier ) ~ metaParameters ~ ( "extends" ~> typeName ).? ~ implementsInterfaces >> {
+    case mods ~ name ~ mps ~ sup ~ ifs => ClassMemberParsers(name).classBody ^^ { body => ClassDeclaration(mods, name, mps, sup, ifs, body) }
   }
 
   lazy val enumDeclaration = modifiers ~ ( "enum" ~> identifier ) ~ implementsInterfaces >> {
@@ -54,19 +54,31 @@ object DeclarationParsers extends TwoLevelParsers {
     }
   }
 
-  lazy val interfaceDeclaration = modifiers ~ ( "interface" ~> identifier ) ~ typeParameters ~ extendsInterfaces ~ ( '{' ~> interfaceMember.* <~ '}' ) ^^ {
-    case mods ~ name ~ tps ~ ifs ~ body => InterfaceDeclaration(mods, name, tps, ifs, body)
+  lazy val interfaceDeclaration = modifiers ~ ( "interface" ~> identifier ) ~ metaParameters ~ extendsInterfaces ~ ( '{' ~> interfaceMember.* <~ '}' ) ^^ {
+    case mods ~ name ~ mps ~ ifs ~ body => InterfaceDeclaration(mods, name, mps, ifs, body)
   }
 
   lazy val annotationDeclaration = modifiers ~ ( '@' ~> "interface" ~> identifier ) ~ ( '{' ~> annotationMember.* <~ '}' ) ^^ {
     case mods ~ name ~ body => AnnotationDeclaration(mods, name, body)
   }
 
-  lazy val dslDeclaration: HParser[DSLDeclaration] = ???
+  lazy val dslDeclaration = modifiers ~ ( "dsl" ~> identifier ) ~ mixinDSLs ~ ( '{' ~> dslMember.* <~ '}' ) ^^ {
+    case mods ~ name ~ mixins ~ body => DSLDeclaration(mods, name, mixins, body)
+  }
+
+  lazy val contextDeclaration = modifiers ~ ( "context" ~> identifier ) ~ metaParameters >> {
+    case mods ~ name ~ mps => ClassMemberParsers(name).contextBody ^^ { body => ContextDeclaration(mods, name, mps, body) }
+  }
 
   lazy val implementsInterfaces = ( "implements" ~> typeName.+(',')).? ^^ { _.getOrElse(Nil) }
 
   lazy val extendsInterfaces = ( "extends" ~> typeName.+(',')).? ^^ { _.getOrElse(Nil) }
+
+  lazy val mixinDSLs = ( mixinDSLs_ascending | mixinDSLs_descending ).? ^^ { _.getOrElse(Nil) }
+
+  lazy val mixinDSLs_ascending = "with" ~> qualifiedName.+('<')
+
+  lazy val mixinDSLs_descending = "with" ~> qualifiedName.+('>') ^^ { _.reverse }
 
 
   /* members*/
@@ -75,12 +87,14 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val annotationMember: HParser[AnnotationMember] = annotationElementDeclaration | fieldDeclaration | moduleDeclaration
 
+  lazy val dslMember: HParser[DSLMember] = prioritiesDeclaration | fieldDeclaration | operatorDeclaration | contextDeclaration
+
   lazy val instanceInitializer = block ^^ InstanceInitializer
 
   lazy val staticInitializer = "static" ~> block ^^ StaticInitializer
 
-  lazy val methodDeclaration = modifiers ~ typeParameters ~ typeName ~ identifier ~ formalParameters ~ throwsClause ~ methodBody ^^ {
-    case mods ~ tps ~ ret ~ name ~ params ~ throws ~ body => MethodDeclaration(mods, tps, ret, name, params, throws, body)
+  lazy val methodDeclaration = modifiers ~ metaParameters ~ typeName ~ identifier ~ formalParameters ~ clause.* ~ methodBody ^^ {
+    case mods ~ mps ~ ret ~ name ~ params ~ clauses ~ body => MethodDeclaration(mods, mps, ret, name, params, clauses, body)
   }
 
   lazy val fieldDeclaration = modifiers ~ typeName ~ declarator.+(',') <~ ';' ^^ {
@@ -91,34 +105,75 @@ object DeclarationParsers extends TwoLevelParsers {
     case mods ~ tn ~ name ~ dim ~ default => AnnotationElementDeclaration(mods, tn, name, dim, default)
   }
 
-  lazy val formalParameters: HParser[List[FormalParameter]] = '(' ~> formalParameter.*(',') <~ ')'
-
-  lazy val formalParameter: HParser[FormalParameter] = modifiers ~ parameterType ~ dots ~ identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {
-    case mods ~ pt ~ varArgs ~ name ~ dim ~ init => FormalParameter(mods, pt, varArgs, name, dim, init)
+  lazy val operatorDeclaration = ( identifier <~ ':' ).? ~ modifiers ~ metaParameters ~ typeName ~ priority ~ syntaxElement.+ ~ formalParameters ~ clause.* ~ methodBody ^^ {
+    case label ~ mods ~ mps ~ tn ~ pri ~ syn ~ params ~ clauses ~ body => OperatorDeclaration(label, mods, mps, tn, pri, syn, params, clauses, body)
   }
 
-  lazy val declarator: HParser[VariableDeclarator] = identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {
+  lazy val prioritiesDeclaration = prioritiesDeclaration_ascending | prioritiesDeclaration_descending
+
+  lazy val prioritiesDeclaration_ascending = "priority" ~> identifier.+('<') <~ ';' ^^ { priorities => PrioritiesDeclaration(priorities) }
+
+  lazy val prioritiesDeclaration_descending = "priority" ~> identifier.+('>') <~ ';' ^^ { priorities => PrioritiesDeclaration(priorities.reverse) }
+
+  lazy val formalParameters = '(' ~> formalParameter.*(',') <~ ')'
+
+  lazy val formalParameter = modifiers ~ parameterType ~ priority ~ dots ~ identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {
+    case mods ~ pt ~ pri ~ ds ~ name ~ dim ~ init => FormalParameter(mods, pt, pri, ds, name, dim, init)
+  }
+
+  lazy val declarator = identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {
     case name ~ dim ~ init => VariableDeclarator(name, dim, init)
   }
 
+  lazy val syntaxElement = operatorName | optionalOperand | repetition0 | repetition1 | operand | metaValueRef | andPredicate | notPredicate
+
+  lazy val operatorName = elem[StrLiteral].^ ^^ { lit => OperatorName(lit.value) }
+
+  lazy val optionalOperand = (underscore ~> elem('?')).^ ^^^ OptionalOperand
+  lazy val repetition0 = (underscore ~> elem('*')).^ ^^^ Repetition0
+  lazy val repetition1 = (underscore ~> elem('+')).^ ^^^ Repetition1
+  lazy val operand = underscore.^ ^^^ Operand
+
+  lazy val metaValueRef = identifier ^^ { id => MetaValueRef(id) }
+
+  lazy val andPredicate = ('&' ~> typeName) ~ priority ^^ {
+    case t ~ p => AndPredicate(t, p)
+  }
+  lazy val notPredicate = ('!' ~> typeName) ~ priority ^^ {
+    case t ~ p => NotPredicate(t, p)
+  }
+
+  lazy val underscore = elem(Identifier("_"))
+
   lazy val dots = (elem('.') ~> elem('.') ~> elem('.')).?.map(_.nonEmpty).^
+
+  lazy val priority = ( '[' ~> identifier <~ ']' ).?
 
   lazy val emptyBrackets = ('[' ~> ']').* ^^ { _.size }
 
-  lazy val throwsClause: HParser[List[TypeName]] = "throws" ~> typeName.+(',')
+  lazy val clause = throwsClause | activatesClause | deactivatesClause | requiresClause
+
+  lazy val throwsClause = "throws" ~> typeName.+(',') ^^ ThrowsClause
+
+  lazy val activatesClause = "activates" ~> typeName.+(',') ^^ ActivatesClause
+
+  lazy val deactivatesClause = "deactivates" ~> typeName.+(',') ^^ DeactivatesClause
+
+  lazy val requiresClause = "requires" ~> typeName.+(',') ^^ RequiresClause
 
   lazy val methodBody = block ^^ { Some(_) } | ';' ^^^ None
 
   case class ClassMemberParsers (className: String) {
-
-    lazy val member: HParser[ClassMember] =
-      instanceInitializer | staticInitializer | constructorDeclaration | methodDeclaration | fieldDeclaration | moduleDeclaration
-
-    lazy val classBody = '{' ~> member.* <~ '}'
+    lazy val classBody = '{' ~> classMember.* <~ '}'
 
     lazy val enumBody = '{' ~> ( enumConstants ~ enumMembers ) <~ '}'
 
-    lazy val enumMembers = ( ';' ~> member.* ).? ^^ { _.getOrElse(Nil) }
+    lazy val contextBody = '{' ~> contextMember.* <~ '}'
+
+    lazy val classMember: HParser[ClassMember] =
+      instanceInitializer | staticInitializer | constructorDeclaration | methodDeclaration | fieldDeclaration | moduleDeclaration
+
+    lazy val enumMembers = ( ';' ~> classMember.* ).? ^^ { _.getOrElse(Nil) }
 
     lazy val enumConstants = enumConstant.*(',') <~ ','.?
 
@@ -126,8 +181,10 @@ object DeclarationParsers extends TwoLevelParsers {
       case as ~ name ~ args ~ body => EnumConstant(as, name, args.getOrElse(Nil), body.getOrElse(Nil))
     }
 
-    lazy val constructorDeclaration = modifiers ~ typeParameters ~ className ~ formalParameters ~ throwsClause ~ block ^^ {
-      case mods ~ tps ~ _ ~ params ~ throws ~ body => ConstructorDeclaration(mods, tps, params, throws, body)
+    lazy val contextMember = constructorDeclaration | operatorDeclaration | fieldDeclaration
+
+    lazy val constructorDeclaration = modifiers ~ metaParameters ~ className ~ formalParameters ~ clause.* ~ block ^^ {
+      case mods ~ mps ~ _ ~ params ~ clauses ~ body => ConstructorDeclaration(mods, mps, params, clauses, body)
     }
   }
 
@@ -143,7 +200,13 @@ object DeclarationParsers extends TwoLevelParsers {
     case name ~ args ~ dim => TypeName(name, args, dim)
   }
 
-  lazy val typeParameters = ( '<' ~> typeParameter.+(',') <~ '>' ).? ^^ { _.getOrElse(Nil) }
+  lazy val metaParameters = ( '<' ~> metaParameter.+(',') <~ '>' ).? ^^ { _.getOrElse(Nil) }
+
+  lazy val metaParameter = metaValueParameter | typeParameter
+
+  lazy val metaValueParameter = identifier ~ ( ':' ~> typeName ) ^^ {
+    case name ~ metaType => MetaValueParameter(name, metaType)
+  }
 
   lazy val typeParameter = identifier ~ ( "extends" ~> typeName.+('&') ).? ^^ {
     case name ~ bounds => TypeParameter(name, bounds.getOrElse(Nil))
@@ -170,7 +233,7 @@ object DeclarationParsers extends TwoLevelParsers {
     "public" ^^^ PublicModifier | "private" ^^^ PrivateModifier | "protected" ^^^ ProtectedModifier |
       "static" ^^^ StaticModifier | "final" ^^^ FinalModifier | "synchronized" ^^^ SynchronizedModifier |
       "volatile" ^^^ VolatileModifier | "transient" ^^^ TransientModifier | "native" ^^^ NativeModifier |
-      "abstract" ^^^ AbstractModifier | "strictfp" ^^^ StrictFPModifier | "pure" ^^^ PureModifier
+      "abstract" ^^^ AbstractModifier | "strictfp" ^^^ StrictFPModifier | "pure" ^^^ PureModifier | "literal" ^^^ LiteralModifier
 
   lazy val annotation = fullAnnotation | singleElementAnnotation | markerAnnotation
 
@@ -197,23 +260,23 @@ object DeclarationParsers extends TwoLevelParsers {
 
   /* body code snippet */
 
-  lazy val block = (position ~ blockCode).^ ^^ {
-    case pos ~ code => BlockSnippet(code.map(_.raw).mkString, pos)
-  }
+  lazy val block = positioned(blockCode.^ ^^ {
+    case code => BlockSnippet(code.map(_.raw).mkString)
+  })
 
-  lazy val expression = (position ~ expressionCode).^ ^^ {
-    case pos ~ code => ExpressionSnippet(code.map(_.raw).mkString, pos)
-  }
+  lazy val expression = positioned(expressionCode.^ ^^ {
+    case code => ExpressionSnippet(code.map(_.raw).mkString)
+  })
 
   lazy val expressionCode = blockCode | parenthesizedCode | without(')', '}', ',', ';').*
 
   lazy val parenthesizedCode: LParser[List[DToken]] = elem('(') ~> argumentCode.* <~ elem(')') ^^ { Symbol('(') +: _.flatten :+ Symbol(')') }
 
-  lazy val argumentCode = parenthesizedCode | without(')').*
+  lazy val argumentCode = parenthesizedCode | without('(', ')').+
 
-  lazy val blockCode: LParser[List[DToken]] = elem('{') ~> blockStatementCode.* <~ elem('}') ^^ { Symbol('{') +: _.flatten :+ Symbol('}')}
+  lazy val blockCode: LParser[List[DToken]] = elem('{') ~> blockStatementCode.* <~ elem('}') ^^ { Symbol('{') +: _.flatten :+ Symbol('}') }
 
-  lazy val blockStatementCode = blockCode | without('}').*
+  lazy val blockStatementCode = blockCode | without('{', '}').+
 
 
   /* primary */
@@ -222,7 +285,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val identifier = accept("identifier", { case Identifier(id) => id }).^
 
-  lazy val delimiter = elem[Whitespace]
+  lazy val delimiter = elem[Whitespace].*
 
   private implicit def keyword (word: String): HParser[DToken] = elem(Identifier(word)).^
   private implicit def symbol (ch: Char): HParser[DToken] = elem(Symbol(ch)).^
@@ -288,76 +351,5 @@ object DeclarationPreprocessor extends Scanners {
 
   val whitespace: Parser[Unit] = success(())
 
-  def errorToken(msg: String): Char = throw new UnsupportedOperationException
-}
-
-sealed trait DToken {
-  def raw: String
-}
-
-class Identifier private (val id: String) extends DToken {
-  def raw = id
-}
-
-class Symbol private (val symbol: Char) extends DToken {
-  def raw = symbol.toString
-}
-
-class Whitespace private (ws: Char) extends DToken {
-  def raw = ws.toString
-}
-
-class CharLiteral private (literal: Char) extends DToken {
-  def raw = '\'' + LiteralUtil.escape(literal) + '\''
-}
-
-class StrLiteral private (literal: String) extends DToken {
-  def raw = '\"' + literal.flatMap(LiteralUtil.escape) + '\"'
-}
-
-class ErrorToken private (msg: String) extends DToken {
-  def raw = "<error>"
-}
-
-object LiteralUtil {
-  def escape (c: Char): String = c match {
-    case '\b' => "\\b"
-    case '\f' => "\\f"
-    case '\n' => "\\n"
-    case '\r' => "\\r"
-    case '\t' => "\\t"
-    case '\'' => "\\\'"
-    case '\"' => "\\\""
-    case '\\' => "\\\\"
-    case x    => x.toString
-  }
-}
-
-object Identifier {
-  def apply (id: String): Identifier = get(id)
-  def unapply (id: Identifier): Option[String] = Some(id.id)
-  private val get: String => Identifier = mutableHashMapMemo(new Identifier(_))
-}
-
-object Symbol {
-  def apply (s: Char): Symbol = get(s)
-  def unapply (s: Symbol): Option[Char] = Some(s.symbol)
-  private val get: Char => Symbol = mutableHashMapMemo(new Symbol(_))
-}
-
-object Whitespace {
-  def apply (ws: Char): Whitespace = get(ws)
-  private val get: Char => Whitespace = mutableHashMapMemo(new Whitespace(_))
-}
-
-object CharLiteral {
-  def apply (lit: Char): CharLiteral = new CharLiteral(lit)
-}
-
-object StrLiteral {
-  def apply (lit: String): StrLiteral = new StrLiteral(lit)
-}
-
-object ErrorToken {
-  def apply (msg: String): ErrorToken = new ErrorToken(msg)
+  def errorToken(msg: String): Char = EofCh
 }

@@ -2,7 +2,7 @@ package phenan.prj.combinator
 
 import scala.reflect.ClassTag
 import scala.util.parsing.combinator.PackratParsers
-import scala.util.parsing.input.{Position, Reader}
+import scala.util.parsing.input.{Positional, Position, Reader}
 
 trait TwoLevelParsers {
   self =>
@@ -22,9 +22,7 @@ trait TwoLevelParsers {
   def elem (kind: String, f: Elem => Boolean): LParser[Elem] = Impl.LParserImpl(Impl.elem(kind, f))
   def elem [E <: Elem] (implicit Tag: ClassTag[E]): LParser[E] = Impl.LParserImpl(Impl.accept(Tag.toString(), { case Tag(x) => x }))
 
-  lazy val position: LParser[Position] = Impl.LParserImpl(new Impl.Parser[Position] {
-    override def apply(in: Impl.Input): Impl.ParseResult[Position] = Impl.Success(in.pos, in)
-  })
+  def positioned [T <: Positional] (parser: HParser[T]): HParser[T] = Impl.HParserImpl(Impl.positioned(parser.parser))
 
   trait HParser[+T] {
     def apply (in: Input): ParseResult[T]
@@ -79,6 +77,8 @@ trait TwoLevelParsers {
     def ^^ [R] (f: T => R): LParser[R] = map(f)
     def >> [R] (f: T => LParser[R]): LParser[R] = flatMap(f)
 
+    def log (s: String): LParser[T]
+
     protected [TwoLevelParsers] def parser: Impl.PackratParser[T]
   }
 
@@ -124,6 +124,8 @@ trait TwoLevelParsers {
 
       def map [R] (f: T => R): LParser[R] = LParserImpl(parser.map(f))
       def flatMap [R] (f: T => LParser[R]): LParser[R] = LParserImpl(parser.flatMap(f(_).parser))
+
+      def log (s: String): LParser[T] = LParserImpl(Impl.log(parser)(s))
     }
   }
 }
