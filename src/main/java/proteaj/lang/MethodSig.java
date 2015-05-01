@@ -5,11 +5,11 @@ import java.lang.annotation.*;
 @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface MethodSig {
-  public MetaParameter[] genericParameters() default {};
-  public String returnType();
-  public String[] parameterTypes();
-  public String[] throwsTypes() default {};
-  public String[] activates() default {};
-  public String[] deactivates() default {};
-  public String[] requires() default {};
+  MetaParameter[] metaParameters() default {};
+  String returnType();
+  String[] parameters();
+  String[] throwsTypes() default {};
+  String[] activates() default {};
+  String[] deactivates() default {};
+  String[] requires() default {};
 }

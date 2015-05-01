@@ -23,7 +23,7 @@ object DescriptorParsers extends PackratParsers {
   }
 
   protected lazy val methodDesc: PackratParser[JMethodSignature] =
-    ( '(' ~> typeDesc.* <~ ')' ) ~ returnDesc ^^ { case paramTypes ~ retType => JMethodSignature(Nil, paramTypes, retType, Nil, Nil, Nil, Nil) }
+    ( '(' ~> typeDesc.* <~ ')' ) ~ returnDesc ^^ { case paramTypes ~ retType => JMethodSignature(Nil, paramTypes.map(sig => JParameterSignature(Nil, sig, None, false, None)), retType, Nil, Nil, Nil, Nil) }
 
   protected lazy val typeDesc: PackratParser[JTypeSignature] = baseDesc | objectDesc | arrayDesc
 

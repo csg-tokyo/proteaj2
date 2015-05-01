@@ -7,6 +7,7 @@ import phenan.prj.state.JState
 
 import scala.util._
 
+@Deprecated
 object DeclarationParser {
   def apply (reader: Reader, fileName: String)(implicit state: JState): Try[DeclarationParser] = {
     SourceReader(reader, fileName).map(new DeclarationParser(_, fileName))

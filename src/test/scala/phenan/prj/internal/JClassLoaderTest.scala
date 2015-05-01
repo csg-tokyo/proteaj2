@@ -79,14 +79,11 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
     setterMethod shouldBe a [Some[_]]
 
-    val annotations = setterMethod.get.annotations
-    annotations.signature shouldBe None
-    annotations.operator shouldBe a [Some[_]]
+    val method = setterMethod.get
+    method.syntax shouldBe a [Some[_]]
+    method.syntax.get.priority shouldBe None
 
-    annotations.operator.get shouldBe a [PrjExpressionOperator]
-    annotations.operator.get.association shouldBe a [PrjNonAssociation]
-
-    val pattern = annotations.operator.get.pattern
-    pattern shouldBe List(PrjOperatorPureValueRef("id"), PrjOperatorName("="), PrjOperatorHole)
+    val pattern = method.syntax.get.syntax
+    pattern shouldBe List(JMetaValueRef("id"), JOperatorName("="), JOperand)
   }
 }

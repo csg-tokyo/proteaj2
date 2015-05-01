@@ -52,12 +52,12 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
     for {
       metaParams  <- array("metaParameters")(metaParameter)
       retType     <- required("returnType")(typeSignature)(VoidTypeSignature)
-      paramTypes  <- array("parameterTypes")(typeSignature)
+      parameters  <- array("parameters")(parameterSignature)
       exceptions  <- array("throwsTypes")(typeSignature)
       activates   <- array("activates")(typeSignature)
       deactivates <- array("deactivates")(typeSignature)
       requires    <- array("requires")(typeSignature)
-    } yield JMethodSignature(metaParams, paramTypes, retType, exceptions, activates, deactivates, requires)
+    } yield JMethodSignature(metaParams, parameters, retType, exceptions, activates, deactivates, requires)
   }
 
   private lazy val fieldSig = annotation("FieldSig") {
@@ -79,16 +79,16 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
     } (expressionOperator)
   }
 
-  private def operatorAnnotation (f: (PrjOperatorAssociation, List[PrjOperatorElement]) => PrjOperatorAnnotation): Reader[Map[String, BAnnotationElement], PrjOperatorAnnotation] = for {
-    assoc <- association
+  private def operatorAnnotation (f: (Option[String], List[JSyntaxElement]) => JOperatorSyntax): Reader[Map[String, BAnnotationElement], JOperatorSyntax] = for {
+    priority <- optional("priority")(string)
     pat <- pattern
-  } yield f(assoc, pat)
+  } yield f(priority, pat)
 
-  private lazy val statementOperator = operatorAnnotation(PrjStatementOperator)
+  private lazy val statementOperator = operatorAnnotation(JStatementSyntax)
 
-  private lazy val expressionOperator = operatorAnnotation(PrjExpressionOperator)
+  private lazy val expressionOperator = operatorAnnotation(JExpressionSyntax)
 
-  private lazy val literalOperator = operatorAnnotation(PrjLiteralOperator)
+  private lazy val literalOperator = operatorAnnotation(JLiteralSyntax)
 
   private lazy val pure = marker("Pure")
 
@@ -104,29 +104,23 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
     } yield FormalMetaParameter(name, paramType, bounds)
   }
 
-  private lazy val association = enumSwitch [PrjOperatorAssociation] ("assoc", "Association") {
-    case "LEFT"  => priority >==> PrjLeftAssociation
-    case "RIGHT" => priority >==> PrjRightAssociation
-    case "NON"   => priority >==> PrjNonAssociation
-  } { priority >==> PrjNonAssociation }
-
-  private lazy val priority = element("priority")(string)("")
-
   private lazy val pattern = array("pattern")(elementAnnotation("OpElem")(operatorElement))
 
-  private lazy val operatorElement = enumSwitch [PrjOperatorElement] ("kind", "OpElemType") {
-    case "Name" => required("name")(string)("") >==> PrjOperatorName
-    case "Hole" => elementReader >==> { _ => PrjOperatorHole }
-    case "Star" => elementReader >==> { _ => PrjOperatorRepStarHole }
-    case "Plus" => elementReader >==> { _ => PrjOperatorRepPlusHole }
-    case "Optional" => elementReader >==> { _ => PrjOperatorOptionalHole }
-    case "AndPredicate" => required("name")(typeSignature)(VoidTypeSignature) >==> PrjOperatorAndPredicate
-    case "NotPredicate" => required("name")(typeSignature)(VoidTypeSignature) >==> PrjOperatorNotPredicate
-    case "Reference" => required("name")(string)("") >==> PrjOperatorPureValueRef
+  private lazy val operatorElement = enumSwitch [JSyntaxElement] ("kind", "OpElemType") {
+    case "Name" => required("name")(string)("") >==> JOperatorName
+    case "Hole" => elementReader >==> { _ => JOperand }
+    case "Star" => elementReader >==> { _ => JRepetition0 }
+    case "Plus" => elementReader >==> { _ => JRepetition1 }
+    case "Optional" => elementReader >==> { _ => JOptionalOperand }
+    case "AndPredicate" => required("name")(parameterSignature)(defaultPredicateArg) >==> JAndPredicate
+    case "NotPredicate" => required("name")(parameterSignature)(defaultPredicateArg) >==> JNotPredicate
+    case "Reference" => required("name")(string)("") >==> JMetaValueRef
   } {
     state.error("invalid operator element type")
-    elementReader >==> { _ => PrjOperatorHole }
+    elementReader >==> { _ => JOperand }
   }
+
+  private lazy val defaultPredicateArg = JParameterSignature(Nil, VoidTypeSignature, None, false, None)
 
   private lazy val annotations: Reader[RuntimeVisibleAnnotationsAttribute, Map[String, Map[String, BAnnotationElement]]] = Reader {
     _.annotations.map(ann => readUTF(ann.annotationType) -> ann.values.map { case (k, v) => readUTF(k) -> v }.toMap).toMap
@@ -147,6 +141,10 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   private def required [T] (name: String)(reader: Reader[BAnnotationElement, Option[T]])(default: => T) = element(name)(reader) {
     state.error("invalid generic parameter annotation : name field does not exist")
     default
+  }
+
+  private def optional [T] (name: String)(reader: Reader[BAnnotationElement, Option[T]]): Reader[Map[String, BAnnotationElement], Option[T]] = {
+    elementReader.map(_.get(name)) >==> { _.flatMap(reader =<< _) }
   }
 
   private def element [T] (name: String)(reader: Reader[BAnnotationElement, Option[T]])(default: => T): Reader[Map[String, BAnnotationElement], T] = {
@@ -197,4 +195,5 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
 
   private lazy val classTypeSignature: Reader[BAnnotationElement, Option[JClassTypeSignature]] = string.map(_.flatMap(SignatureParsers.parseClassTypeSignature))
 
+  private lazy val parameterSignature: Reader[BAnnotationElement, Option[JParameterSignature]] = string.map(_.flatMap(SignatureParsers.parseParameterSignature))
 }

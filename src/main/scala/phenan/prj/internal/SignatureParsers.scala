@@ -19,6 +19,8 @@ object SignatureParsers extends PackratParsers {
 
   def parseClassTypeSignature (sig: String)(implicit state: JState): Option[JClassTypeSignature] = parse(sig, "class type signature", classType)
 
+  def parseParameterSignature (sig: String)(implicit state: JState): Option[JParameterSignature] = parse(sig, "parameter signature", parameterSignature)
+
   private def parse[T] (sig: String, kind: String, parser: Parser[T])(implicit state: JState): Option[T] = parser(new PackratReader[Char](new CharSequenceReader(sig))) match {
     case Success(ret, _)   => Some(ret)
     case NoSuccess(msg, _) =>
@@ -32,8 +34,12 @@ object SignatureParsers extends PackratParsers {
 
   private lazy val fieldType: PackratParser[JTypeSignature] = classType | arrayType | typeVariable
 
-  private lazy val methodSignature = formalTypeParamList ~ ( '(' ~> typeSignature.* <~ ')' ) ~ returnType ~ throwsType.* ^^ {
-    case typeParams ~ paramTypes ~ retType ~ throwsTypes => JMethodSignature(typeParams, paramTypes, retType, throwsTypes, Nil, Nil, Nil)
+  private lazy val methodSignature = formalTypeParamList ~ ( '(' ~> parameterSignature.* <~ ')' ) ~ returnType ~ throwsType.* ^^ {
+    case typeParams ~ parameters ~ retType ~ throwsTypes => JMethodSignature(typeParams, parameters, retType, throwsTypes, Nil, Nil, Nil)
+  }
+
+  private lazy val parameterSignature = ( '@' ~> typeSignature ).* ~ typeSignature ~ ( '#' ~> identifier ).? ~ ( '*'.? ^^ { _.nonEmpty } ) ~ ( '?' ~> identifier ).? ^^ {
+    case contexts ~ sig ~ pri ~ va ~ df => JParameterSignature(contexts, sig, pri, va, df)
   }
 
   private lazy val typeSignature: PackratParser[JTypeSignature] = fieldType | baseType

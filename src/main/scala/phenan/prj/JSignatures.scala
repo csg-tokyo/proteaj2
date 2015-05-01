@@ -8,13 +8,15 @@ object JClassSignature {
   }
 }
 
-case class JMethodSignature (metaParams: List[FormalMetaParameter], paramTypes: List[JTypeSignature], returnType: JTypeSignature, throwTypes: List[JTypeSignature],
+case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: List[JParameterSignature], returnType: JTypeSignature, throwTypes: List[JTypeSignature],
                             activates: List[JTypeSignature], deactivates: List[JTypeSignature], requires: List[JTypeSignature]) {
   def throws (es: List[String]): JMethodSignature = {
-    if (es.nonEmpty) JMethodSignature(metaParams, paramTypes, returnType, throwTypes ++ es.map(name => SimpleClassTypeSignature(name, Nil)), activates, deactivates, requires)
+    if (es.nonEmpty) JMethodSignature(metaParams, parameters, returnType, throwTypes ++ es.map(name => SimpleClassTypeSignature(name, Nil)), activates, deactivates, requires)
     else this
   }
 }
+
+case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, priority: Option[String], varArgs: Boolean, defaultArg: Option[String])
 
 case class FormalMetaParameter (name: String, metaType: JTypeSignature, bounds: List[JTypeSignature])
 

@@ -1,6 +1,6 @@
 package phenan.prj.declaration
 
-import scala.util.parsing.input.{Positional, Position}
+import scala.util.parsing.input.Positional
 
 case class CompilationUnit (header: Header, modules: List[ModuleDeclaration])
 

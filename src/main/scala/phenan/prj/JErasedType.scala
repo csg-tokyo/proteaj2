@@ -69,6 +69,7 @@ trait JMethodDef {
   def declaringClass: JClass
 
   def signature: JMethodSignature
+  def syntax: Option[JOperatorSyntax]
 
   def erasedReturnType: JErasedType
   def erasedParameterTypes: List[JErasedType]
