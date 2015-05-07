@@ -1,5 +1,5 @@
 package phenan.prj.ir
-
+/*
 import phenan.prj._
 import phenan.prj.decl._
 import phenan.prj.state._
@@ -213,4 +213,5 @@ case class IRStaticInitializerDef (blockSnippet: BlockSnippet, declaringClass: I
 
   override def signature: Option[JMethodSignature] = None
 }
+*/
 */

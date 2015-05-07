@@ -1,15 +1,28 @@
 package phenan.prj.declaration
 
 import phenan.prj.combinator.TwoLevelParsers
+import phenan.prj.exception.ParseException
 
+import scala.collection.immutable.PagedSeq
 import scala.language.implicitConversions
+import scala.util._
 import scala.util.parsing.combinator.lexical.Scanners
-import scala.util.parsing.input.CharArrayReader.EofCh
+import scala.util.parsing.input._
+import CharArrayReader.EofCh
 
 object DeclarationParsers extends TwoLevelParsers {
   override type Elem = DToken
 
-  def parse [T] (parser: HParser[T], src: String) = parser.apply(new DeclarationScanners.Scanner(new DeclarationPreprocessor.Scanner(src)))
+  def parse [T] (parser: HParser[T], src: String): ParseResult[T] = parser(scanner(src))
+  def parse [T] (parser: HParser[T], seq: PagedSeq[Char]): ParseResult[T] = parser(scanner(seq))
+
+  def tryParse [T] (parser: HParser[T], seq: PagedSeq[Char], file: String): Try[T] = parse(parser, seq) match {
+    case ParseSuccess(result, _) => Success(result)
+    case ParseFailure(msg, _)    => Failure(ParseException("[ parse error ] at " + file + "\n" + msg))
+  }
+
+  private def scanner (src: String): DeclarationScanners.Scanner = new DeclarationScanners.Scanner(new DeclarationPreprocessor.Scanner(src))
+  private def scanner (seq: PagedSeq[Char]): DeclarationScanners.Scanner = new DeclarationScanners.Scanner(new DeclarationPreprocessor.Scanner(new PagedSeqReader(seq)))
 
   lazy val compilationUnit = header ~ moduleDeclaration.* ^^ {
     case head ~ body => CompilationUnit(head, body)
@@ -218,11 +231,11 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val wildcardType = wildcardExtends | wildcardSuper | unboundWildcard
 
-  lazy val wildcardExtends = '?' ~> "extends" ~> typeName ^^ { bound => WildcardType(Some(bound), None) }
+  lazy val wildcardExtends = '?' ~> "extends" ~> typeName ^^ { bound => UpperBoundWildcardType(bound) }
 
-  lazy val wildcardSuper = '?' ~> "super" ~> typeName ^^ { bound => WildcardType(None, Some(bound)) }
+  lazy val wildcardSuper = '?' ~> "super" ~> typeName ^^ { bound => LowerBoundWildcardType(bound) }
 
-  lazy val unboundWildcard = '?' ^^^ WildcardType(None, None)
+  lazy val unboundWildcard = '?' ^^^ UnboundWildcardType
 
 
   /* modifiers and annotations */

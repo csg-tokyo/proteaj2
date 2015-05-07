@@ -16,6 +16,8 @@ trait TwoLevelParsers {
   type ~ [+A, +B] = Impl.~[A, B]
 
   val ~ = Impl.~
+  val ParseSuccess = Impl.Success
+  val ParseFailure = Impl.NoSuccess
 
   def accept [T] (kind: String, f: PartialFunction[Elem, T]): LParser[T] = Impl.LParserImpl(Impl.accept(kind, f))
   def elem (e: Elem): LParser[Elem] = Impl.LParserImpl(Impl.elem(e))

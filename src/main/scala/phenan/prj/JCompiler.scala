@@ -2,7 +2,7 @@ package phenan.prj
 
 import java.io._
 
-import phenan.prj.decl.DeclarationCompiler
+import phenan.prj.declaration.DeclarationCompiler
 import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state.JState
@@ -17,17 +17,22 @@ class JCompiler (implicit state: JState) {
   }
 
   def generateIR (files: List[String]): Unit = {
-    for (file <- files) generateIR(new FileReader(file), file)
+    for (file <- files) generateIR(file)
   }
 
-  def generateIR (in: Reader, fileName: String): Unit = {
-    val ir = declarationCompiler.compile(in, fileName)
-    for (file <- ir; module <- file.modules) {
-      modules += (module.internalName -> module)
-    }
+  def generateIR (file: String): Unit = {
+    declarationCompiler.compile(file).foreach(registerIR)
   }
 
-  def findIR (name: String): Option[IRModule] = compiled.get(name).orElse(modules.get(name))
+  def generateIR (reader: Reader, file: String): Unit = {
+    declarationCompiler.compile(reader, file).foreach(registerIR)
+  }
+
+  def registerIR (ir: IRFile): Unit = {
+    for (module <- ir.modules) modules += (module.internalName -> module)
+  }
+
+  def findIR (name: String): Option[IRClass] = compiled.get(name).orElse(modules.get(name))
 
   def generateClassFile (): Unit = {
     while (modules.nonEmpty) {
@@ -38,7 +43,7 @@ class JCompiler (implicit state: JState) {
     }
   }
 
-  private def generateClassFile (module: IRModule): Unit = {
+  private def generateClassFile (module: IRClass): Unit = {
 
   }
 
@@ -46,6 +51,6 @@ class JCompiler (implicit state: JState) {
   val typeLoader: JTypeLoader = new JTypeLoaderImpl(this)
   val declarationCompiler = new DeclarationCompiler(this)
 
-  private var modules: Map[String, IRModule] = Map.empty
-  private var compiled: Map[String, IRModule] = Map.empty
+  private var modules: Map[String, IRClass] = Map.empty
+  private var compiled: Map[String, IRClass] = Map.empty
 }
