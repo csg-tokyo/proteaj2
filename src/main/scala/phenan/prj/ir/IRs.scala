@@ -4,9 +4,13 @@ import phenan.prj._
 import phenan.prj.JCompiler
 import phenan.prj.declaration._
 import phenan.prj.state.JState
+import phenan.util._
+
 import JModifier._
 
-case class IRFile (ast: CompilationUnit, root: RootResolver)(implicit state: JState) {
+import scala.util.Success
+
+case class IRFile (ast: CompilationUnit, root: RootResolver)(implicit val state: JState) {
   lazy val modules: List[IRClass] = collectModules(ast.modules.map(IRClass(_, this)), Nil)
 
   lazy val internalName = ast.header.pack.map(_.name.names.mkString("/"))
@@ -64,7 +68,23 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
 
   override def methods: List[JMethodDef] = ???
 
-  override def signature: JClassSignature = ???
+  import scalaz.Scalaz._
+  override def signature: JClassSignature = {
+    val mps = ast.metaParameters.traverse(resolver.metaParameter).getOrElse {
+      file.state.error("invalid meta parameters in class " + name)
+      Nil
+    }
+    val sup = ast.superClass.map(s => resolver.classTypeSignature(s).getOrElse {
+      file.state.error("invalid super type of class " + name + " : " + s)
+      JTypeSignature.objectTypeSig
+    }).getOrElse(JTypeSignature.objectTypeSig)
+    val ifs = ast.interfaces.traverse(resolver.classTypeSignature).getOrElse {
+      file.state.error("invalid interface types in class " + name)
+      Nil
+    }
+    JClassSignature(mps, sup, ifs)
+  }
+
 
 }
 

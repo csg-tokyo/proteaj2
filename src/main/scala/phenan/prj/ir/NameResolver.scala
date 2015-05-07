@@ -29,6 +29,11 @@ trait NameResolver {
 
   def typeSignature (tn: TypeName): Try[JTypeSignature] = nonArrayTypeSignature(tn.name, tn.args).map(arrayTypeSignature(_, tn.dim))
 
+  def classTypeSignature (tn: TypeName): Try[JClassTypeSignature] = {
+    if (tn.dim > 0) Failure(InvalidTypeException("expected class type, but found array type : " + tn.name.names.mkString(".") + "[]".multiply(tn.dim)))
+    else classTypeSignature(tn.name, tn.args)
+  }
+
   def classTypeSignature (name: String): Try[JClassTypeSignature] = resolve(name).map(clazz => SimpleClassTypeSignature(clazz.internalName, Nil))
 
   def classTypeSignature (name: QualifiedName): Try[JClassTypeSignature] = resolve(name).map(clazz => SimpleClassTypeSignature(clazz.internalName, Nil))
