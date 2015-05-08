@@ -87,9 +87,11 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
 
   def syntax = annotations.operator
 
+  @Deprecated
   lazy val erasedReturnType: JErasedType = declaringClass.compiler.classLoader.erase_Force(descriptor.returnType, Nil)
 
-  lazy val erasedParameterTypes: List[JErasedType] = descriptor.parameters.map(sig => declaringClass.compiler.classLoader.erase_Force(sig, Nil))
+  @Deprecated
+  lazy val erasedParameterTypes: List[JErasedType] = descriptor.parameters.map(sig => declaringClass.compiler.classLoader.erase_Force(sig.actualTypeSignature, Nil))
 
   private lazy val annotations = readMethodAnnotations(attributes.annotations)
 

@@ -82,10 +82,5 @@ trait JClassLoader {
       loadClass("java/lang/Object").get
   }
 
-  def erase_Force (signature: JParameterSignature, metaParams: List[FormalMetaParameter]): JErasedType = {
-    if (signature.contexts.isEmpty) erase_Force(signature.typeSig, metaParams)
-    else loadClass("java/util/function/Function").get
-  }
-
   implicit def state: JState
 }

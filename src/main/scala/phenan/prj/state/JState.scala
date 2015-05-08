@@ -2,7 +2,20 @@ package phenan.prj.state
 
 import org.slf4j._
 
+import scala.util._
+
 class JState private[state] (val searchPath: JSearchPath) {
+  def uniqueId: Int = {
+    val uid = uniqueNum
+    uniqueNum += 1
+    uid
+  }
+
+  def successOrError [T] (x: Try[T], msg: => String, default: => T): T = x match {
+    case Success(t) => t
+    case Failure(e) => error(msg, e); default
+  }
+
   def error (msg: => String): Unit = {
     logger.error(msg)
     nErrors += 1
@@ -27,5 +40,6 @@ class JState private[state] (val searchPath: JSearchPath) {
 
   private var nErrors: Int = 0
   private var nWarns: Int = 0
+  private var uniqueNum: Int = 0
   private lazy val logger = LoggerFactory.getLogger("pjc")
 }

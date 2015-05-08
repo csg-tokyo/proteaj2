@@ -16,7 +16,9 @@ case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: 
   }
 }
 
-case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, priority: Option[String], varArgs: Boolean, defaultArg: Option[String])
+case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, priority: Option[String], varArgs: Boolean, defaultArg: Option[String]) {
+  def actualTypeSignature: JTypeSignature = contexts.foldRight(typeSig)(JTypeSignature.functionTypeSig)
+}
 
 case class FormalMetaParameter (name: String, metaType: JTypeSignature, bounds: List[JTypeSignature])
 
@@ -25,6 +27,7 @@ sealed trait JTypeSignature extends JTypeArgument
 object JTypeSignature {
   lazy val typeTypeSig = SimpleClassTypeSignature("proteaj/lang/Type", Nil)
   lazy val objectTypeSig = SimpleClassTypeSignature("java/lang/Object", Nil)
+  def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature("java/util/function/Function", List(from, to))
 }
 
 sealed trait JClassTypeSignature extends JTypeSignature

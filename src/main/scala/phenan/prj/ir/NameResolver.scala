@@ -43,6 +43,14 @@ trait NameResolver {
     as    <- args.traverse(typeArgument)
   } yield SimpleClassTypeSignature(clazz.internalName, as)
 
+  def parameterSignature (contexts: List[TypeName], parameterType: ParameterType, priority: Option[String], varArgs: Boolean, dim: Int, initializer: Option[String]): Try[JParameterSignature] = parameterType match {
+    case ContextualType(c, p) => parameterSignature(contexts :+ c, p, priority, varArgs, dim, initializer)
+    case tn: TypeName => for {
+      cs  <- contexts.traverse(typeSignature)
+      sig <- typeSignature(tn).map(arrayTypeSignature(_, dim))
+    } yield JParameterSignature(cs, sig, priority, varArgs, initializer)
+  }
+
   private def nonArrayTypeSignature (name: QualifiedName, args: List[TypeArgument]): Try[JTypeSignature] = {
     if (args.nonEmpty) classTypeSignature(name, args)
     else if (name.names.size > 1) classTypeSignature(name)

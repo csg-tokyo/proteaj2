@@ -71,7 +71,9 @@ trait JMethodDef {
   def signature: JMethodSignature
   def syntax: Option[JOperatorSyntax]
 
+  @Deprecated
   def erasedReturnType: JErasedType
+  @Deprecated
   def erasedParameterTypes: List[JErasedType]
 
   def isStatic: Boolean           = mod.check(JModifier.accStatic)

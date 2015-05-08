@@ -8,8 +8,6 @@ import phenan.util._
 
 import JModifier._
 
-import scala.util.Success
-
 case class IRFile (ast: CompilationUnit, root: RootResolver)(implicit val state: JState) {
   lazy val modules: List[IRClass] = collectModules(ast.modules.map(IRClass(_, this)), Nil)
 
@@ -28,11 +26,13 @@ case class IRFile (ast: CompilationUnit, root: RootResolver)(implicit val state:
 trait IRClass extends JClass {
   def ast: ModuleDeclaration
   def file: IRFile
-  def simpleName = ast.name
 
   def outer: Option[IRClass]
   def inners: List[IRClass]
-  
+
+  private[ir] def implicitMethodModifier: Int
+
+  def simpleName = ast.name
   lazy val name = internalName.replace('/', '.').replace('$', '.')
 
   lazy val outerClass: Option[String] = outer.map(_.internalName)
@@ -47,6 +47,7 @@ trait IRClass extends JClass {
   lazy val resolver = file.resolver.inClass(this)
   
   def compiler: JCompiler = file.compiler
+  def state: JState = file.state
 }
 
 object IRClass {
@@ -70,25 +71,63 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
 
   import scalaz.Scalaz._
   override def signature: JClassSignature = {
-    val mps = ast.metaParameters.traverse(resolver.metaParameter).getOrElse {
-      file.state.error("invalid meta parameters in class " + name)
-      Nil
-    }
-    val sup = ast.superClass.map(s => resolver.classTypeSignature(s).getOrElse {
-      file.state.error("invalid super type of class " + name + " : " + s)
-      JTypeSignature.objectTypeSig
-    }).getOrElse(JTypeSignature.objectTypeSig)
-    val ifs = ast.interfaces.traverse(resolver.classTypeSignature).getOrElse {
-      file.state.error("invalid interface types in class " + name)
-      Nil
-    }
+    val mps = file.state.successOrError(ast.metaParameters.traverse(resolver.metaParameter), "invalid meta parameters in class " + name, Nil)
+    val sup = ast.superClass.map { s =>
+      file.state.successOrError(resolver.classTypeSignature(s), "invalid super type of class " + name + " : " + s, JTypeSignature.objectTypeSig)
+    }.getOrElse(JTypeSignature.objectTypeSig)
+    val ifs = file.state.successOrError(ast.interfaces.traverse(resolver.classTypeSignature), "invalid interface types in class " + name, Nil)
     JClassSignature(mps, sup, ifs)
   }
 
-
+  override private[ir] def implicitMethodModifier = 0
 }
 
-trait IRMethodDef extends JMethodDef
+trait IRMethod extends JMethodDef {
+  private[ir] def paramInitializers: List[IRParameterInitializer]
+  def declaringClass: IRClass
+  def compiler = declaringClass.compiler
+  def state = declaringClass.state
+}
+
+case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends IRMethod {
+  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | declaringClass.implicitMethodModifier
+
+  def name: String = ast.name
+
+  override def erasedReturnType: JErasedType = ???
+
+  override def erasedParameterTypes: List[JErasedType] = ???
+
+  override def syntax: Option[JOperatorSyntax] = ???
+
+  override def signature: JMethodSignature = ???
+
+  override private[ir] def paramInitializers: List[IRParameterInitializer] = ???
+}
+
+class IRFormalParameter (ast: FormalParameter, method: IRMethod) {
+  //lazy val initializer: Option[IRParameterInitializer] = ast.initializer.map(snippet => IRParameterInitializer(method, ))
+}
+
+case class IRParameterInitializer (method: IRMethod, returnType: JTypeSignature, snippet: String) extends IRMethod {
+  def mod = JModifier(accPublic | accStatic | accFinal)
+
+  def erasedReturnType: JErasedType = ??? //method.compiler.classLoader.erase(returnType, Nil)
+
+  def erasedParameterTypes: List[JErasedType] = Nil
+
+  def syntax: Option[JOperatorSyntax] = None
+
+  def declaringClass: IRClass = method.declaringClass
+
+  def name: String = method.name + "$init$" + uid
+
+  def signature: JMethodSignature = JMethodSignature(Nil, Nil, returnType, Nil, Nil, Nil, Nil)
+
+  private[ir] def paramInitializers: List[IRParameterInitializer] = Nil
+
+  private lazy val uid = method.state.uniqueId
+}
 
 object IRModifiers {
   def mod (modifiers: List[Modifier]): JModifier = JModifier(modifiers.foldRight(0)((m, flags) => flags | flag(m)))
