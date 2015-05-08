@@ -188,7 +188,7 @@ case class NameResolverInClass (clazz: IRClass, parent: NameResolver) extends Na
     case _ => parent.metaVariable(tn)
   }
 
-  def resolve (name: String): Try[JClass] = parent.resolve(name)
+  def resolve (name: String): Try[JClass] = abbreviated(name).orElse(parent.resolve(name))
 
   def root = parent.root
 
@@ -200,6 +200,8 @@ case class NameResolverInClass (clazz: IRClass, parent: NameResolver) extends Na
   private lazy val metaVariables = clazz.ast.metaParameters.collect {
     case MetaValueParameter(name, t) if ! isTypeType(t) => name
   }.toSet
+
+  private val abbreviated: String => Try[JClass] = mutableHashMapMemo { name => root.findInnerClass(clazz, name) }
 
   private def isTypeType (t: TypeName): Boolean = parent.typeSignature(t).toOption.contains(JTypeSignature.typeTypeSig)
 }
