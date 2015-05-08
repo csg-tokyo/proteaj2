@@ -13,6 +13,7 @@ trait NameResolver {
   import scalaz.Scalaz._
 
   def inClass (clazz: IRClass) = NameResolverInClass(clazz, this)
+  def inMethod (method: IRMethod) = NameResolverInMethod(method, this)
 
   def typeVariable (name: String): Option[JTypeVariableSignature]
   def metaVariable (tn: TypeName): Try[JTypeArgument]
@@ -177,7 +178,24 @@ case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameRes
   }
 }
 
-case class NameResolverInClass (clazz: IRClass, parent: NameResolver) extends NameResolver {
+case class NameResolverInClass (clazz: IRClass, parent: NameResolver) extends MetaParametersResolver {
+  def resolve (name: String): Try[JClass] = abbreviated(name).orElse(parent.resolve(name))
+
+  def metaParameters: List[MetaParameter] = clazz.metaParameters
+
+  private val abbreviated: String => Try[JClass] = mutableHashMapMemo { name => root.findInnerClass(clazz, name) }
+}
+
+case class NameResolverInMethod (method: IRMethod, parent: NameResolver) extends MetaParametersResolver {
+  def resolve (name: String) = parent.resolve(name)
+
+  def metaParameters: List[MetaParameter] = method.metaParameters
+}
+
+trait MetaParametersResolver extends NameResolver {
+  def metaParameters: List[MetaParameter]
+  def parent: NameResolver
+
   def typeVariable (name: String) = {
     if (typeVariables.contains(name)) Some(JTypeVariableSignature(name))
     else parent.typeVariable(name)
@@ -188,20 +206,16 @@ case class NameResolverInClass (clazz: IRClass, parent: NameResolver) extends Na
     case _ => parent.metaVariable(tn)
   }
 
-  def resolve (name: String): Try[JClass] = abbreviated(name).orElse(parent.resolve(name))
-
   def root = parent.root
 
-  private lazy val typeVariables = clazz.ast.metaParameters.collect {
+  private lazy val typeVariables = metaParameters.collect {
     case TypeParameter(name, _) => name
     case MetaValueParameter(name, t) if isTypeType(t) => name
   }.toSet
 
-  private lazy val metaVariables = clazz.ast.metaParameters.collect {
+  private lazy val metaVariables = metaParameters.collect {
     case MetaValueParameter(name, t) if ! isTypeType(t) => name
   }.toSet
-
-  private val abbreviated: String => Try[JClass] = mutableHashMapMemo { name => root.findInnerClass(clazz, name) }
 
   private def isTypeType (t: TypeName): Boolean = parent.typeSignature(t).toOption.contains(JTypeSignature.typeTypeSig)
 }

@@ -30,9 +30,11 @@ trait IRClass extends JClass {
   def outer: Option[IRClass]
   def inners: List[IRClass]
 
-  private[ir] def implicitMethodModifier: Int
-
   def simpleName = ast.name
+
+  private[ir] def implicitMethodModifier: Int
+  private[ir] def metaParameters = ast.metaParameters
+
   lazy val name = internalName.replace('/', '.').replace('$', '.')
 
   lazy val outerClass: Option[String] = outer.map(_.internalName)
@@ -83,9 +85,13 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
 }
 
 trait IRMethod extends JMethodDef {
-  private[ir] def paramInitializers: List[IRParameterInitializer]
   def declaringClass: IRClass
   def state = declaringClass.state
+
+  private[ir] def metaParameters: List[MetaParameter]
+  private[ir] def paramInitializers: List[IRParameterInitializer]
+
+  lazy val resolver = declaringClass.resolver.inMethod(this)
 }
 
 case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends IRMethod {
@@ -96,6 +102,8 @@ case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends
   override def syntax: Option[JOperatorSyntax] = ???
 
   override def signature: JMethodSignature = ???
+
+  private[ir] def metaParameters: List[MetaParameter] = ast.metaParameters
 
   override private[ir] def paramInitializers: List[IRParameterInitializer] = ???
 }
@@ -114,6 +122,8 @@ case class IRParameterInitializer (method: IRMethod, returnType: JTypeSignature,
   def name: String = method.name + "$init$" + uid
 
   def signature: JMethodSignature = JMethodSignature(Nil, Nil, returnType, Nil, Nil, Nil, Nil)
+
+  private[ir] def metaParameters: List[MetaParameter] = Nil
 
   private[ir] def paramInitializers: List[IRParameterInitializer] = Nil
 
