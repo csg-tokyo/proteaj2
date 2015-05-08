@@ -71,14 +71,14 @@ trait JMethodDef {
   def signature: JMethodSignature
   def syntax: Option[JOperatorSyntax]
 
-  @Deprecated
-  def erasedReturnType: JErasedType
-  @Deprecated
-  def erasedParameterTypes: List[JErasedType]
+  lazy val erasedReturnType: JErasedType = compiler.classLoader.erase_Force(signature.returnType, signature.metaParams)
+  lazy val erasedParameterTypes: List[JErasedType] = signature.parameters.map(param => compiler.classLoader.erase_Force(param.actualTypeSignature, signature.metaParams))
 
   def isStatic: Boolean           = mod.check(JModifier.accStatic)
   def isConstructor: Boolean      = name == constructorName
   def isClassInitializer: Boolean = name == classInitializerName
   def isInstanceMethod: Boolean   = ! (isStatic || isConstructor || isClassInitializer)
   def isStaticMethod: Boolean     = isStatic && ! (isConstructor || isClassInitializer)
+
+  def compiler = declaringClass.compiler
 }

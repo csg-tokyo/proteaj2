@@ -27,7 +27,7 @@ trait NameResolver {
     case MetaValueParameter(name, mt) => typeSignature(mt).map(FormalMetaParameter(name, _, Nil))
   }
 
-  def typeSignature (tn: TypeName): Try[JTypeSignature] = nonArrayTypeSignature(tn.name, tn.args).map(arrayTypeSignature(_, tn.dim))
+  def typeSignature (tn: TypeName): Try[JTypeSignature] = nonArrayTypeSignature(tn.name, tn.args).map(JTypeSignature.arraySig(_, tn.dim))
 
   def classTypeSignature (tn: TypeName): Try[JClassTypeSignature] = {
     if (tn.dim > 0) Failure(InvalidTypeException("expected class type, but found array type : " + tn.name.names.mkString(".") + "[]".multiply(tn.dim)))
@@ -47,7 +47,7 @@ trait NameResolver {
     case ContextualType(c, p) => parameterSignature(contexts :+ c, p, priority, varArgs, dim, initializer)
     case tn: TypeName => for {
       cs  <- contexts.traverse(typeSignature)
-      sig <- typeSignature(tn).map(arrayTypeSignature(_, dim))
+      sig <- typeSignature(tn).map(JTypeSignature.arraySig(_, dim))
     } yield JParameterSignature(cs, sig, priority, varArgs, initializer)
   }
 
@@ -58,11 +58,6 @@ trait NameResolver {
       val simpleName = name.names.head
       primitiveType(simpleName).orElse(typeVariable(simpleName)).map(Success(_)).getOrElse(classTypeSignature(simpleName))
     }
-  }
-
-  private def arrayTypeSignature (sig: JTypeSignature, dim: Int): JTypeSignature = {
-    if (dim > 0) arrayTypeSignature(JArrayTypeSignature(sig), dim - 1)
-    else sig
   }
 
   private def primitiveType (name: String): Option[JPrimitiveTypeSignature] = name match {

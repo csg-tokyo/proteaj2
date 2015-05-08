@@ -85,7 +85,6 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
 trait IRMethod extends JMethodDef {
   private[ir] def paramInitializers: List[IRParameterInitializer]
   def declaringClass: IRClass
-  def compiler = declaringClass.compiler
   def state = declaringClass.state
 }
 
@@ -93,10 +92,6 @@ case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends
   lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | declaringClass.implicitMethodModifier
 
   def name: String = ast.name
-
-  override def erasedReturnType: JErasedType = ???
-
-  override def erasedParameterTypes: List[JErasedType] = ???
 
   override def syntax: Option[JOperatorSyntax] = ???
 
@@ -111,10 +106,6 @@ class IRFormalParameter (ast: FormalParameter, method: IRMethod) {
 
 case class IRParameterInitializer (method: IRMethod, returnType: JTypeSignature, snippet: String) extends IRMethod {
   def mod = JModifier(accPublic | accStatic | accFinal)
-
-  def erasedReturnType: JErasedType = ??? //method.compiler.classLoader.erase(returnType, Nil)
-
-  def erasedParameterTypes: List[JErasedType] = Nil
 
   def syntax: Option[JOperatorSyntax] = None
 

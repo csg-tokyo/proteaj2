@@ -17,7 +17,10 @@ case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: 
 }
 
 case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, priority: Option[String], varArgs: Boolean, defaultArg: Option[String]) {
-  def actualTypeSignature: JTypeSignature = contexts.foldRight(typeSig)(JTypeSignature.functionTypeSig)
+  def actualTypeSignature: JTypeSignature = {
+    val target = if (varArgs) JArrayTypeSignature(typeSig) else typeSig
+    contexts.foldRight(target)(JTypeSignature.functionTypeSig)
+  }
 }
 
 case class FormalMetaParameter (name: String, metaType: JTypeSignature, bounds: List[JTypeSignature])
@@ -28,6 +31,11 @@ object JTypeSignature {
   lazy val typeTypeSig = SimpleClassTypeSignature("proteaj/lang/Type", Nil)
   lazy val objectTypeSig = SimpleClassTypeSignature("java/lang/Object", Nil)
   def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature("java/util/function/Function", List(from, to))
+
+  def arraySig (typeSig: JTypeSignature, dim: Int): JTypeSignature = {
+    if (dim > 0) arraySig(JArrayTypeSignature(typeSig), dim - 1)
+    else typeSig
+  }
 }
 
 sealed trait JClassTypeSignature extends JTypeSignature
