@@ -277,11 +277,11 @@ object DeclarationParsers extends TwoLevelParsers {
     case code => BlockSnippet(code.map(_.raw).mkString)
   })
 
-  lazy val expression = positioned(expressionCode.^ ^^ {
-    case code => ExpressionSnippet(code.map(_.raw).mkString)
+  lazy val expression = positioned(expressionCode.*.^ ^^ {
+    case code => ExpressionSnippet(code.flatten.map(_.raw).mkString)
   })
 
-  lazy val expressionCode = blockCode | parenthesizedCode | without(')', '}', ',', ';').*
+  lazy val expressionCode = blockCode | parenthesizedCode | without('(', ')', '{', '}', ',', ';').+
 
   lazy val parenthesizedCode: LParser[List[DToken]] = elem('(') ~> argumentCode.* <~ elem(')') ^^ { Symbol('(') +: _.flatten :+ Symbol(')') }
 

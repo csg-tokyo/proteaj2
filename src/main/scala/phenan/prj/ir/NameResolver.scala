@@ -121,7 +121,7 @@ case class RootResolver (compiler: JCompiler) extends NameResolver {
   def addKnownPackages (packageName: List[String]): Unit = {
     if (! knownPackages.contains(packageName)) {
       knownPackages += packageName
-      addKnownPackages(packageName.init)
+      if (packageName.size > 1) addKnownPackages(packageName.init)
     }
   }
 
@@ -193,7 +193,7 @@ case class NameResolverInClass (clazz: IRClass, parent: NameResolver) extends Me
 case class NameResolverInMethod (method: IRMethod, parent: NameResolver) extends MetaParametersResolver {
   def resolve (name: String) = parent.resolve(name)
 
-  def metaParameters: List[MetaParameter] = method.metaParameters
+  def metaParameters: List[MetaParameter] = method.metaParametersAST
 }
 
 trait MetaParametersResolver extends NameResolver {

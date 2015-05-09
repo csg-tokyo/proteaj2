@@ -43,9 +43,9 @@ class JClassLoaderImpl (jdc: JCompiler)(implicit val state: JState) extends JCla
 
   /* factory method for JClass ( without cache ) */
 
-  private def getClass(name: String): Try[JClass] = {
-    jdc.findIR(name).map(Success(_)) getOrElse state.searchPath.find(name) match {
-      case Some(cf: FoundClassFile)  =>
+  private def getClass(name: String): Try[JClass] = jdc.findIR(name).map(Success(_)).getOrElse {
+    state.searchPath.find(name) match {
+      case Some(cf: FoundClassFile) =>
         classFileParser.fromStream(cf.in).map(new JLoadedClass(_, jdc))
       case Some(sf: FoundSourceFile) =>
         jdc.generateIR(sf.in, sf.name)

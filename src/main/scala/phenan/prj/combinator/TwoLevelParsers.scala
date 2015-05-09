@@ -52,6 +52,8 @@ trait TwoLevelParsers {
     def ^^^ [R] (f: => R): HParser[R]
     def >> [R] (f: T => HParser[R]): HParser[R] = flatMap(f)
 
+    def log (s: String): HParser[T]
+
     protected [TwoLevelParsers] def parser: Impl.PackratParser[T]
   }
 
@@ -107,6 +109,8 @@ trait TwoLevelParsers {
       def flatMap [R] (f: T => HParser[R]): HParser[R] = HParserImpl(parser.flatMap(f(_).parser))
 
       def ^^^ [R] (f: => R): HParser[R] = HParserImpl(parser ^^^ f)
+
+      def log (s: String): HParser[T] = HParserImpl(Impl.log(parser)(s))
     }
 
     case class LParserImpl[T] (parser: PackratParser[T]) extends LParser[T] {

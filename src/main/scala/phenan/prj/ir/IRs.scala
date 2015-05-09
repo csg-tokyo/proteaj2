@@ -33,6 +33,7 @@ trait IRClass extends JClass {
   def simpleName = ast.name
 
   private[ir] def implicitMethodModifier: Int
+  private[ir] def implicitFieldModifier: Int
   private[ir] def metaParameters = ast.metaParameters
 
   lazy val name = internalName.replace('/', '.').replace('$', '.')
@@ -67,9 +68,30 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
     case m: ModuleDeclaration => IRClass(m, Some(this), file)
   }
 
-  override def fields: List[JFieldDef] = ???
+  lazy val fields: List[JFieldDef] = ast.members.collect {
+    case FieldDeclaration(mods, ft, ds) =>
+      val mod = IRModifiers.mod(mods)
+      val fieldType = state.successOrError(resolver.typeSignature(ft), "invalid type of field " + ds.head.name, JTypeSignature.objectTypeSig)
+      ds.map(IRFieldDef(mod, fieldType, _, this))
+  }.flatten
 
-  override def methods: List[JMethodDef] = ???
+  lazy val methods: List[IRMethod] = collectMethods(declaredMethods ++ declaredConstructors ++ instanceInitializer ++ staticInitializer)
+
+  lazy val declaredMethods = ast.members.collect {
+    case m: MethodDeclaration => IRMethodDef(m, this)
+  }
+
+  lazy val declaredConstructors = ast.members.collect {
+    case c: ConstructorDeclaration => IRConstructorDef(c, this)
+  }
+
+  lazy val instanceInitializer = ast.members.collect {
+    case i: InstanceInitializer => IRInstanceInitializer(i, this)
+  }
+
+  lazy val staticInitializer = ast.members.collect {
+    case s: StaticInitializer => IRStaticInitializer(s, this)
+  }
 
   import scalaz.Scalaz._
 
@@ -83,57 +105,53 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
 
   lazy val signature: JClassSignature = JClassSignature(formalMetaParameters, superTypeSignature, interfaceSignatures)
 
-  override private[ir] def implicitMethodModifier = 0
+  private[ir] def implicitMethodModifier = 0
+  private[ir] def implicitFieldModifier = 0
+
+  private def collectMethods (methods: List[IRMethod]): List[IRMethod] = methods ++ methods.flatMap(_.paramInitializers)
+}
+
+case class IRFieldDef (mod: JModifier, fieldType: JTypeSignature, ast: VariableDeclarator, declaringClass: IRClass) extends JFieldDef {
+  def name: String = ast.name
+  def signature: JTypeSignature = JTypeSignature.arraySig(fieldType, ast.dim)
 }
 
 trait IRMethod extends JMethodDef {
   def declaringClass: IRClass
-  def state = declaringClass.state
+  def returnTypeSignature: JTypeSignature
 
-  private[ir] def metaParameters: List[MetaParameter]
-  private[ir] def paramInitializers: List[IRParameterInitializer]
-
-  lazy val resolver = declaringClass.resolver.inMethod(this)
-}
-
-case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends IRMethod {
-  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | declaringClass.implicitMethodModifier
-
-  def name: String = ast.name
-
-  override def syntax: Option[JOperatorSyntax] = ???
+  private[ir] def metaParametersAST: List[MetaParameter]
+  private[ir] def formalParametersAST: List[FormalParameter]
+  private[ir] def clausesAST: List[MethodClause]
 
   lazy val signature: JMethodSignature =
     JMethodSignature(formalMetaParameters, formalParameterSignatures, returnTypeSignature,
       throwsTypeSignatures, activatesTypeSignatures, deactivatesTypeSignatures, requiresTypeSignatures)
 
+  def state = declaringClass.state
+  lazy val resolver = declaringClass.resolver.inMethod(this)
+
   import scalaz.Scalaz._
 
-  lazy val formalMetaParameters = state.successOrError(metaParameters.traverse(resolver.metaParameter), "invalid meta parameters of method " + name, Nil)
-
-  lazy val formalParameters = ast.formalParameters.map(param => new IRFormalParameter(param, this))
-
+  lazy val formalMetaParameters = state.successOrError(metaParametersAST.traverse(resolver.metaParameter), "invalid meta parameters of method " + name, Nil)
+  lazy val formalParameters = formalParametersAST.map(param => new IRFormalParameter(param, this))
   lazy val formalParameterSignatures = state.successOrError(formalParameters.traverse(_.signature), "invalid parameter types of method " + name, Nil)
 
-  lazy val returnTypeSignature = state.successOrError(resolver.typeSignature(ast.returnType), "invalid return type of method " + name, VoidTypeSignature)
-
-  lazy val throwsTypeSignatures = ast.clauses.collectFirst { case ThrowsClause(es) =>
+  lazy val throwsTypeSignatures = clausesAST.collectFirst { case ThrowsClause(es) =>
     state.successOrError(es.traverse(resolver.typeSignature), "invalid throws clause of method " + name, Nil)
   }.getOrElse(Nil)
 
-  lazy val activatesTypeSignatures = ast.clauses.collectFirst { case ActivatesClause(cs) =>
+  lazy val activatesTypeSignatures = clausesAST.collectFirst { case ActivatesClause(cs) =>
     state.successOrError(cs.traverse(resolver.typeSignature), "invalid activates clause of method " + name, Nil)
   }.getOrElse(Nil)
 
-  lazy val deactivatesTypeSignatures = ast.clauses.collectFirst { case DeactivatesClause(cs) =>
+  lazy val deactivatesTypeSignatures = clausesAST.collectFirst { case DeactivatesClause(cs) =>
     state.successOrError(cs.traverse(resolver.typeSignature), "invalid deactivates clause of method " + name, Nil)
   }.getOrElse(Nil)
 
-  lazy val requiresTypeSignatures = ast.clauses.collectFirst { case RequiresClause(cs) =>
+  lazy val requiresTypeSignatures = clausesAST.collectFirst { case RequiresClause(cs) =>
     state.successOrError(cs.traverse(resolver.typeSignature), "invalid requires clause of method " + name, Nil)
   }.getOrElse(Nil)
-
-  private[ir] def metaParameters: List[MetaParameter] = ast.metaParameters
 
   private[ir] def paramInitializers: List[IRParameterInitializer] = formalParameters.flatMap(_.initializerMethod)
 }
@@ -147,17 +165,57 @@ class IRFormalParameter (ast: FormalParameter, method: IRMethod) {
   } yield IRParameterInitializer(method, returnType, name, snippet.snippet)
 }
 
-case class IRParameterInitializer (method: IRMethod, returnType: JTypeSignature, name: String, snippet: String) extends IRMethod {
+case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends IRMethod {
+  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | declaringClass.implicitMethodModifier
+
+  def name: String = ast.name
+
+  override def syntax: Option[JOperatorSyntax] = ???
+
+  lazy val returnTypeSignature = state.successOrError(resolver.typeSignature(ast.returnType), "invalid return type of method " + name, VoidTypeSignature)
+
+  private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
+  private[ir] def formalParametersAST: List[FormalParameter] = ast.formalParameters
+  private[ir] def clausesAST: List[MethodClause] = ast.clauses
+}
+
+case class IRConstructorDef (ast: ConstructorDeclaration, declaringClass: IRClass) extends IRMethod {
+  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers)
+
+  def name = CommonNames.constructorName
+
+  override def returnTypeSignature: JTypeSignature = VoidTypeSignature
+
+  override def syntax: Option[JOperatorSyntax] = ???
+
+  override private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
+  override private[ir] def formalParametersAST: List[FormalParameter] = ast.formalParameters
+  override private[ir] def clausesAST: List[MethodClause] = ast.clauses
+}
+
+trait IRInitializerMethod extends IRMethod {
+  private[ir] def metaParametersAST: List[MetaParameter] = Nil
+  private[ir] def formalParametersAST: List[FormalParameter] = Nil
+  private[ir] def clausesAST: List[MethodClause] = Nil
+
+  override def syntax: Option[JOperatorSyntax] = None
+}
+
+case class IRInstanceInitializer (ast: InstanceInitializer, declaringClass: IRClass) extends IRInitializerMethod {
+  def mod: JModifier = JModifier(0)
+  def name: String = ""
+  def returnTypeSignature: JTypeSignature = VoidTypeSignature
+}
+
+case class IRStaticInitializer (ast: StaticInitializer, declaringClass: IRClass) extends IRInitializerMethod {
+  def mod: JModifier = JModifier(accStatic)
+  def name: String = CommonNames.classInitializerName
+  def returnTypeSignature: JTypeSignature = VoidTypeSignature
+}
+
+case class IRParameterInitializer (method: IRMethod, returnTypeSignature: JTypeSignature, name: String, snippet: String) extends IRInitializerMethod {
   def mod = JModifier(accPublic | accStatic | accFinal)
-
-  def syntax: Option[JOperatorSyntax] = None
-
   def declaringClass: IRClass = method.declaringClass
-
-  def signature: JMethodSignature = JMethodSignature(Nil, Nil, returnType, Nil, Nil, Nil, Nil)
-
-  private[ir] def metaParameters: List[MetaParameter] = Nil
-  private[ir] def paramInitializers: List[IRParameterInitializer] = Nil
 }
 
 object IRModifiers {
