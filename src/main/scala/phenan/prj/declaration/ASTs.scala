@@ -23,23 +23,13 @@ case class ImportStaticStarDeclaration (name: QualifiedName) extends StaticImpor
 // ascending order
 case class ImportDSLsDeclaration (dsls: List[QualifiedName]) extends ImportDeclaration
 
-sealed trait ModuleDeclaration extends ClassMember with AnnotationMember {
-  def modifiers: List[Modifier]
-  def metaParameters: List[MetaParameter]
-  def name: String
-}
+sealed trait ModuleDeclaration extends ClassMember with AnnotationMember
 
 case class ClassDeclaration (modifiers: List[Modifier], name: String, metaParameters: List[MetaParameter], superClass: Option[TypeName], interfaces: List[TypeName], members: List[ClassMember]) extends ModuleDeclaration
-case class EnumDeclaration (modifiers: List[Modifier], name: String, interfaces: List[TypeName], enumConstants: List[EnumConstant], members: List[ClassMember]) extends ModuleDeclaration {
-  def metaParameters = Nil
-}
+case class EnumDeclaration (modifiers: List[Modifier], name: String, interfaces: List[TypeName], enumConstants: List[EnumConstant], members: List[ClassMember]) extends ModuleDeclaration
 case class InterfaceDeclaration (modifiers: List[Modifier], name: String, metaParameters: List[MetaParameter], superInterfaces: List[TypeName], members: List[ClassMember]) extends ModuleDeclaration
-case class AnnotationDeclaration (modifiers: List[Modifier], name: String, members: List[AnnotationMember]) extends ModuleDeclaration {
-  def metaParameters = Nil
-}
-case class DSLDeclaration (modifiers: List[Modifier], name: String, withDSLs: List[QualifiedName], members: List[DSLMember]) extends ModuleDeclaration {
-  def metaParameters = Nil
-}
+case class AnnotationDeclaration (modifiers: List[Modifier], name: String, members: List[AnnotationMember]) extends ModuleDeclaration
+case class DSLDeclaration (modifiers: List[Modifier], name: String, withDSLs: List[QualifiedName], members: List[DSLMember]) extends ModuleDeclaration
 
 sealed trait ClassMember
 sealed trait AnnotationMember

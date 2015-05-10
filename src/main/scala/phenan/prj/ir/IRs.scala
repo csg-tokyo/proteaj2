@@ -24,17 +24,18 @@ case class IRFile (ast: CompilationUnit, root: RootResolver)(implicit val state:
 }
 
 trait IRClass extends JClass {
-  def ast: ModuleDeclaration
   def file: IRFile
 
   def outer: Option[IRClass]
   def inners: List[IRClass]
 
-  def simpleName = ast.name
+  def simpleName: String
+  def superTypeSignature: JClassTypeSignature
+  def interfaceSignatures: List[JClassTypeSignature]
 
   private[ir] def implicitMethodModifier: Int
   private[ir] def implicitFieldModifier: Int
-  private[ir] def metaParameters = ast.metaParameters
+  private[ir] def metaParametersAST: List[MetaParameter]
 
   lazy val name = internalName.replace('/', '.').replace('$', '.')
 
@@ -46,7 +47,13 @@ trait IRClass extends JClass {
   }
 
   lazy val innerClasses = inners.map(m => m.simpleName -> m.internalName).toMap
-  
+
+  lazy val signature: JClassSignature = JClassSignature(formalMetaParameters, superTypeSignature, interfaceSignatures)
+
+  import scalaz.Scalaz._
+
+  lazy val formalMetaParameters = state.successOrError(metaParametersAST.traverse(resolver.metaParameter), "invalid meta parameters of class " + name, Nil)
+
   lazy val resolver = file.resolver.inClass(this)
   
   def compiler: JCompiler = file.compiler
@@ -61,14 +68,18 @@ object IRClass {
   }
 }
 
-case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFile) extends IRClass {
-  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | accSuper
+trait IRClassLike extends IRClass {
+  private[ir] def defaultSuperTypeSignature: JClassTypeSignature
 
-  lazy val inners: List[IRClass] = ast.members.collect {
+  private[ir] def membersAST: List[ClassMember]
+  private[ir] def superTypeAST: Option[TypeName]
+  private[ir] def interfacesAST: List[TypeName]
+
+  lazy val inners: List[IRClass] = membersAST.collect {
     case m: ModuleDeclaration => IRClass(m, Some(this), file)
   }
 
-  lazy val fields: List[JFieldDef] = ast.members.collect {
+  lazy val fields: List[JFieldDef] = membersAST.collect {
     case FieldDeclaration(mods, ft, ds) =>
       val mod = IRModifiers.mod(mods)
       val fieldType = state.successOrError(resolver.typeSignature(ft), "invalid type of field " + ds.head.name, JTypeSignature.objectTypeSig)
@@ -77,38 +88,38 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
 
   lazy val methods: List[IRMethod] = collectMethods(declaredMethods ++ declaredConstructors ++ instanceInitializer ++ staticInitializer)
 
-  lazy val declaredMethods = ast.members.collect {
-    case m: MethodDeclaration => IRMethodDef(m, this)
-  }
+  lazy val declaredMethods = membersAST.collect { case m: MethodDeclaration => IRMethodDef(m, this) }
 
-  lazy val declaredConstructors = ast.members.collect {
-    case c: ConstructorDeclaration => IRConstructorDef(c, this)
-  }
+  lazy val declaredConstructors = membersAST.collect { case c: ConstructorDeclaration => IRConstructorDef(c, this) }
 
-  lazy val instanceInitializer = ast.members.collect {
-    case i: InstanceInitializer => IRInstanceInitializer(i, this)
-  }
+  lazy val instanceInitializer = membersAST.collect { case i: InstanceInitializer => IRInstanceInitializer(i, this) }
 
-  lazy val staticInitializer = ast.members.collect {
-    case s: StaticInitializer => IRStaticInitializer(s, this)
-  }
+  lazy val staticInitializer = membersAST.collect { case s: StaticInitializer => IRStaticInitializer(s, this) }
 
   import scalaz.Scalaz._
 
-  lazy val formalMetaParameters = state.successOrError(metaParameters.traverse(resolver.metaParameter), "invalid meta parameters of class " + name, Nil)
+  lazy val superTypeSignature = superTypeAST.map { s =>
+    state.successOrError(resolver.classTypeSignature(s), "invalid super type of class " + name + " : " + s, defaultSuperTypeSignature)
+  }.getOrElse(defaultSuperTypeSignature)
 
-  lazy val superTypeSignature = ast.superClass.map { s =>
-    state.successOrError(resolver.classTypeSignature(s), "invalid super type of class " + name + " : " + s, JTypeSignature.objectTypeSig)
-  }.getOrElse(JTypeSignature.objectTypeSig)
+  lazy val interfaceSignatures = state.successOrError(interfacesAST.traverse(resolver.classTypeSignature), "invalid interface types of class " + name, Nil)
 
-  lazy val interfaceSignatures = state.successOrError(ast.interfaces.traverse(resolver.classTypeSignature), "invalid interface types of class " + name, Nil)
+  private def collectMethods (methods: List[IRMethod]): List[IRMethod] = methods ++ methods.flatMap(_.paramInitializers)
+}
 
-  lazy val signature: JClassSignature = JClassSignature(formalMetaParameters, superTypeSignature, interfaceSignatures)
+case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
+  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | accSuper
+
+  def simpleName: String = ast.name
 
   private[ir] def implicitMethodModifier = 0
   private[ir] def implicitFieldModifier = 0
+  private[ir] def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
 
-  private def collectMethods (methods: List[IRMethod]): List[IRMethod] = methods ++ methods.flatMap(_.paramInitializers)
+  private[ir] def metaParametersAST = ast.metaParameters
+  private[ir] def superTypeAST = ast.superClass
+  private[ir] def interfacesAST = ast.interfaces
+  private[ir] def membersAST = ast.members
 }
 
 case class IRFieldDef (mod: JModifier, fieldType: JTypeSignature, ast: VariableDeclarator, declaringClass: IRClass) extends JFieldDef {

@@ -185,7 +185,7 @@ case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameRes
 case class NameResolverInClass (clazz: IRClass, parent: NameResolver) extends MetaParametersResolver {
   def resolve (name: String): Try[JClass] = abbreviated(name).orElse(parent.resolve(name))
 
-  def metaParameters: List[MetaParameter] = clazz.metaParameters
+  def metaParameters: List[MetaParameter] = clazz.metaParametersAST
 
   private val abbreviated: String => Try[JClass] = mutableHashMapMemo { name => root.findInnerClass(clazz, name) }
 }

@@ -7,8 +7,6 @@ import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state.JState
 
-//import scala.util._
-
 class JCompiler (implicit state: JState) {
 
   def compile (files: List[String]): Unit = {
