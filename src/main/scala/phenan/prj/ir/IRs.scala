@@ -64,6 +64,7 @@ object IRClass {
   def apply (module: ModuleDeclaration, file: IRFile): IRClass = apply(module, None, file)
   def apply (module: ModuleDeclaration, outer: Option[IRClass], file: IRFile): IRClass = module match {
     case c: ClassDeclaration => IRClassDef(c, outer, file)
+    case i: InterfaceDeclaration => IRInterfaceDef(i, outer, file)
     case _ => ???
   }
 }
@@ -120,6 +121,21 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
   private[ir] def superTypeAST = ast.superClass
   private[ir] def interfacesAST = ast.interfaces
   private[ir] def membersAST = ast.members
+}
+
+case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
+  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | accAbstract | accInterface
+
+  def simpleName: String = ast.name
+
+  private[ir] def implicitMethodModifier: Int = accPublic | accAbstract
+  private[ir] def implicitFieldModifier: Int = accPublic | accStatic | accFinal
+  private[ir] def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.objectTypeSig
+
+  private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
+  private[ir] def superTypeAST: Option[TypeName] = None
+  private[ir] def interfacesAST: List[TypeName] = ast.superInterfaces
+  private[ir] def membersAST: List[ClassMember] = ast.members
 }
 
 case class IRFieldDef (mod: JModifier, fieldType: JTypeSignature, ast: VariableDeclarator, declaringClass: IRClass) extends JFieldDef {
