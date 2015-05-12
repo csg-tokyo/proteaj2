@@ -3,7 +3,7 @@ package phenan.prj.declaration
 import java.io.Reader
 
 import phenan.prj.JCompiler
-import phenan.prj.ir.{NameResolver, IRFile}
+import phenan.prj.ir._
 import phenan.prj.state.JState
 
 import scala.collection.immutable.PagedSeq

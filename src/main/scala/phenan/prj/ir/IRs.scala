@@ -33,9 +33,16 @@ trait IRClass extends JClass {
   def superTypeSignature: JClassTypeSignature
   def interfaceSignatures: List[JClassTypeSignature]
 
+  private[ir] def implicitClassModifier: Int
   private[ir] def implicitMethodModifier: Int
   private[ir] def implicitFieldModifier: Int
+
+  private[ir] def modifiersAST: List[Modifier]
   private[ir] def metaParametersAST: List[MetaParameter]
+
+  lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitClassModifier
+
+  lazy val annotations = modifiersAST.collect { case ann: Annotation => ann }
 
   lazy val name = internalName.replace('/', '.').replace('$', '.')
 
@@ -109,14 +116,14 @@ trait IRClassLike extends IRClass {
 }
 
 case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
-  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | accSuper
-
   def simpleName: String = ast.name
 
+  private[ir] def implicitClassModifier = accSuper
   private[ir] def implicitMethodModifier = 0
   private[ir] def implicitFieldModifier = 0
   private[ir] def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
 
+  private[ir] def modifiersAST = ast.modifiers
   private[ir] def metaParametersAST = ast.metaParameters
   private[ir] def superTypeAST = ast.superClass
   private[ir] def interfacesAST = ast.interfaces
@@ -124,14 +131,14 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
 }
 
 case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
-  lazy val mod: JModifier = IRModifiers.mod(ast.modifiers) | accAbstract | accInterface
-
   def simpleName: String = ast.name
 
+  private[ir] def implicitClassModifier = accAbstract | accInterface
   private[ir] def implicitMethodModifier: Int = accPublic | accAbstract
   private[ir] def implicitFieldModifier: Int = accPublic | accStatic | accFinal
   private[ir] def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.objectTypeSig
 
+  private[ir] def modifiersAST = ast.modifiers
   private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
   private[ir] def superTypeAST: Option[TypeName] = None
   private[ir] def interfacesAST: List[TypeName] = ast.superInterfaces
@@ -189,7 +196,7 @@ class IRFormalParameter (ast: FormalParameter, method: IRMethod) {
   lazy val initializerMethod = for {
     returnType <- signature.map(_.actualTypeSignature).toOption
     (name, snippet) <- initializer
-  } yield IRParameterInitializer(method, returnType, name, snippet.snippet)
+  } yield IRParameterInitializer(method, returnType, name, snippet)
 }
 
 case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends IRMethod {
@@ -197,7 +204,7 @@ case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends
 
   def name: String = ast.name
 
-  override def syntax: Option[JOperatorSyntax] = ???
+  override def syntax: Option[JOperatorSyntax] = None
 
   lazy val returnTypeSignature = state.successOrError(resolver.typeSignature(ast.returnType), "invalid return type of method " + name, VoidTypeSignature)
 
@@ -213,7 +220,7 @@ case class IRConstructorDef (ast: ConstructorDeclaration, declaringClass: IRClas
 
   override def returnTypeSignature: JTypeSignature = VoidTypeSignature
 
-  override def syntax: Option[JOperatorSyntax] = ???
+  override def syntax: Option[JOperatorSyntax] = None
 
   override private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
   override private[ir] def formalParametersAST: List[FormalParameter] = ast.formalParameters
@@ -240,7 +247,7 @@ case class IRStaticInitializer (ast: StaticInitializer, declaringClass: IRClass)
   def returnTypeSignature: JTypeSignature = VoidTypeSignature
 }
 
-case class IRParameterInitializer (method: IRMethod, returnTypeSignature: JTypeSignature, name: String, snippet: String) extends IRInitializerMethod {
+case class IRParameterInitializer (method: IRMethod, returnTypeSignature: JTypeSignature, name: String, snippet: ExpressionSnippet) extends IRInitializerMethod {
   def mod = JModifier(accPublic | accStatic | accFinal)
   def declaringClass: IRClass = method.declaringClass
 }
@@ -262,4 +269,29 @@ object IRModifiers {
     case StrictFPModifier     => accStrict
     case _ => 0
   }
+}
+
+// TODO:
+trait IRAnnotations {
+  def resolver: NameResolver
+  def annotations: List[Annotation]
+
+  def classSig: Option[JClassSignature] = find (JTypeSignature.classSigTypeSig).map { args =>
+    val metaParams = args.get("metaParameters")
+    val superType = args.get("superType")
+    val interfaces = args.get("interfaces")
+    ???
+  }
+
+  def find (sig: JClassTypeSignature): Option[Map[String, AnnotationElement]] = annotations.collectFirst {
+    case MarkerAnnotation(name) if resolver.classTypeSignature(name).toOption.contains(sig) => Map.empty
+    case SingleElementAnnotation(name, arg) if resolver.classTypeSignature(name).toOption.contains(sig) => Map("value" -> arg)
+    case FullAnnotation(name, args) if resolver.classTypeSignature(name).toOption.contains(sig) => args
+  }
+
+  type ElemReader[A] = scalaz.ReaderT[Option, AnnotationElement, A]
+  object ElemReader extends scalaz.KleisliInstances with scalaz.KleisliFunctions {
+    def apply[A] (f: AnnotationElement => Option[A]): ElemReader[A] = kleisli(f)
+  }
+
 }

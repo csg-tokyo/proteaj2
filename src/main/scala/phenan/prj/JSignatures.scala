@@ -29,7 +29,9 @@ sealed trait JTypeSignature extends JTypeArgument
 
 object JTypeSignature {
   lazy val typeTypeSig = SimpleClassTypeSignature("proteaj/lang/Type", Nil)
+  lazy val classSigTypeSig = SimpleClassTypeSignature("proteaj/lang/ClassSig", Nil)
   lazy val objectTypeSig = SimpleClassTypeSignature("java/lang/Object", Nil)
+
   def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature("java/util/function/Function", List(from, to))
 
   def arraySig (typeSig: JTypeSignature, dim: Int): JTypeSignature = {

@@ -61,4 +61,9 @@ class Piyo {
   }
 
   static <T> List<List<T>> mklistlist() { return null; }
+
+  static <T extends List<String>, U extends T> void foo(T t) {
+    List<? extends U> l2 = null;
+    t = l2.get(0);
+  }
 }

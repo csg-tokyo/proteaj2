@@ -288,6 +288,7 @@ object JTypeUnification {
     case arr: JArrayType            => unifyG(arr, sig, env, compiler)
     case cap: JCapturedWildcardType => unifyG(cap, sig, env, compiler)
     case wil: JWildcard             => unifyG(wil, sig, env, compiler)
+    case tvr: JTypeVariable         => unifyG(tvr, sig, env, compiler)
     case prv: PureValue             => None
   }
 
@@ -295,6 +296,7 @@ object JTypeUnification {
     case obj: JObjectType           => unifyG(obj, sig, env, compiler)
     case arr: JArrayType            => unifyG(arr, sig, env, compiler)
     case cap: JCapturedWildcardType => unifyG(cap, sig, env, compiler)
+    case tvr: JTypeVariable         => unifyG(tvr, sig, env, compiler)
     case prm: JPrimitiveType        => unifyE(prm, sig, env, compiler)
   }
 
@@ -341,6 +343,12 @@ object JTypeUnification {
     case tv: JTypeVariableSignature => unifyG(wild, tv, env)
     case _: JPrimitiveTypeSignature => None
     case _ => wild.upperBound.orElse(compiler.typeLoader.objectType).flatMap(_.unifyG(JGenericType(sig, env, compiler)))
+  }
+
+  private def unifyG (tvr: JTypeVariable, sig: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = sig match {
+    case wil : JCapturedWildcardSignature => wil.upperBound.flatMap(bound => unifyG(tvr, bound, env, compiler))
+    case sig : JTypeVariableSignature     => unifyG(tvr, sig, env)
+    case _: JClassTypeSignature | _: JArrayTypeSignature | _: JPrimitiveTypeSignature => None
   }
 
   private def unifyArgsE (obj: JObjectType, args: List[(FormalMetaParameter, JTypeArgument)], env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = args match {
@@ -404,6 +412,29 @@ case class JArrayType (componentType: JType) extends JRefType {
   def matches (that: MetaValue): Boolean = this == that
 
   def compiler: JCompiler = componentType.compiler
+}
+
+case class JTypeVariable (name: String, bounds: List[JRefType], compiler: JCompiler) extends JRefType {
+  def isSubtypeOf(that: JType): Boolean = bounds.exists(_.isSubtypeOf(that)) | compiler.typeLoader.objectType.contains(that)
+  def isAssignableTo(that: JType): Boolean = isSubtypeOf(that)
+
+  override def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = JTypeUnification.unifyG(this, t.signature, t.env, compiler)
+    /*t.signature match {
+    case cls : JClassTypeSignature        => None
+    case arr : JArrayTypeSignature        => None
+    case wil : JCapturedWildcardSignature => wil.upperBound.flatMap(bound => unifyG(JGenericType(bound, t.env, compiler)))
+    case tvr : JTypeVariableSignature     => JTypeUnification.unifyG(this, tvr, t.env)
+    case prm : JPrimitiveTypeSignature    => None
+  }*/
+
+  override def unifyL(t: JGenericType): Option[Map[String, MetaValue]] = ???
+
+  override def matches(v: MetaValue): Boolean = ???
+
+  def methods = boundHead.map(_.methods).getOrElse(Map.empty)
+  def fields = boundHead.map(_.fields).getOrElse(Map.empty)
+
+  private lazy val boundHead = bounds.headOption.orElse(compiler.typeLoader.objectType)
 }
 
 case class JCapturedWildcardType private (upperBound: JRefType, lowerBound: Option[JRefType], id: Int) extends JRefType {
