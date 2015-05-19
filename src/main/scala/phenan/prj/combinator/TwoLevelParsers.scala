@@ -19,6 +19,7 @@ trait TwoLevelParsers {
   val ParseSuccess = Impl.Success
   val ParseFailure = Impl.NoSuccess
 
+  def success [T] (t: => T): LParser[T] = Impl.LParserImpl(Impl.success(t))
   def accept [T] (kind: String, f: PartialFunction[Elem, T]): LParser[T] = Impl.LParserImpl(Impl.accept(kind, f))
   def elem (e: Elem): LParser[Elem] = Impl.LParserImpl(Impl.elem(e))
   def elem (kind: String, f: Elem => Boolean): LParser[Elem] = Impl.LParserImpl(Impl.elem(kind, f))
@@ -37,6 +38,7 @@ trait TwoLevelParsers {
 
     def ? : HParser[Option[T]]
     def ! : HParser[Unit]
+    def ! (f: T => Boolean): HParser[T]
     def * : HParser[List[T]]
     def + : HParser[List[T]]
 
@@ -48,7 +50,9 @@ trait TwoLevelParsers {
 
     def into [R] (f: T => HParser[R]): HParser[R] = flatMap(f)
 
+    def ^? [R] (f: PartialFunction[T, R]): HParser[R]
     def ^^ [R] (f: T => R): HParser[R] = map(f)
+    def ^^? [R] (f: T => Option[R]): HParser[R]
     def ^^^ [R] (f: => R): HParser[R]
     def >> [R] (f: T => HParser[R]): HParser[R] = flatMap(f)
 
@@ -67,6 +71,7 @@ trait TwoLevelParsers {
     def | [U >: T] (parser: => LParser[U]): LParser[U]
 
     def ? : LParser[Option[T]]
+    def ! : LParser[Unit]
     def * : LParser[List[T]]
     def + : LParser[List[T]]
 
@@ -100,6 +105,7 @@ trait TwoLevelParsers {
 
       def ? : HParser[Option[T]] = HParserImpl(parser.?)
       def ! : HParser[Unit] = HParserImpl(not(parser))
+      def ! (f: T => Boolean): HParser[T] = HParserImpl(parser ^? { case r if ! f(r) => r })
       def * : HParser[List[T]] = HParserImpl(repsep(parser, delimiter.parser))
       def + : HParser[List[T]] = HParserImpl(rep1sep(parser, delimiter.parser))
       def * [U] (sep: => HParser[U]): HParser[List[T]] = HParserImpl(repsep(parser, delimiter.parser ~> sep.parser ~> delimiter.parser))
@@ -108,6 +114,8 @@ trait TwoLevelParsers {
       def map [R] (f: T => R): HParser[R] = HParserImpl(parser.map(f))
       def flatMap [R] (f: T => HParser[R]): HParser[R] = HParserImpl(parser.flatMap(f(_).parser))
 
+      def ^? [R] (f: PartialFunction[T, R]): HParser[R] = HParserImpl(parser ^? f)
+      def ^^? [R] (f: T => Option[R]): HParser[R] = HParserImpl(parser ^^ f ^? { case Some(r) => r })
       def ^^^ [R] (f: => R): HParser[R] = HParserImpl(parser ^^^ f)
 
       def log (s: String): HParser[T] = HParserImpl(Impl.log(parser)(s))
@@ -123,6 +131,7 @@ trait TwoLevelParsers {
       def | [U >: T] (that: => LParser[U]): LParser[U] = LParserImpl(this.parser | that.parser)
 
       def ? : LParser[Option[T]] = LParserImpl(parser.?)
+      def ! : LParser[Unit] = LParserImpl(not(parser))
       def * : LParser[List[T]] = LParserImpl(parser.*)
       def + : LParser[List[T]] = LParserImpl(parser.+)
       def * [U] (sep: => LParser[U]): LParser[List[T]] = LParserImpl(repsep(parser, sep.parser))

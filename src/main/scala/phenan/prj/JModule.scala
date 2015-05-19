@@ -8,8 +8,8 @@ sealed trait PureValue extends MetaValue {
   def valueType: JType
 }
 
-case class UnknownPureValue (valueType: JType) extends PureValue {
-  def matches (v: MetaValue): Boolean = false
+case class PureVariableRef (name: String, valueType: JType) extends PureValue {
+  def matches (v: MetaValue): Boolean = this == v
 }
 
 case class ConcretePureValue (value: Any, valueType: JType) extends PureValue {
@@ -419,17 +419,10 @@ case class JTypeVariable (name: String, bounds: List[JRefType], compiler: JCompi
   def isAssignableTo(that: JType): Boolean = isSubtypeOf(that)
 
   override def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = JTypeUnification.unifyG(this, t.signature, t.env, compiler)
-    /*t.signature match {
-    case cls : JClassTypeSignature        => None
-    case arr : JArrayTypeSignature        => None
-    case wil : JCapturedWildcardSignature => wil.upperBound.flatMap(bound => unifyG(JGenericType(bound, t.env, compiler)))
-    case tvr : JTypeVariableSignature     => JTypeUnification.unifyG(this, tvr, t.env)
-    case prm : JPrimitiveTypeSignature    => None
-  }*/
 
   override def unifyL(t: JGenericType): Option[Map[String, MetaValue]] = ???
 
-  override def matches(v: MetaValue): Boolean = ???
+  override def matches (v: MetaValue): Boolean = this == v
 
   def methods = boundHead.map(_.methods).getOrElse(Map.empty)
   def fields = boundHead.map(_.fields).getOrElse(Map.empty)

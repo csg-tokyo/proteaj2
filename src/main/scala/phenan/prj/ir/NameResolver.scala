@@ -15,13 +15,16 @@ trait NameResolver {
   def inClass (clazz: IRClass) = NameResolverInClass(clazz, this)
   def inMethod (method: IRMethod) = NameResolverInMethod(method, this)
 
-  def typeVariable (name: String): Option[JTypeVariableSignature]
+  def isTypeVariable (name: String): Boolean
+
   def metaVariable (tn: TypeName): Try[JTypeArgument]
   def resolve (name: String): Try[JClass]
   def root: RootResolver
 
-  def resolve (name: QualifiedName): Try[JClass] =
-    resolve(name.names.head).flatMap(root.findInnerClass(_, name.names.tail)).orElse(root.findClass(name.names))
+  def resolve (name: QualifiedName): Try[JClass] = resolve(name.names)
+
+  def resolve (name: List[String]): Try[JClass] =
+    resolve(name.head).flatMap(root.findInnerClass(_, name.tail)).orElse(root.findClass(name))
 
   def metaParameter (mp: MetaParameter): Try[FormalMetaParameter] = mp match {
     case TypeParameter(name, bounds)  => bounds.traverse(typeSignature).map(FormalMetaParameter(name, JTypeSignature.typeTypeSig, _))
@@ -61,21 +64,22 @@ trait NameResolver {
     else if (name.names.size > 1) classTypeSignature(name)
     else {
       val simpleName = name.names.head
-      primitiveType(simpleName).orElse(typeVariable(simpleName)).map(Success(_)).getOrElse(classTypeSignature(simpleName))
+      if (isTypeVariable(simpleName)) Success(JTypeVariableSignature(simpleName))
+      else primitiveType(simpleName).orElse(classTypeSignature(simpleName))
     }
   }
 
-  private def primitiveType (name: String): Option[JPrimitiveTypeSignature] = name match {
-    case "byte"    => Some(ByteTypeSignature)
-    case "char"    => Some(CharTypeSignature)
-    case "double"  => Some(DoubleTypeSignature)
-    case "float"   => Some(FloatTypeSignature)
-    case "int"     => Some(IntTypeSignature)
-    case "long"    => Some(LongTypeSignature)
-    case "short"   => Some(ShortTypeSignature)
-    case "boolean" => Some(BoolTypeSignature)
-    case "void"    => Some(VoidTypeSignature)
-    case _ => None
+  private def primitiveType (name: String): Try[JPrimitiveTypeSignature] = name match {
+    case "byte"    => Success(ByteTypeSignature)
+    case "char"    => Success(CharTypeSignature)
+    case "double"  => Success(DoubleTypeSignature)
+    case "float"   => Success(FloatTypeSignature)
+    case "int"     => Success(IntTypeSignature)
+    case "long"    => Success(LongTypeSignature)
+    case "short"   => Success(ShortTypeSignature)
+    case "boolean" => Success(BoolTypeSignature)
+    case "void"    => Success(VoidTypeSignature)
+    case _ => Failure(InvalidTypeException("type " + name + " is not a primitive type"))
   }
 
   private def typeArgument (arg: TypeArgument): Try[JTypeArgument] = arg match {
@@ -93,7 +97,7 @@ object NameResolver {
 case class RootResolver (compiler: JCompiler) extends NameResolver {
   def file (file: IRFile): NameResolver = NameResolverInFile(file, this)
 
-  def typeVariable (name: String) = None
+  def isTypeVariable (name: String) = false
 
   def metaVariable (tn: TypeName) = typeSignature(tn)
 
@@ -104,9 +108,11 @@ case class RootResolver (compiler: JCompiler) extends NameResolver {
     else resolve(name.head)
   }
 
+  def isKnownPackage (names: List[String]) = knownPackages.contains(names)
+
   def findClass (packageName: List[String], name: String, rest: List[String]): Try[JClass] = {
     val names = packageName :+ name
-    if (knownPackages.contains(names)) findClass(names, rest.head, rest.tail)
+    if (isKnownPackage(names)) findClass(names, rest.head, rest.tail)
     else findClass(names.mkString("/")) match {
       case Success(clazz) =>
         addKnownPackages(packageName)
@@ -119,7 +125,7 @@ case class RootResolver (compiler: JCompiler) extends NameResolver {
   }
 
   def addKnownPackages (packageName: List[String]): Unit = {
-    if (! knownPackages.contains(packageName)) {
+    if (! isKnownPackage(packageName)) {
       knownPackages += packageName
       if (packageName.size > 1) addKnownPackages(packageName.init)
     }
@@ -149,7 +155,7 @@ case class RootResolver (compiler: JCompiler) extends NameResolver {
 }
 
 case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameResolver {
-  def typeVariable (name: String) = None
+  def isTypeVariable (name: String) = false
 
   def metaVariable (tn: TypeName) = root.metaVariable(tn)
 
@@ -200,10 +206,7 @@ trait MetaParametersResolver extends NameResolver {
   def metaParameters: List[MetaParameter]
   def parent: NameResolver
 
-  def typeVariable (name: String) = {
-    if (typeVariables.contains(name)) Some(JTypeVariableSignature(name))
-    else parent.typeVariable(name)
-  }
+  def isTypeVariable (name: String) = typeVariableNames.contains(name) || parent.isTypeVariable(name)
 
   def metaVariable (tn: TypeName): Try[JTypeArgument] = tn match {
     case TypeName(QualifiedName(name :: Nil), Nil, 0) if metaVariables.contains(name) => Success(PureVariable(name))
@@ -212,7 +215,7 @@ trait MetaParametersResolver extends NameResolver {
 
   def root = parent.root
 
-  private lazy val typeVariables = metaParameters.collect {
+  private lazy val typeVariableNames = metaParameters.collect {
     case TypeParameter(name, _) => name
     case MetaValueParameter(name, t) if isTypeType(t) => name
   }.toSet

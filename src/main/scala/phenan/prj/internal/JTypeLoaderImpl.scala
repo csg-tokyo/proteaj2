@@ -23,15 +23,6 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
     case a : JArrayClass     => toJType(a.component).map(_.array)
   }
 
-  def rawTypeArguments (typeParams: List[FormalMetaParameter], env: Map[String, MetaValue]): Map[String, MetaValue] = {
-    typeParams.foldLeft(env) { (e, param) =>
-      getRawMetaValue(param, e).map(t => e + (param.name -> t)).getOrElse {
-        state.error("cannot get raw meta value for " + param.name)
-        e
-      }
-    }
-  }
-
   def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JType] = sig match {
     case p: JPrimitiveTypeSignature => Some(fromPrimitiveSignature(p))
     case s                          => fromTypeSignature_RefType(s, env)
@@ -50,11 +41,6 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
   def fromTypeArguments (args: List[JTypeArgument], env: Map[String, MetaValue]): Option[List[MetaValue]] = {
     import scalaz.Scalaz._
     args.traverse(arg => argSig2JType(arg, env))
-  }
-
-  private def getRawMetaValue (param: FormalMetaParameter, env: Map[String, MetaValue]): Option[MetaValue] = {
-    if (param.metaType != JTypeSignature.typeTypeSig) fromTypeSignature(param.metaType, env).map(UnknownPureValue)
-    else param.bounds.headOption.flatMap(fromTypeSignature_RefType(_, env)).orElse(objectType)
   }
 
   private def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JRefType] = sig match {
@@ -82,16 +68,6 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
   }
 
   private def getArrayType (component: JType): JArrayType = JArrayType(component)
-  /*
-  private def getLoadedObjectType (clazz: JClass, args: List[MetaValue]): Option[JObjectType] = { case (clazz, args) =>
-    val map = clazz.signature.metaParams.map(_.name).zip(args).toMap
-    val result = memoizedGetObjectType((clazz, map))
-    if (validTypeArgs(clazz.signature.metaParams, args, map)) Some(result)
-    else {
-      state.error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
-      None
-    }
-  }*/
 
   private def getLoadedObjectType (clazz: JClass, args: List[MetaValue]): JObjectType = {
     memoizedGetObjectType((clazz, clazz.signature.metaParams.map(_.name).zip(args).toMap))
