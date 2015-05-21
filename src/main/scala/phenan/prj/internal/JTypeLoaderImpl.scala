@@ -5,7 +5,7 @@ import phenan.prj.state.JState
 
 import scalaz.Memo._
 
-class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends JTypeLoader {
+class JTypeLoaderImpl (val compiler: JCompiler) extends JTypeLoader {
   val arrayOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
 
   def getObjectType (clazz: JClass, args: List[MetaValue]): Option[JObjectType] = {

@@ -3,7 +3,7 @@ package phenan.prj.internal
 import phenan.prj._
 import phenan.prj.state.JState
 
-class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler)(implicit state: JState) extends JClass {
+class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler) extends JClass {
 
   import classFile.poolReader._
   import classFile.attrParser._
@@ -48,7 +48,7 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler)(implicit
     attributes.innerClasses.toList.flatMap(_.classes.filter(info => info.outerClassInfo == classFile.thisClass && info.innerName != 0))
 }
 
-class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val descriptor: JTypeSignature)(implicit state: JState) extends JFieldDef {
+class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val descriptor: JTypeSignature) extends JFieldDef {
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._
@@ -68,7 +68,7 @@ class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val 
   private lazy val attributes = parseFieldAttribute(field.attributes)
 }
 
-class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, val descriptor: JMethodSignature)(implicit state: JState) extends JMethodDef {
+class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, val descriptor: JMethodSignature) extends JMethodDef {
 
   import declaringClass.classFile.poolReader._
   import declaringClass.classFile.attrParser._

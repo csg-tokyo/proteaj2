@@ -8,7 +8,7 @@ import phenan.util._
 
 import JModifier._
 
-case class IRFile (ast: CompilationUnit, root: RootResolver)(implicit val state: JState) {
+case class IRFile (ast: CompilationUnit, root: RootResolver) {
   lazy val modules: List[IRClass] = collectModules(ast.modules.map(IRClass(_, this)), Nil)
 
   lazy val internalName = ast.header.pack.map(_.name.names.mkString("/"))
@@ -21,6 +21,7 @@ case class IRFile (ast: CompilationUnit, root: RootResolver)(implicit val state:
   }
 
   def compiler = root.compiler
+  def state = compiler.state
 }
 
 trait IRClass extends JClass {
@@ -64,7 +65,6 @@ trait IRClass extends JClass {
   lazy val resolver = file.resolver.inClass(this)
   
   def compiler: JCompiler = file.compiler
-  def state: JState = file.state
 }
 
 object IRClass {
@@ -162,7 +162,6 @@ trait IRMethod extends JMethodDef {
     JMethodSignature(formalMetaParameters, formalParameterSignatures, returnTypeSignature,
       throwsTypeSignatures, activatesTypeSignatures, deactivatesTypeSignatures, requiresTypeSignatures)
 
-  def state = declaringClass.state
   lazy val resolver = declaringClass.resolver.inMethod(this)
 
   import scalaz.Scalaz._

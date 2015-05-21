@@ -6,6 +6,7 @@ sealed trait JErasedType {
   def name: String
   def isSubclassOf (that: JErasedType): Boolean
   def compiler: JCompiler
+  implicit def state = compiler.state
 }
 
 trait JClass extends JErasedType {
@@ -61,6 +62,8 @@ trait JFieldDef {
   def signature: JTypeSignature
 
   def isStatic: Boolean = mod.check(JModifier.accStatic)
+
+  implicit def state = declaringClass.state
 }
 
 trait JMethodDef {
@@ -81,4 +84,5 @@ trait JMethodDef {
   def isStaticMethod: Boolean     = isStatic && ! (isConstructor || isClassInitializer)
 
   def compiler = declaringClass.compiler
+  implicit def state = declaringClass.state
 }

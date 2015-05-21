@@ -82,5 +82,6 @@ trait JClassLoader {
       loadClass("java/lang/Object").get
   }
 
-  implicit def state: JState
+  def compiler: JCompiler
+  implicit def state: JState = compiler.state
 }

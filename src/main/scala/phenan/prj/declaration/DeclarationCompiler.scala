@@ -4,12 +4,11 @@ import java.io.Reader
 
 import phenan.prj.JCompiler
 import phenan.prj.ir._
-import phenan.prj.state.JState
 
 import scala.collection.immutable.PagedSeq
 import scala.util.Try
 
-class DeclarationCompiler (compiler: JCompiler) (implicit state: JState) {
+class DeclarationCompiler (compiler: JCompiler) {
   import DeclarationParsers._
 
   def compile (file: String): Try[IRFile] = compile(PagedSeq.fromFile(file), file)

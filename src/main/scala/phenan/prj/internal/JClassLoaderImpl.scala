@@ -8,7 +8,7 @@ import scala.util._
 
 import scalaz.Memo._
 
-class JClassLoaderImpl (jdc: JCompiler)(implicit val state: JState) extends JClassLoader {
+class JClassLoaderImpl (val compiler: JCompiler) extends JClassLoader {
   def load(name: String): Try[JErasedType] = {
     if (name.startsWith("[")) DescriptorParsers.parseArrayDescriptor(name) match {
       case Some(desc) => erase(desc, Nil)
@@ -31,25 +31,25 @@ class JClassLoaderImpl (jdc: JCompiler)(implicit val state: JState) extends JCla
     else clazz
   }
 
-  lazy val boolean: JPrimitiveClass = new JPrimitiveClassImpl("boolean", "java/lang/Boolean", jdc)
-  lazy val byte: JPrimitiveClass = new JPrimitiveClassImpl("byte", "java/lang/Byte", jdc)
-  lazy val char: JPrimitiveClass = new JPrimitiveClassImpl("char", "java/lang/Character", jdc)
-  lazy val short: JPrimitiveClass = new JPrimitiveClassImpl("short", "java/lang/Short", jdc)
-  lazy val int: JPrimitiveClass = new JPrimitiveClassImpl("int", "java/lang/Integer", jdc)
-  lazy val long: JPrimitiveClass = new JPrimitiveClassImpl("long", "java/lang/Long", jdc)
-  lazy val float: JPrimitiveClass = new JPrimitiveClassImpl("float", "java/lang/Float", jdc)
-  lazy val double: JPrimitiveClass = new JPrimitiveClassImpl("double", "java/lang/Double", jdc)
-  lazy val void: JPrimitiveClass = new JPrimitiveClassImpl("void", "java/lang/Void", jdc)
+  lazy val boolean: JPrimitiveClass = new JPrimitiveClassImpl("boolean", "java/lang/Boolean", compiler)
+  lazy val byte: JPrimitiveClass = new JPrimitiveClassImpl("byte", "java/lang/Byte", compiler)
+  lazy val char: JPrimitiveClass = new JPrimitiveClassImpl("char", "java/lang/Character", compiler)
+  lazy val short: JPrimitiveClass = new JPrimitiveClassImpl("short", "java/lang/Short", compiler)
+  lazy val int: JPrimitiveClass = new JPrimitiveClassImpl("int", "java/lang/Integer", compiler)
+  lazy val long: JPrimitiveClass = new JPrimitiveClassImpl("long", "java/lang/Long", compiler)
+  lazy val float: JPrimitiveClass = new JPrimitiveClassImpl("float", "java/lang/Float", compiler)
+  lazy val double: JPrimitiveClass = new JPrimitiveClassImpl("double", "java/lang/Double", compiler)
+  lazy val void: JPrimitiveClass = new JPrimitiveClassImpl("void", "java/lang/Void", compiler)
 
   /* factory method for JClass ( without cache ) */
 
-  private def getClass(name: String): Try[JClass] = jdc.findIR(name).map(Success(_)).getOrElse {
+  private def getClass(name: String): Try[JClass] = compiler.findIR(name).map(Success(_)).getOrElse {
     state.searchPath.find(name) match {
       case Some(cf: FoundClassFile) =>
-        classFileParser.fromStream(cf.in).map(new JLoadedClass(_, jdc))
+        classFileParser.fromStream(cf.in).map(new JLoadedClass(_, compiler))
       case Some(sf: FoundSourceFile) =>
-        jdc.generateIR(sf.in, sf.name)
-        jdc.findIR(name).map(Success(_)).getOrElse(Failure(ClassFileNotFoundException("not found : " + name)))
+        compiler.generateIR(sf.in, sf.name)
+        compiler.findIR(name).map(Success(_)).getOrElse(Failure(ClassFileNotFoundException("not found : " + name)))
       case None =>
         Failure(ClassFileNotFoundException("not found : " + name))
     }

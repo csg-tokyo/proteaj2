@@ -17,4 +17,6 @@ trait JTypeLoader {
   lazy val superTypesOfArray: List[JObjectType] = CommonNames.superClassesOfArray.flatMap { name =>
     compiler.classLoader.loadClass_PE(name).flatMap(_.objectType(Nil))
   }
+
+  def state = compiler.state
 }
