@@ -11,6 +11,7 @@ trait JTypeLoader {
   lazy val voidType = compiler.classLoader.void.primitiveType
 
   def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JType]
+  def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JRefType]
   def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaValue]): Option[JObjectType]
 
   lazy val superTypesOfArray: List[JObjectType] = CommonNames.superClassesOfArray.flatMap { name =>

@@ -10,7 +10,7 @@ import scala.util._
 
 class JClassLoaderTest extends FunSuite with Matchers {
   test ("String 型をロード") {
-    implicit val state  = JConfig().configure.get
+    implicit val state = JConfig().configure.get
     val loader = (new JCompiler).classLoader
 
     val clazz = loader.load("java/lang/String")

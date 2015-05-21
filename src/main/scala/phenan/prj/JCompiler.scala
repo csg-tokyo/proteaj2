@@ -7,7 +7,7 @@ import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state.JState
 
-class JCompiler (implicit state: JState) {
+class JCompiler (implicit val state: JState) {
 
   def compile (files: List[String]): Unit = {
     generateIR(files)

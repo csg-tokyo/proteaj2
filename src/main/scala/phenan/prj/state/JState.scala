@@ -16,6 +16,11 @@ class JState private[state] (val searchPath: JSearchPath) {
     case Failure(e) => error(msg, e); default
   }
 
+  def someOrError [T] (x: Option[T], msg: => String, default: => T): T = x match {
+    case Some(t) => t
+    case None => error(msg); default
+  }
+
   def error (msg: => String): Unit = {
     logger.error(msg)
     nErrors += 1

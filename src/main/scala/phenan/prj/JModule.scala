@@ -219,7 +219,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
 
   private def assignTypeArgument (a: JTypeArgument, map: Map[FormalMetaParameter, JTypeArgument]): Option[JTypeArgument] = a match {
     case sig: JTypeSignature => assignTypeSignature(sig, map)
-    case PureVariable(name)  => map.find(_._1.name == name).map(_._2)
+    case PureVariableSignature(name)  => map.find(_._1.name == name).map(_._2)
     case UpperBoundWildcardArgument(sig) => assignTypeSignature(sig, map).map(UpperBoundWildcardArgument)
     case LowerBoundWildcardArgument(sig) => assignTypeSignature(sig, map).map(LowerBoundWildcardArgument)
     case UnboundWildcardArgument => Some(UnboundWildcardArgument)
@@ -231,7 +231,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
     case JArrayTypeSignature(c)       => assignTypeSignature(c, map).map(JArrayTypeSignature)
     case JTypeVariableSignature(name) => map.find(_._1.name == name).map(_._2).flatMap {
       case sig: JTypeSignature               => Some(sig)
-      case _: PureVariable                   => None
+      case _: PureVariableSignature                   => None
       case UpperBoundWildcardArgument(bound) => Some(JCapturedWildcardSignature(Some(bound), None))
       case LowerBoundWildcardArgument(bound) => Some(JCapturedWildcardSignature(None, Some(bound)))
       case UnboundWildcardArgument           => Some(JCapturedWildcardSignature(None, None))
@@ -253,7 +253,7 @@ object JTypeUnification {
   // unifyG (String, T, e) = Some(e + (T -> String))
   def unifyG (mv: MetaValue, arg: JTypeArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = arg match {
     case sig: JTypeSignature             => unifyG(mv, sig, env, compiler)
-    case pvr: PureVariable               => unifyG(mv, pvr, env, compiler)
+    case pvr: PureVariableSignature               => unifyG(mv, pvr, env, compiler)
     case ubw: UpperBoundWildcardArgument => unifyG(mv, ubw, env, compiler)
     case lbw: LowerBoundWildcardArgument => unifyG(mv, lbw, env, compiler)
     case UnboundWildcardArgument         => mv match {
@@ -300,7 +300,7 @@ object JTypeUnification {
     case prm: JPrimitiveType        => unifyE(prm, sig, env, compiler)
   }
 
-  private def unifyG (mv: MetaValue, pvr: PureVariable, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = {
+  private def unifyG (mv: MetaValue, pvr: PureVariableSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = {
     if (env.contains(pvr.name)) {
       if (env(pvr.name) == mv) Some(env)
       else None

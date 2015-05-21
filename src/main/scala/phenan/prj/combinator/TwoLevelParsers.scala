@@ -4,6 +4,8 @@ import scala.reflect.ClassTag
 import scala.util.parsing.combinator.PackratParsers
 import scala.util.parsing.input.{Positional, Position, Reader}
 
+import scala.language.implicitConversions
+
 trait TwoLevelParsers {
   self =>
 
@@ -25,6 +27,9 @@ trait TwoLevelParsers {
   def elem (kind: String, f: Elem => Boolean): LParser[Elem] = Impl.LParserImpl(Impl.elem(kind, f))
   def elem [E <: Elem] (implicit Tag: ClassTag[E]): LParser[E] = Impl.LParserImpl(Impl.accept(Tag.toString(), { case Tag(x) => x }))
 
+  // workaround for avoiding infinite loop of lazy initialization
+  def ref [T] (parser: => HParser[T]): HParser[T] = new Impl.HParserRef[T](parser)
+
   def positioned [T <: Positional] (parser: HParser[T]): HParser[T] = Impl.HParserImpl(Impl.positioned(parser.parser))
 
   trait HParser[+T] {
@@ -44,6 +49,8 @@ trait TwoLevelParsers {
 
     def * [U] (sep: => HParser[U]): HParser[List[T]]
     def + [U] (sep: => HParser[U]): HParser[List[T]]
+
+    def *! (f: List[T] => Boolean): HParser[List[T]]
 
     def map [R] (f: T => R): HParser[R]
     def flatMap [R] (f: T => HParser[R]): HParser[R]
@@ -94,7 +101,7 @@ trait TwoLevelParsers {
   object Impl extends PackratParsers {
     override type Elem = self.Elem
 
-    case class HParserImpl[T] (parser: PackratParser[T]) extends HParser[T] {
+    trait HParserLike[T] extends HParser[T] {
       def apply (in: Input): ParseResult[T] = (delimiter.parser ~> parser <~ delimiter.parser).apply(new PackratReader[Elem](in))
 
       def ~ [U] (that: => HParser[U]): HParser[T ~ U] = HParserImpl((this.parser <~ delimiter.parser) ~ that.parser)
@@ -118,7 +125,24 @@ trait TwoLevelParsers {
       def ^^? [R] (f: T => Option[R]): HParser[R] = HParserImpl(parser ^^ f ^? { case Some(r) => r })
       def ^^^ [R] (f: => R): HParser[R] = HParserImpl(parser ^^^ f)
 
+      def *! (f: List[T] => Boolean): HParser[List[T]] = HParserImpl(new Parser[List[T]] {
+        def apply (in: Input): ParseResult[List[T]] = apply_rec(Nil, in)
+        private def apply_rec (list: List[T], in: Input): ParseResult[List[T]] = parser(in) match {
+          case Success(res, next) =>
+            val rs = list :+ res
+            if (f(rs)) Success(list, in)
+            else apply_rec(rs, next)
+          case fail => Success(list, in)
+        }
+      })
+
       def log (s: String): HParser[T] = HParserImpl(Impl.log(parser)(s))
+    }
+
+    case class HParserImpl[T] (parser: PackratParser[T]) extends HParserLike[T]
+
+    class HParserRef[T] (hp: => HParser[T]) extends HParserLike[T] {
+      lazy val parser: PackratParser[T] = hp.parser
     }
 
     case class LParserImpl[T] (parser: PackratParser[T]) extends LParser[T] {

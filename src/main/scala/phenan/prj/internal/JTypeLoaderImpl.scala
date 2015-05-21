@@ -43,7 +43,7 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
     args.traverse(arg => argSig2JType(arg, env))
   }
 
-  private def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JRefType] = sig match {
+  def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JRefType] = sig match {
     case cts: JClassTypeSignature        => fromClassTypeSignature(cts, env)
     case tvs: JTypeVariableSignature     => fromTypeVariableSignature(tvs, env)
     case JArrayTypeSignature(component)  => fromTypeSignature(component, env).map(_.array)
@@ -99,7 +99,7 @@ class JTypeLoaderImpl (val compiler: JCompiler)(implicit state: JState) extends 
     }
     case LowerBoundWildcardArgument(sig) => fromTypeSignature_RefType(sig, env).map(lb => JWildcard(None, Some(lb)))
     case UnboundWildcardArgument         => Some(JWildcard(None, None))
-    case PureVariable(name)              => env.get(name)
+    case PureVariableSignature(name)              => env.get(name)
   }
 
   private def classLoader = compiler.classLoader
