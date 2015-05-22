@@ -14,20 +14,81 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
   class StatementParsers private (returnType: JType, env: Environment) {
     lazy val block = '{' ~> blockStatements <~ '}' ^^ IRBlock
-    lazy val blockStatements: HParser[List[IRStatement]] = statement_BlockStatements | local_BlockStatements | expression_BlockStatements
+
+    lazy val blockStatements: HParser[List[IRStatement]] = statement_BlockStatements | local_BlockStatements | expression_BlockStatements | success(Nil).^
 
     private lazy val statement_BlockStatements = statement ~ blockStatements ^^ { case s ~ bs => s :: bs }
-    private lazy val local_BlockStatements = localDeclaration >> { local => StatementParsers(returnType, env.defineLocals(local)).blockStatements ^^ { local :: _ } }
-    private lazy val expression_BlockStatements = expressionStatement >> { es => StatementParsers(returnType, env.modifyContext(es)).blockStatements ^^ { es :: _ } }
+
+    private lazy val local_BlockStatements = localDeclarationStatement >> { local =>
+      StatementParsers(returnType, env.defineLocals(local.declaration)).blockStatements ^^ { local :: _ }
+    }
+
+    private lazy val expression_BlockStatements = expressionStatement >> { es =>
+      StatementParsers(returnType, env.modifyContext(es)).blockStatements ^^ { es :: _ }
+    }
 
     lazy val statement: HParser[IRStatement] = block | controlStatement
-    lazy val controlStatement: HParser[IRStatement] = ???
-    lazy val localDeclaration: HParser[IRLocalDeclaration] = ???
-    lazy val variableDeclarator: HParser[IRVariableDeclarator] = ???
-    lazy val expressionStatement = ExpressionParsers(compiler.typeLoader.voidType, env).expression <~ ';' ^^ IRExpressionStatement
+
+    lazy val controlStatement: HParser[IRStatement] = ifStatement | whileStatement | forStatement | returnStatement
+
+    lazy val ifStatement: HParser[IRIfStatement] = ( "if" ~> '(' ~> expression(compiler.typeLoader.boolean) <~ ')' ) ~ statement ~ ( "else" ~> statement ).? ^^ {
+      case cond ~ thenStmt ~ elseStmt => IRIfStatement(cond, thenStmt, elseStmt)
+    }
+
+    lazy val whileStatement = ( "while" ~> '(' ~> expression(compiler.typeLoader.boolean) <~ ')' ) ~ statement ^^ {
+      case cond ~ stmt => IRWhileStatement(cond, stmt)
+    }
+
+    lazy val forStatement = normalForStatement | ancientForStatement | enhancedForStatement
+
+    lazy val normalForStatement = "for" ~> '(' ~> localDeclaration <~ ';' >> { local =>
+      StatementParsers(returnType, env.defineLocals(local)).forControlRest ^^ {
+        case cond ~ update ~ stmt => IRNormalForStatement(local, cond, update, stmt)
+      }
+    }
+
+    lazy val ancientForStatement = "for" ~> '(' ~> ( statementExpressionList <~ ';' ) ~ forControlRest ^^ {
+      case init ~ ( cond ~ update ~ stmt ) => IRAncientForStatement(init, cond, update, stmt)
+    }
+
+    lazy val enhancedForStatement = ( "for" ~> '(' ~> typeName ) ~ identifier ~ emptyBrackets <~ ':' >> {
+      case elemType ~ name ~ dim => collection(elemType.array(dim)) ~ ( ')' ~> StatementParsers(returnType, env.defineLocal(elemType.array(dim), name)).statement ) ^^ {
+        case set ~ stmt => IREnhancedForStatement(elemType, name, dim, set, stmt)
+      }
+    }
+
+    private lazy val forControlRest = expression(compiler.typeLoader.boolean).? ~ ( ';' ~> statementExpressionList ) ~ ( ')' ~> statement )
+
+
+    lazy val returnStatement = "return" ~> expression(returnType) <~ ';' ^^ IRReturnStatement
+
+    lazy val localDeclarationStatement = localDeclaration <~ ';' ^^ IRLocalDeclarationStatement
+
+    lazy val localDeclaration: HParser[IRLocalDeclaration] = typeName >> { t =>
+      ExpressionParsers(t, env).variableDeclarator.+(',') ^^ { IRLocalDeclaration(t, _) }
+    }
+
+    lazy val expressionStatement = statementExpression <~ ';' ^^ IRExpressionStatement
+
+    lazy val statementExpressionList = statementExpression.*(',')
+
+    lazy val statementExpression = expression(compiler.typeLoader.void)
+
+
+    def collection (elemType: JType) =
+      compiler.state.someOrError(elemType.boxed.flatMap(compiler.typeLoader.iterableOf).map(expression).map(_ | expression(elemType.array)),
+        "cannot get type object Iterable<" + elemType.name + ">" , expression(elemType.array))
+
+
+    def expression (expected: JType) = ExpressionParsers(expected, env).expression
+
+    lazy val typeName = TypeParsers(env.resolver).typeName
   }
 
   class ExpressionParsers private (expected: JType, env: Environment) {
+    lazy val variableDeclarator: HParser[IRVariableDeclarator] = identifier ~ emptyBrackets >> {
+      case id ~ dim => ( '=' ~> ExpressionParsers(expected.array(dim), env).expression ).? ^^ { IRVariableDeclarator(id, dim, _) }
+    }
     lazy val expression: HParser[IRExpression] = ???
   }
 
@@ -50,7 +111,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
     lazy val typeVariable: HParser[JTypeVariable] = identifier ^^? resolver.typeVariable
     lazy val metaVariable: HParser[PureVariableRef] = identifier ^^? resolver.metaVariable
-    lazy val arrayType: HParser[JArrayType] = typeName <~ '[' <~ ']' ^^ { _.array }
+    lazy val arrayType: HParser[JArrayType] = typeName <~ emptyBracket ^^ { _.array }
     lazy val primitiveTypeName: HParser[JPrimitiveType] = identifier ^? {
       case "byte"    => compiler.classLoader.byte.primitiveType
       case "char"    => compiler.classLoader.char.primitiveType
@@ -83,6 +144,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   lazy val delimiter: LParser[Any] = elem("white space", Character.isWhitespace).*
+
+  lazy val emptyBrackets = emptyBracket.* ^^ { _.size }
+  lazy val emptyBracket = '[' ~> ']'
 
   lazy val qualifiedName = identifier.+('.')
 

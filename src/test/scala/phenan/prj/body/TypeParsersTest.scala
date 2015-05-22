@@ -69,7 +69,7 @@ class TypeParsersTest extends FunSuite with Matchers {
     r2.successful shouldBe true
     r2.get shouldBe ans2
 
-    val r3 = parsers.typeName(src("Map.Entry<String, JarEntry>"))
+    val r3 = parsers.typeName(src("Map.Entry<String, java.util.jar.JarEntry>"))
     val ans3 = compiler.classLoader.loadClass("java/util/Map$Entry").get.objectType(List(str, je)).get
     r3.successful shouldBe true
     r3.get shouldBe ans3

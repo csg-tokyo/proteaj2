@@ -61,6 +61,12 @@ case class JClassModule (clazz: JClass) extends JModule {
 sealed trait JType extends JModule {
   def name: String
   def array: JArrayType = compiler.typeLoader.arrayOf(this)
+  def array (dim: Int): JType = {
+    if (dim > 0) array.array(dim - 1)
+    else this
+  }
+
+  def boxed: Option[JRefType]
 
   def isSubtypeOf (that: JType): Boolean
   def isAssignableTo (that: JType): Boolean
@@ -75,7 +81,9 @@ sealed trait JType extends JModule {
   def >=> (t: JGenericType) = unifyL(t)
 }
 
-sealed trait JRefType extends JType with MetaValue
+sealed trait JRefType extends JType with MetaValue {
+  def boxed = Some(this)
+}
 
 case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRefType {
   def compiler = erase.compiler
@@ -366,14 +374,14 @@ object JTypeUnification {
 case class JPrimitiveType (clazz: JPrimitiveClass) extends JType {
   def name = clazz.name
 
-  lazy val wrapperType: Option[JType] = clazz.wrapperClass.flatMap(_.objectType(Nil))
-
   def fields: Map[String, JField] = Map.empty
   def methods: Map[String, List[JMethod]] = Map.empty
 
   def isSubtypeOf (that: JType): Boolean = this == that
 
   def isAssignableTo(that: JType): Boolean = ???
+
+  lazy val boxed: Option[JRefType] = clazz.wrapperClass.flatMap(_.objectType(Nil))
 
   def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = unifyE(t)
   def unifyL (t: JGenericType): Option[Map[String, MetaValue]] = unifyE(t)

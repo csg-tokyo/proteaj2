@@ -40,6 +40,7 @@ trait JClassLoader {
   )
 
   lazy val objectClass: Option[JClass] = loadClass_PE("java/lang/Object")
+  lazy val iterableClass: Option[JClass] = loadClass_PE("java/lang/Iterable")
 
   def erase (signature: JTypeSignature, metaParams: List[FormalMetaParameter]): Try[JErasedType] = signature match {
     case prm: JPrimitiveTypeSignature => Success(erase(prm))

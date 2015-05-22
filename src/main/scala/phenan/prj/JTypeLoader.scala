@@ -8,7 +8,10 @@ trait JTypeLoader {
   def getObjectType (clazz: JClass, args: List[MetaValue]): Option[JObjectType]
 
   lazy val objectType = compiler.classLoader.objectClass.flatMap(_.objectType(Nil))
-  lazy val voidType = compiler.classLoader.void.primitiveType
+  lazy val boolean = compiler.classLoader.boolean.primitiveType
+  lazy val void = compiler.classLoader.void.primitiveType
+
+  def iterableOf (arg: JRefType) = compiler.classLoader.iterableClass.flatMap(_.objectType(List(arg)))
 
   def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JType]
   def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JRefType]

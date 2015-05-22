@@ -3,7 +3,6 @@ package phenan.prj.ir
 import phenan.prj._
 import phenan.prj.JCompiler
 import phenan.prj.declaration._
-import phenan.prj.state.JState
 import phenan.util._
 
 import JModifier._
