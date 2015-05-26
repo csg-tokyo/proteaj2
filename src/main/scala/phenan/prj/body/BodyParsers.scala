@@ -24,7 +24,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
 
     private lazy val expression_BlockStatements = expressionStatement >> { es =>
-      StatementParsers(returnType, env.modifyContext(es)).blockStatements ^^ { es :: _ }
+      StatementParsers(returnType, env.modifyContext(es.expression)).blockStatements ^^ { es :: _ }
     }
 
     lazy val statement: HParser[IRStatement] = block | controlStatement
@@ -89,7 +89,21 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     lazy val variableDeclarator: HParser[IRVariableDeclarator] = identifier ~ emptyBrackets >> {
       case id ~ dim => ( '=' ~> ExpressionParsers(expected.array(dim), env).expression ).? ^^ { IRVariableDeclarator(id, dim, _) }
     }
-    lazy val expression: HParser[IRExpression] = ???
+
+    def expression: HParser[IRExpression] = env.highestPriority(expected).map(cached).getOrElse(hostExpression)
+
+    def expression (priority: Priority): HParser[IRExpression] = cached(priority)
+
+    lazy val hostExpression: HParser[IRExpression] = ???
+
+    private val cached: Priority => HParser[IRExpression] = mutableHashMapMemo { p =>
+      env.expressionOperators(expected, p).map(OperatorParsers(_).operator).reduce(_ ||| _) | env.nextPriority(expected, p).map(cached).getOrElse(hostExpression)
+    }
+  }
+
+  class OperatorParsers private (syntax: Syntax) {
+    lazy val operator: HParser[IROperation] = pattern ^^ { IROperation(syntax, _) }
+    lazy val pattern: HParser[List[IRExpression]] = ???
   }
 
   class TypeParsers private (resolver: NameResolver) {
@@ -136,6 +150,11 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   object ExpressionParsers {
     def apply (expected: JType, env: Environment): ExpressionParsers = cached((expected, env))
     private val cached : ((JType, Environment)) => ExpressionParsers = mutableHashMapMemo { pair => new ExpressionParsers(pair._1, pair._2) }
+  }
+
+  object OperatorParsers {
+    def apply (syntax: Syntax): OperatorParsers = cached(syntax)
+    private val cached : Syntax => OperatorParsers = mutableHashMapMemo(new OperatorParsers(_))
   }
 
   object TypeParsers {
