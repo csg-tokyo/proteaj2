@@ -84,6 +84,6 @@ class JClassLoaderTest extends FunSuite with Matchers {
     method.syntax.get.priority shouldBe None
 
     val pattern = method.syntax.get.syntax
-    pattern shouldBe List(JMetaValueRef("id"), JOperatorName("="), JOperand)
+    pattern shouldBe List(JMetaValueRefDef("id"), JOperatorNameDef("="), JOperandDef)
   }
 }

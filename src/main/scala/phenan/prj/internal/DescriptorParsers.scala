@@ -15,6 +15,8 @@ object DescriptorParsers extends PackratParsers {
 
   def parseArrayDescriptor (desc: String)(implicit state: JState): Option[JArrayTypeSignature] = parse(desc, "array type descriptor", arrayDesc)
 
+  def parseReturnDescriptor (desc: String)(implicit state: JState): Option[JTypeSignature] = parse(desc, "return descriptor", returnDesc)
+
   private def parse[T] (desc: String, kind: String, parser: Parser[T])(implicit state: JState): Option[T] = parser(new PackratReader[Char](new CharSequenceReader(desc))) match {
     case Success(ret, _)   => Some(ret)
     case NoSuccess(msg, _) =>

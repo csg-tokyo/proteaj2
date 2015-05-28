@@ -92,16 +92,16 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     def expression: HParser[IRExpression] = env.highestPriority(expected).map(cached).getOrElse(hostExpression)
 
-    def expression (priority: Priority): HParser[IRExpression] = cached(priority)
+    def expression (priority: JPriority): HParser[IRExpression] = cached(priority)
 
     lazy val hostExpression: HParser[IRExpression] = ???
 
-    private val cached: Priority => HParser[IRExpression] = mutableHashMapMemo { p =>
+    private val cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
       env.expressionOperators(expected, p).map(OperatorParsers(_).operator).reduce(_ ||| _) | env.nextPriority(expected, p).map(cached).getOrElse(hostExpression)
     }
   }
 
-  class OperatorParsers private (syntax: Syntax) {
+  class OperatorParsers private (syntax: JSyntax) {
     lazy val operator: HParser[IROperation] = pattern ^^ { IROperation(syntax, _) }
     lazy val pattern: HParser[List[IRExpression]] = ???
   }
@@ -153,8 +153,8 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   object OperatorParsers {
-    def apply (syntax: Syntax): OperatorParsers = cached(syntax)
-    private val cached : Syntax => OperatorParsers = mutableHashMapMemo(new OperatorParsers(_))
+    def apply (syntax: JSyntax): OperatorParsers = cached(syntax)
+    private val cached : JSyntax => OperatorParsers = mutableHashMapMemo(new OperatorParsers(_))
   }
 
   object TypeParsers {

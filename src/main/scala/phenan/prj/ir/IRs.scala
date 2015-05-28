@@ -111,6 +111,8 @@ trait IRClassLike extends IRClass {
 
   lazy val interfaceSignatures = state.successOrError(interfacesAST.traverse(resolver.classTypeSignature), "invalid interface types of class " + name, Nil)
 
+  def dslInfo = None
+
   private def collectMethods (methods: List[IRMethod]): List[IRMethod] = methods ++ methods.flatMap(_.paramInitializers)
 }
 
@@ -202,7 +204,7 @@ case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends
 
   def name: String = ast.name
 
-  override def syntax: Option[JOperatorSyntax] = None
+  override def syntax: Option[JOperatorSyntaxDef] = None
 
   lazy val returnTypeSignature = state.successOrError(resolver.typeSignature(ast.returnType), "invalid return type of method " + name, VoidTypeSignature)
 
@@ -218,7 +220,7 @@ case class IRConstructorDef (ast: ConstructorDeclaration, declaringClass: IRClas
 
   override def returnTypeSignature: JTypeSignature = VoidTypeSignature
 
-  override def syntax: Option[JOperatorSyntax] = None
+  override def syntax: Option[JOperatorSyntaxDef] = None
 
   override private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
   override private[ir] def formalParametersAST: List[FormalParameter] = ast.formalParameters
@@ -230,7 +232,7 @@ trait IRInitializerMethod extends IRMethod {
   private[ir] def formalParametersAST: List[FormalParameter] = Nil
   private[ir] def clausesAST: List[MethodClause] = Nil
 
-  override def syntax: Option[JOperatorSyntax] = None
+  override def syntax: Option[JOperatorSyntaxDef] = None
 }
 
 case class IRInstanceInitializer (ast: InstanceInitializer, declaringClass: IRClass) extends IRInitializerMethod {

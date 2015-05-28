@@ -20,6 +20,7 @@ trait JClass extends JErasedType {
   def outerClass: Option[String]
 
   def signature: JClassSignature
+  def dslInfo: Option[DSLInfo]
 
   lazy val superClass: Option[JClass] = compiler.classLoader.erase_PE(signature.superClass)
   lazy val interfaces: List[JClass] = signature.interfaces.flatMap(compiler.classLoader.erase_PE)
@@ -72,7 +73,7 @@ trait JMethodDef {
   def declaringClass: JClass
 
   def signature: JMethodSignature
-  def syntax: Option[JOperatorSyntax]
+  def syntax: Option[JOperatorSyntaxDef]
 
   lazy val erasedReturnType: JErasedType = compiler.classLoader.erase_Force(signature.returnType, signature.metaParams)
   lazy val erasedParameterTypes: List[JErasedType] = signature.parameters.map(param => compiler.classLoader.erase_Force(param.actualTypeSignature, signature.metaParams))

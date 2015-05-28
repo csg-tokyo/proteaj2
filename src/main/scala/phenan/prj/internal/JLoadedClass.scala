@@ -37,6 +37,8 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler) extends 
 
   lazy val outerClass = outerInfo.flatMap(info => readClassNameOption(info.outerClassInfo))
 
+  def dslInfo = annotations.dsl
+
   private lazy val annotations = readClassAnnotations(attributes.annotations)
 
   private lazy val attributes = parseClassAttributes(classFile.attributes)
