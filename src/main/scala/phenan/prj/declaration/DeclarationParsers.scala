@@ -217,8 +217,8 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val metaParameter = metaValueParameter | typeParameter
 
-  lazy val metaValueParameter = identifier ~ ( ':' ~> typeName ) ^^ {
-    case name ~ metaType => MetaValueParameter(name, metaType)
+  lazy val metaValueParameter = identifier ~ ( ':' ~> typeName ) ~ priority ^^ {
+    case name ~ metaType ~ pri => MetaValueParameter(name, metaType, pri)
   }
 
   lazy val typeParameter = identifier ~ ( "extends" ~> typeName.+('&') ).? ^^ {

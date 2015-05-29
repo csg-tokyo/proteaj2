@@ -23,7 +23,7 @@ case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSi
   }
 }
 
-case class FormalMetaParameter (name: String, metaType: JTypeSignature, bounds: List[JTypeSignature])
+case class FormalMetaParameter (name: String, metaType: JTypeSignature, priority: Option[String], bounds: List[JTypeSignature])
 
 sealed trait JTypeSignature extends JTypeArgument
 

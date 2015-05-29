@@ -77,7 +77,7 @@ object SignatureParsers extends PackratParsers {
 
   private lazy val formalTypeParameter = identifier ~ ( ':' ~> fieldType.? ) ~ ( ':' ~> fieldType ).* ^^ {
     case name ~ classBound ~ interfaceBounds =>
-      FormalMetaParameter(name, JTypeSignature.typeTypeSig, classBound.map(_ :: interfaceBounds).getOrElse(interfaceBounds))
+      FormalMetaParameter(name, JTypeSignature.typeTypeSig, None, classBound.map(_ :: interfaceBounds).getOrElse(interfaceBounds))
   }
 
   private lazy val typeArgList = '<' ~> typeArgument.+ <~ '>' | success(Nil)

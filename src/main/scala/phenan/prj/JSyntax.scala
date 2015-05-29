@@ -16,7 +16,7 @@ case class JRepetition0 (parameter: JParameter) extends JSyntaxElement
 case class JRepetition1 (parameter: JParameter) extends JSyntaxElement
 case class JOperatorName (name: String) extends JSyntaxElement
 
-case class JMetaOperand (expectedType: JType) extends JSyntaxElement
+case class JMetaOperand (name: String, parameter: JParameter) extends JSyntaxElement
 case class JMetaValue (mv: MetaValue) extends JSyntaxElement
 case class JAndPredicate (parameter: JParameter) extends JSyntaxElement
 case class JNotPredicate (parameter: JParameter) extends JSyntaxElement

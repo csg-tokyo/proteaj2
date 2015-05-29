@@ -32,8 +32,8 @@ trait NameResolver {
   import scalaz.Scalaz._
 
   def metaParameter (mp: MetaParameter): Try[FormalMetaParameter] = mp match {
-    case TypeParameter(name, bounds)  => bounds.traverse(typeSignature).map(FormalMetaParameter(name, JTypeSignature.typeTypeSig, _))
-    case MetaValueParameter(name, mt) => typeSignature(mt).map(FormalMetaParameter(name, _, Nil))
+    case TypeParameter(name, bounds)       => bounds.traverse(typeSignature).map(FormalMetaParameter(name, JTypeSignature.typeTypeSig, None, _))
+    case MetaValueParameter(name, mt, pri) => typeSignature(mt).map(FormalMetaParameter(name, _, pri, Nil))
   }
 
   def typeSignature (tn: TypeName): Try[JTypeSignature] = nonArrayTypeSignature(tn.name, tn.args).map(JTypeSignature.arraySig(_, tn.dim))
@@ -230,11 +230,11 @@ trait MetaParametersResolver extends NameResolver {
 
   private lazy val typeVariableNames = metaParameters.collect {
     case TypeParameter(name, _) => name
-    case MetaValueParameter(name, t) if isTypeType(t) => name
+    case MetaValueParameter(name, t, _) if isTypeType(t) => name
   }.toSet
 
   private lazy val metaVariableNames = metaParameters.collect {
-    case MetaValueParameter(name, t) if ! isTypeType(t) => name
+    case MetaValueParameter(name, t, _) if ! isTypeType(t) => name
   }.toSet
 
   private def isTypeType (t: TypeName): Boolean = parent.typeSignature(t).toOption.contains(JTypeSignature.typeTypeSig)
@@ -250,8 +250,8 @@ trait MetaParametersResolver extends NameResolver {
         state.error("invalid type bounds : " + bounds)
         JTypeVariable(name, Nil, root.compiler)
     }
-    case MetaValueParameter(name, tn) if isTypeType(tn) => JTypeVariable(name, Nil, root.compiler)
-    case MetaValueParameter(name, tn) => typeNameToType(tn, env) match {
+    case MetaValueParameter(name, tn, _) if isTypeType(tn) => JTypeVariable(name, Nil, root.compiler)
+    case MetaValueParameter(name, tn, _) => typeNameToType(tn, env) match {
       case Some(t) => PureVariableRef(name, t)
       case None    => JTypeVariable(name, Nil, root.compiler)
     }

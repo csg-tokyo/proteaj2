@@ -97,13 +97,38 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     lazy val hostExpression: HParser[IRExpression] = ???
 
     private val cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
-      env.expressionOperators(expected, p).map(OperatorParsers(_).operator).reduce(_ ||| _) | env.nextPriority(expected, p).map(cached).getOrElse(hostExpression)
+      env.expressionOperators(expected, p).map(OperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(expected, p).map(cached).getOrElse(hostExpression)
     }
   }
 
-  class OperatorParsers private (syntax: JSyntax) {
+  class OperatorParsers private (syntax: JSyntax, env: Environment) {
     lazy val operator: HParser[IROperation] = pattern ^^ { IROperation(syntax, _) }
     lazy val pattern: HParser[List[IRExpression]] = ???
+
+    // return typeArgs?
+    def constructParser (pattern: List[JSyntaxElement], typeArgs: Map[String, MetaValue], env: Environment): HParser[List[IRExpression]] = pattern match {
+      case JOperand(param) :: rest           => parameter(param, env) >> { e => constructParser(rest, typeArgs, env.modifyContext(e)) ^^ { e :: _ } }
+      case JOptionalOperand(param) :: rest   => parameter(param, env).? >> {
+        case Some(e) => constructParser(rest, typeArgs, env.modifyContext(e)) ^^ { e :: _ }
+        case None    => constructParser(rest, typeArgs, env) ^^ { IRDefaultArgument(param) :: _ }
+      }
+      case JRepetition0(param) :: rest       => parameter(param, env).* ~ constructParser(rest, typeArgs, env) ^^ {
+        case es ~ args => IRVariableArguments(es) :: args
+      }
+      case JRepetition1(param) :: rest       => parameter(param, env).+ ~ constructParser(rest, typeArgs, env) ^^ {
+        case es ~ args => IRVariableArguments(es) :: args
+      }
+      case JOperatorName(name) :: rest       => word(name).^ ~> constructParser(rest, typeArgs, env)
+      case JMetaOperand(name, param) :: rest => parameter(param, env) >> { arg => constructParser(rest, compiler.state.successOrError(arg.eval.map(v => typeArgs + (name -> v)), "invalid meta operand : cannot evaluate parameter " + name, typeArgs), env) }
+      case JMetaValue(value) :: rest         => metaValue(value) ~> constructParser(rest, typeArgs, env)
+      case JAndPredicate(param) :: rest      => parameter(param, env).& ~> constructParser(rest, typeArgs, env)
+      case JNotPredicate(param) :: rest      => parameter(param, env).! ~> constructParser(rest, typeArgs, env)
+      case Nil                               => success(Nil).^
+    }
+
+    def parameter (param: JParameter, env: Environment): HParser[IRExpression] = ???
+
+    def metaValue (mv: MetaValue): HParser[MetaValue] = ???
   }
 
   class TypeParsers private (resolver: NameResolver) {
@@ -153,8 +178,8 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   object OperatorParsers {
-    def apply (syntax: JSyntax): OperatorParsers = cached(syntax)
-    private val cached : JSyntax => OperatorParsers = mutableHashMapMemo(new OperatorParsers(_))
+    def apply (syntax: JSyntax, env: Environment): OperatorParsers = cached((syntax, env))
+    private val cached : ((JSyntax, Environment)) => OperatorParsers = mutableHashMapMemo { pair => new OperatorParsers(pair._1, pair._2) }
   }
 
   object TypeParsers {

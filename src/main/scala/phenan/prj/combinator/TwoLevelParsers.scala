@@ -43,6 +43,7 @@ trait TwoLevelParsers {
     def ||| [U >: T] (parser: => HParser[U]): HParser[U]
 
     def ? : HParser[Option[T]]
+    def & : HParser[T]
     def ! : HParser[Unit]
     def ! (f: T => Boolean): HParser[T]
     def * : HParser[List[T]]
@@ -113,6 +114,7 @@ trait TwoLevelParsers {
       def ||| [U >: T] (that: => HParser[U]): HParser[U] = HParserImpl(this.parser ||| that.parser)
 
       def ? : HParser[Option[T]] = HParserImpl(parser.?)
+      def & : HParser[T] = HParserImpl(guard(parser))
       def ! : HParser[Unit] = HParserImpl(not(parser))
       def ! (f: T => Boolean): HParser[T] = HParserImpl(parser ^? { case r if ! f(r) => r })
       def * : HParser[List[T]] = HParserImpl(repsep(parser, delimiter.parser))

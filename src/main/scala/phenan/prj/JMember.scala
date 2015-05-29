@@ -45,12 +45,10 @@ class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val d
       case Nil         => clazz.state.errorAndReturn("corresponding parameter cannot be found", result)
     }
     case JOperatorNameDef(name) :: rest => translatePattern(rest, result :+ JOperatorName(name), restParameters)
-    case JMetaValueRefDef(name) :: rest if env.contains(name)            => translatePattern(rest, result :+ JMetaValue(env(name)), restParameters)
-    case JMetaValueRefDef(name) :: rest if metaParameters.contains(name) => compiler.typeLoader.fromTypeSignature(metaParameters(name).metaType, env) match {
-      case Some(metaType) => translatePattern(rest, result :+ JMetaOperand(metaType), restParameters)
-      case None           => clazz.state.errorAndReturn("invalid meta type of meta parameter " + name, result)
+    case (mv: JMetaValueRefDef) :: rest => translateMetaValueRef(mv) match {
+      case Some(e) => translatePattern(rest, result :+ e, restParameters)
+      case None    => clazz.state.errorAndReturn("meta parameter " + mv.name + " cannot be found", result)
     }
-    case JMetaValueRefDef(name) :: rest => clazz.state.errorAndReturn("meta parameter " + name + " cannot be found", result)
     case (pred: JPredicateDef) :: rest  => translatePattern(rest, result :+ translatePredicate(pred), restParameters)
     case Nil if restParameters.isEmpty  => result
     case Nil                            => clazz.state.errorAndReturn("corresponding operand cannot be found", result)
@@ -61,6 +59,15 @@ class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val d
     case JOptionalOperandDef => JOptionalOperand(param)
     case JRepetition0Def     => JRepetition0(param)
     case JRepetition1Def     => JRepetition1(param)
+  }
+
+  private def translateMetaValueRef (mv: JMetaValueRefDef): Option[JSyntaxElement] = {
+    if (env.contains(mv.name)) Some(JMetaValue(env(mv.name)))
+    else if (metaParameters.contains(mv.name)) {
+      val mp = metaParameters(mv.name)
+      Some(JMetaOperand(mv.name, new JParameter(JParameterSignature(Nil, mp.metaType, mp.priority, false, None), env, compiler)))
+    }
+    else None
   }
 
   private def translatePredicate (elem: JPredicateDef): JSyntaxElement = elem match {

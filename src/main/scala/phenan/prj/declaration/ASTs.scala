@@ -102,7 +102,7 @@ sealed trait MetaParameter {
   def name: String
 }
 case class TypeParameter (name: String, bounds: List[TypeName]) extends MetaParameter
-case class MetaValueParameter (name: String, metaType: TypeName) extends MetaParameter
+case class MetaValueParameter (name: String, metaType: TypeName, priority: Option[String]) extends MetaParameter
 
 sealed trait ParameterType
 case class ContextualType (context: TypeName, paramType: ParameterType) extends ParameterType

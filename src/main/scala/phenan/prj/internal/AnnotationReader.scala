@@ -100,8 +100,9 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
     for {
       name      <- required("name")(string)("")
       paramType <- element("type")(typeSignature)(JTypeSignature.typeTypeSig)
+      priority  <- optional("priority")(string)
       bounds    <- array("bounds")(typeSignature)
-    } yield FormalMetaParameter(name, paramType, bounds)
+    } yield FormalMetaParameter(name, paramType, priority, bounds)
   }
 
   private lazy val pattern = array("pattern")(elementAnnotation("OpElem")(operatorElement))

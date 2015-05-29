@@ -59,7 +59,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     val varClass = clazz.get.asInstanceOf[JLoadedClass]
 
     varClass.signature shouldBe
-      JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), JTypeSignature.objectTypeSig, Nil)
+      JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, None, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), None, Nil)), JTypeSignature.objectTypeSig, Nil)
 
     varClass.isContext shouldBe true
   }
