@@ -30,6 +30,7 @@ case class JGenericType (signature: JTypeSignature, env: Map[String, MetaValue],
   def bind (args: Map[String, MetaValue]): Option[JType] = {
     compiler.typeLoader.fromTypeSignature(signature, env ++ args)
   }
+  def unbound (args: Map[String, MetaValue]): List[String] = ???
 }
 
 sealed trait JModule {
@@ -230,11 +231,9 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
   }
 
   private def assignTypeArgument (a: JTypeArgument, map: Map[FormalMetaParameter, JTypeArgument]): Option[JTypeArgument] = a match {
-    case sig: JTypeSignature => assignTypeSignature(sig, map)
-    case PureVariableSignature(name)  => map.find(_._1.name == name).map(_._2)
-    case UpperBoundWildcardArgument(sig) => assignTypeSignature(sig, map).map(UpperBoundWildcardArgument)
-    case LowerBoundWildcardArgument(sig) => assignTypeSignature(sig, map).map(LowerBoundWildcardArgument)
-    case UnboundWildcardArgument => Some(UnboundWildcardArgument)
+    case sig: JTypeSignature         => assignTypeSignature(sig, map)
+    case PureVariableSignature(name) => map.find(_._1.name == name).map(_._2)
+    case WildcardArgument(upper, lower) => Some(WildcardArgument(upper.flatMap(assignTypeSignature(_, map)), lower.flatMap(assignTypeSignature(_, map))))
   }
 
   private def assignTypeSignature (sig: JTypeSignature, map: Map[FormalMetaParameter, JTypeArgument]): Option[JTypeSignature] = sig match {
@@ -244,9 +243,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
     case JTypeVariableSignature(name) => map.find(_._1.name == name).map(_._2).flatMap {
       case sig: JTypeSignature               => Some(sig)
       case _: PureVariableSignature                   => None
-      case UpperBoundWildcardArgument(bound) => Some(JCapturedWildcardSignature(Some(bound), None))
-      case LowerBoundWildcardArgument(bound) => Some(JCapturedWildcardSignature(None, Some(bound)))
-      case UnboundWildcardArgument           => Some(JCapturedWildcardSignature(None, None))
+      case WildcardArgument(upper, lower) => Some(JCapturedWildcardSignature(upper, lower))
     }
     case cap: JCapturedWildcardSignature     => Some(cap)
   }
@@ -264,14 +261,9 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
 object JTypeUnification {
   // unifyG (String, T, e) = Some(e + (T -> String))
   def unifyG (mv: MetaValue, arg: JTypeArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = arg match {
-    case sig: JTypeSignature             => unifyG(mv, sig, env, compiler)
-    case pvr: PureVariableSignature               => unifyG(mv, pvr, env, compiler)
-    case ubw: UpperBoundWildcardArgument => unifyG(mv, ubw, env, compiler)
-    case lbw: LowerBoundWildcardArgument => unifyG(mv, lbw, env, compiler)
-    case UnboundWildcardArgument         => mv match {
-      case JWildcard(None, None) => Some(env)
-      case _ => None
-    }
+    case sig: JTypeSignature        => unifyG(mv, sig, env, compiler)
+    case pvr: PureVariableSignature => unifyG(mv, pvr, env, compiler)
+    case wld: WildcardArgument      => unifyG(mv, wld, env, compiler)
   }
 
   def unifyG (mv: MetaValue, tv: JTypeVariableSignature, env: Map[String, MetaValue]): Option[Map[String, MetaValue]] = {
@@ -320,16 +312,9 @@ object JTypeUnification {
     else Some(env + (pvr.name -> mv))
   }
 
-  private def unifyG (mv: MetaValue, ub: UpperBoundWildcardArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = mv match {
-    case _: PureValue | _: JRefType | JWildcard(_, Some(_)) => None
-    case JWildcard(None, None) => Some(env)
-    case JWildcard(Some(u), None) => u.unifyG(JGenericType(ub.signature, env, compiler))
-  }
-
-  private def unifyG (mv: MetaValue, lb: LowerBoundWildcardArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = mv match {
-    case _: PureValue | _: JRefType | JWildcard(Some(_), _) => None
-    case JWildcard(None, None) => Some(env)
-    case JWildcard(None, Some(l)) => l.unifyL(JGenericType(lb.signature, env, compiler))
+  private def unifyG (mv: MetaValue, wild: WildcardArgument, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = mv match {
+    case _: PureValue | _: JRefType => None
+    case JWildcard(ub, lb) => wild.upperBound.flatMap(upper => ub.flatMap(_.unifyG(JGenericType(upper, env, compiler)))).orElse(wild.lowerBound.flatMap(lower => lb.flatMap(_.unifyL(JGenericType(lower, env, compiler))))).orElse(Some(env))
   }
 
   private def unifyG (obj: JObjectType, sig: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler): Option[Map[String, MetaValue]] = sig match {

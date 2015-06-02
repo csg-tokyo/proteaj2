@@ -68,8 +68,4 @@ sealed trait JTypeArgument
 
 case class PureVariableSignature (name: String) extends JTypeArgument
 
-case class UpperBoundWildcardArgument (signature: JTypeSignature) extends JTypeArgument
-
-case class LowerBoundWildcardArgument (signature: JTypeSignature) extends JTypeArgument
-
-object UnboundWildcardArgument extends JTypeArgument
+case class WildcardArgument (upperBound: Option[JTypeSignature], lowerBound: Option[JTypeSignature]) extends JTypeArgument

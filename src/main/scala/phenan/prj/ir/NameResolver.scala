@@ -88,9 +88,9 @@ trait NameResolver {
   }
 
   private def typeArgument (arg: TypeArgument): Try[JTypeArgument] = arg match {
-    case UpperBoundWildcardType(bound) => typeSignature(bound).map(UpperBoundWildcardArgument)
-    case LowerBoundWildcardType(bound) => typeSignature(bound).map(LowerBoundWildcardArgument)
-    case UnboundWildcardType           => Success(UnboundWildcardArgument)
+    case UpperBoundWildcardType(bound) => typeSignature(bound).map(ub => WildcardArgument(Some(ub), None))
+    case LowerBoundWildcardType(bound) => typeSignature(bound).map(lb => WildcardArgument(None, Some(lb)))
+    case UnboundWildcardType           => Success(WildcardArgument(None, None))
     case tn: TypeName                  => metaVariableSignature(tn)
   }
 }

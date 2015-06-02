@@ -84,11 +84,11 @@ object SignatureParsers extends PackratParsers {
 
   private lazy val typeArgument = upperBoundedWildcard | lowerBoundedWildcard | unboundedWildcard | pureVariable | fieldType
 
-  private lazy val upperBoundedWildcard = '+' ~> fieldType ^^ UpperBoundWildcardArgument
+  private lazy val upperBoundedWildcard = '+' ~> fieldType ^^ { ub => WildcardArgument(Some(ub), None) }
 
-  private lazy val lowerBoundedWildcard = '-' ~> fieldType ^^ LowerBoundWildcardArgument
+  private lazy val lowerBoundedWildcard = '-' ~> fieldType ^^ { lb => WildcardArgument(None, Some(lb)) }
 
-  private lazy val unboundedWildcard = '*' ^^^ UnboundWildcardArgument
+  private lazy val unboundedWildcard = '*' ^^^ WildcardArgument(None, None)
 
   private lazy val pureVariable = 'P' ~> identifier <~ ';' ^^ PureVariableSignature
 

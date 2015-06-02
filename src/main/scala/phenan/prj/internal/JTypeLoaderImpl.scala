@@ -92,14 +92,9 @@ class JTypeLoaderImpl (val compiler: JCompiler) extends JTypeLoader {
   }
 
   private def argSig2JType (arg: JTypeArgument, env: Map[String, MetaValue]): Option[MetaValue] = arg match {
-    case sig: JTypeSignature             => fromTypeSignature_RefType(sig, env)
-    case UpperBoundWildcardArgument(sig) => fromTypeSignature_RefType(sig, env).map { bound =>
-      if (objectType.contains(bound)) JWildcard(None, None)
-      else JWildcard(Some(bound), None)
-    }
-    case LowerBoundWildcardArgument(sig) => fromTypeSignature_RefType(sig, env).map(lb => JWildcard(None, Some(lb)))
-    case UnboundWildcardArgument         => Some(JWildcard(None, None))
-    case PureVariableSignature(name)              => env.get(name)
+    case sig: JTypeSignature            => fromTypeSignature_RefType(sig, env)
+    case WildcardArgument(upper, lower) => Some(JWildcard(upper.flatMap(fromTypeSignature_RefType(_, env)).filterNot(objectType.contains), lower.flatMap(fromTypeSignature_RefType(_, env))))
+    case PureVariableSignature(name)    => env.get(name)
   }
 
   private def classLoader = compiler.classLoader

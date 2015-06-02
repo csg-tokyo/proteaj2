@@ -62,7 +62,7 @@ class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val d
   }
 
   private def translateMetaValueRef (mv: JMetaValueRefDef): Option[JSyntaxElement] = {
-    if (env.contains(mv.name)) Some(JMetaValue(env(mv.name)))
+    if (env.contains(mv.name)) Some(JMetaName(env(mv.name)))
     else if (metaParameters.contains(mv.name)) {
       val mp = metaParameters(mv.name)
       Some(JMetaOperand(mv.name, new JParameter(JParameterSignature(Nil, mp.metaType, mp.priority, false, None), env, compiler)))

@@ -36,6 +36,11 @@ class JState private[state] (val searchPath: JSearchPath) {
     default
   }
 
+  def errorAndReturn [T] (msg: => String, e: Throwable, default: T): T = {
+    error(msg, e)
+    default
+  }
+
   def warn (msg: => String): Unit = {
     logger.warn(msg)
     nWarns += 1
