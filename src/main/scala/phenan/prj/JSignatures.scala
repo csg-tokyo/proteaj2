@@ -40,11 +40,17 @@ object JTypeSignature {
   }
 }
 
-sealed trait JClassTypeSignature extends JTypeSignature
+sealed trait JClassTypeSignature extends JTypeSignature {
+  def internalName: String
+}
 
-case class SimpleClassTypeSignature (clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature
+case class SimpleClassTypeSignature (clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature {
+  def internalName = clazz
+}
 
-case class MemberClassTypeSignature (outer: JClassTypeSignature, clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature
+case class MemberClassTypeSignature (outer: JClassTypeSignature, clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature {
+  def internalName = outer.internalName + '$' + clazz
+}
 
 sealed trait JPrimitiveTypeSignature extends JTypeSignature
 

@@ -16,6 +16,7 @@ trait JTypeLoader {
   def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JType]
   def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JRefType]
   def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaValue]): Option[JObjectType]
+  def fromPrimitiveSignature (p: JPrimitiveTypeSignature): JPrimitiveType
 
   lazy val superTypesOfArray: List[JObjectType] = CommonNames.superClassesOfArray.flatMap { name =>
     compiler.classLoader.loadClass_PE(name).flatMap(_.objectType(Nil))
