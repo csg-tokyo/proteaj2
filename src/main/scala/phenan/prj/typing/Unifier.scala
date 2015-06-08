@@ -65,14 +65,13 @@ class Unifier (compiler: JCompiler) {
 
     def check (cap: JCapturedWildcardType, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = cap.lowerBound.flatMap(check(_, cts, args))
 
-    def check (cap: JCapturedWildcardType, pts: JPrimitiveTypeSignature, args: MetaArgs): Option[MetaArgs] = cap.lowerBound.flatMap(check(_, pts, args))
+    def check (cap: JCapturedWildcardType, pts: JPrimitiveTypeSignature, args: MetaArgs): Option[MetaArgs] = None
 
     def check (cap: JCapturedWildcardType, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = cap.lowerBound.flatMap(check(_, ats, args))
 
-    def check (cap: JCapturedWildcardType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = cap.lowerBound.flatMap(check(_, tvs, args))
-
     def check (cap: JCapturedWildcardType, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = cap.lowerBound.flatMap(check(_, cws, args))
 
+    def check (cap: JCapturedWildcardType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(cap, tvs, args)
 
     private def typeVariableSignature (rt: JRefType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = {
       if (args.contains(tvs.name)) args(tvs.name) match {
