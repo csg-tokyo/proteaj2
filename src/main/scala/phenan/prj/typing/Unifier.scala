@@ -5,6 +5,8 @@ import phenan.prj._
 class Unifier (compiler: JCompiler) {
   type MetaArgs = Map[String, MetaValue]
 
+  def unify (t: JType, gt: JGenericType): Option[MetaArgs] = TypeUnifier.check(t, gt.signature, gt.env)
+
   object TypeUnifier extends TypeChecker[Option[MetaArgs]] {
 
     // type >:> signature
@@ -148,6 +150,8 @@ class Unifier (compiler: JCompiler) {
     def check (obj: JObjectType, pvs: PureVariableSignature, args: MetaArgs): Option[MetaArgs] = None
 
     def check (wc: JWildcard, pts: JPrimitiveTypeSignature, args: MetaArgs): Option[MetaArgs] = None
+    def check (wc: JWildcard, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(wc, tvs, args)
+    def check (wc: JWildcard, pvs: PureVariableSignature, args: MetaArgs): Option[MetaArgs] = None
 
     def check (ary: JArrayType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(ary, tvs, args)
     def check (ary: JArrayType, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = ExactTypeUnifier.check(ary.componentType, ats.component, args)
@@ -196,28 +200,43 @@ class Unifier (compiler: JCompiler) {
       case Nil => Some(env)
     }
 
-    private def typeVariableSignature (rt: JRefType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = {
+    private def typeVariableSignature (mv: MetaValue, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = {
       if (args.contains(tvs.name)) {
-        if (rt == args(tvs.name)) Some(args)
+        if (mv == args(tvs.name)) Some(args)
         else None
       }
-      else Some(args + (tvs.name -> rt))
+      else Some(args + (tvs.name -> mv))
     }
   }
 
   object MetaValueUnifier extends TypeArgumentUnifier {
-    def check(wc: JWildcard, pvs: PureVariableSignature, args: MetaArgs): Option[MetaArgs] = ???
+    def check (wc: JWildcard, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = wc match {
+      case JWildcard(Some(ub1), None) => wld match {
+        case WildcardArgument(ub2, None) => TypeUnifier.check(ub1, ub2.getOrElse(JTypeSignature.objectTypeSig), args)
+        case _ => None
+      }
+      case JWildcard(None, Some(lb1)) => wld match {
+        case WildcardArgument(None, Some(lb2)) => compiler.inferencer.TypeInferencer.check(lb1, lb2, args)
+        case _ => None
+      }
+      case JWildcard(None, None) => wld match {
+        case WildcardArgument(None, None) => Some(args)
+        case WildcardArgument(Some(obj), None) if compiler.typeLoader.objectType.contains(obj) => Some(args)
+        case _ => None
+      }
+    }
 
-    def check(wc: JWildcard, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = ???
+    def check (wc: JWildcard, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = checkWildcard(wc, cts, args)
 
-    def check(wc: JWildcard, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = ???
+    def check (wc: JWildcard, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = checkWildcard(wc, ats, args)
 
-    def check(wc: JWildcard, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = ???
+    def check (wc: JWildcard, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = checkWildcard(wc, cws, args)
 
-    def check(wc: JWildcard, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = ???
-
-    def check(wc: JWildcard, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = ???
-
+    private def checkWildcard (wc: JWildcard, sig: JTypeSignature, args: MetaArgs): Option[MetaArgs] = wc match {
+      case JWildcard(Some(ub), None) => TypeUnifier.check(ub, sig, args)
+      case JWildcard(None, Some(lb)) => compiler.inferencer.TypeInferencer.check(lb, sig, args)
+      case JWildcard(None, None) => Some(args)
+    }
   }
 
   object ExactTypeUnifier extends TypeArgumentUnifier {
@@ -231,17 +250,27 @@ class Unifier (compiler: JCompiler) {
       case _ => None
     }
 
-    def check (wc: JWildcard, pvs: PureVariableSignature, args: MetaArgs): Option[MetaArgs] = ???
+    def check (wc: JWildcard, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = wc match {
+      case JWildcard(Some(ub1), None) => wld match {
+        case WildcardArgument(ub2, None) => super.check(ub1, ub2.getOrElse(JTypeSignature.objectTypeSig), args)
+        case _ => None
+      }
+      case JWildcard(None, Some(lb1)) => wld match {
+        case WildcardArgument(None, Some(lb2)) => super.check(lb1, lb2, args)
+        case _ => None
+      }
+      case JWildcard(None, None) => wld match {
+        case WildcardArgument(None, None) => Some(args)
+        case WildcardArgument(Some(obj), None) if compiler.typeLoader.objectType.contains(obj) => Some(args)
+        case _ => None
+      }
+    }
 
-    def check (wc: JWildcard, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = ???
+    def check (wc: JWildcard, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = None
 
-    def check (wc: JWildcard, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = ???
+    def check (wc: JWildcard, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = None
 
-    def check (wc: JWildcard, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = ???
-
-    def check (wc: JWildcard, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = ???
-
-    def check (wc: JWildcard, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = ???
+    def check (wc: JWildcard, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = None
   }
 }
 

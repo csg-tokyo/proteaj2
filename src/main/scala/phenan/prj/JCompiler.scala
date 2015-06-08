@@ -6,6 +6,7 @@ import phenan.prj.declaration.DeclarationCompiler
 import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state.JState
+import phenan.prj.typing._
 
 class JCompiler (implicit val state: JState) {
 
@@ -48,6 +49,9 @@ class JCompiler (implicit val state: JState) {
   val classLoader: JClassLoader = new JClassLoaderImpl(this)
   val typeLoader: JTypeLoader = new JTypeLoaderImpl(this)
   val declarationCompiler = new DeclarationCompiler(this)
+
+  val unifier = new Unifier(this)
+  val inferencer = new Inferencer(this)
 
   private var modules: Map[String, IRClass] = Map.empty
   private var compiled: Map[String, IRClass] = Map.empty
