@@ -2,15 +2,22 @@ package phenan.prj.body
 
 import phenan.prj._
 import phenan.prj.combinator._
+import phenan.prj.exception.ParseException
 import phenan.prj.ir._
 
 import scala.language.implicitConversions
 import scala.util._
+import scala.util.parsing.input.CharSequenceReader
 
 import scalaz.Memo._
 
 class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   type Elem = Char
+
+  def parse [T] (parser: HParser[T], in: String): Try[T] = parser(new CharSequenceReader(in)) match {
+    case ParseSuccess(result, _) => Success(result)
+    case ParseFailure(msg, _)    => Failure(ParseException(msg))
+  }
 
   class StatementParsers private (returnType: JType, env: Environment) {
     lazy val block = '{' ~> blockStatements <~ '}' ^^ IRBlock

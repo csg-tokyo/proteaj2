@@ -15,6 +15,9 @@ class JTypeLoader (compiler: JCompiler) {
   }
 
   lazy val objectType = compiler.classLoader.objectClass.flatMap(_.objectType(Nil))
+  lazy val stringType = compiler.classLoader.stringClass.flatMap(_.objectType(Nil))
+  lazy val anyClassType = compiler.classLoader.classClass.flatMap(_.objectType(List(JWildcard(None, None))))
+
   lazy val boolean = compiler.classLoader.boolean.primitiveType
   lazy val void = compiler.classLoader.void.primitiveType
 

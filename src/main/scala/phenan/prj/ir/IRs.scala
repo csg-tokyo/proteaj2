@@ -270,28 +270,3 @@ object IRModifiers {
     case _ => 0
   }
 }
-
-// TODO:
-trait IRAnnotations {
-  def resolver: NameResolver
-  def annotations: List[Annotation]
-
-  def classSig: Option[JClassSignature] = find (JTypeSignature.classSigTypeSig).map { args =>
-    val metaParams = args.get("metaParameters")
-    val superType = args.get("superType")
-    val interfaces = args.get("interfaces")
-    ???
-  }
-
-  def find (sig: JClassTypeSignature): Option[Map[String, AnnotationElement]] = annotations.collectFirst {
-    case MarkerAnnotation(name) if resolver.classTypeSignature(name).toOption.contains(sig) => Map.empty
-    case SingleElementAnnotation(name, arg) if resolver.classTypeSignature(name).toOption.contains(sig) => Map("value" -> arg)
-    case FullAnnotation(name, args) if resolver.classTypeSignature(name).toOption.contains(sig) => args
-  }
-
-  type ElemReader[A] = scalaz.ReaderT[Option, AnnotationElement, A]
-  object ElemReader extends scalaz.KleisliInstances with scalaz.KleisliFunctions {
-    def apply[A] (f: AnnotationElement => Option[A]): ElemReader[A] = kleisli(f)
-  }
-
-}

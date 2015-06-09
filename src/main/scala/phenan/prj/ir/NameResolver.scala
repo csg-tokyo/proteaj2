@@ -96,10 +96,10 @@ trait NameResolver {
 }
 
 object NameResolver {
-  def root (compiler: JCompiler) = RootResolver(compiler)
+  def root (compiler: JCompiler) = new RootResolver(compiler)
 }
 
-case class RootResolver (compiler: JCompiler) extends NameResolver {
+class RootResolver private[ir] (val compiler: JCompiler) extends NameResolver {
   def file (file: IRFile): NameResolver = NameResolverInFile(file, this)
 
   def environment: Map[String, MetaValue] = Map.empty

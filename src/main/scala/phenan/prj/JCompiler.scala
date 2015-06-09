@@ -2,6 +2,7 @@ package phenan.prj
 
 import java.io._
 
+import phenan.prj.body.BodyCompiler
 import phenan.prj.declaration.DeclarationCompiler
 import phenan.prj.internal._
 import phenan.prj.ir._
@@ -50,6 +51,7 @@ class JCompiler (implicit val state: JState) {
   val classLoader: JClassLoader = new JClassLoaderImpl(this)
   val typeLoader: JTypeLoader = new JTypeLoader(this)
   val declarationCompiler = new DeclarationCompiler(this)
+  val bodyCompiler = new BodyCompiler(this)
 
   private var modules: Map[String, IRClass] = Map.empty
   private var compiled: Map[String, IRClass] = Map.empty

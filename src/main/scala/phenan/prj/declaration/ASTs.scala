@@ -86,7 +86,9 @@ case object PureModifier extends Modifier
 case object LiteralModifier extends Modifier
 
 sealed trait AnnotationElement
-sealed trait Annotation extends Modifier with AnnotationElement
+sealed trait Annotation extends Modifier with AnnotationElement {
+  def name: QualifiedName
+}
 
 case class FullAnnotation (name: QualifiedName, args: Map[String, AnnotationElement]) extends Annotation
 case class SingleElementAnnotation (name: QualifiedName, arg: AnnotationElement) extends Annotation
