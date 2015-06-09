@@ -51,7 +51,6 @@ class JCompiler (implicit val state: JState) {
   val declarationCompiler = new DeclarationCompiler(this)
 
   val unifier = new Unifier(this)
-  val inferencer = new Inferencer(this)
 
   private var modules: Map[String, IRClass] = Map.empty
   private var compiled: Map[String, IRClass] = Map.empty
