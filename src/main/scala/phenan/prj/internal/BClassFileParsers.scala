@@ -2,6 +2,7 @@ package phenan.prj.internal
 
 import java.io._
 
+import phenan.prj.combinator._
 import phenan.prj.exception._
 import phenan.prj.state.JState
 

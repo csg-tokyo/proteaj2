@@ -1,5 +1,6 @@
 package phenan.prj.internal
 
+import phenan.prj.combinator._
 import phenan.prj.exception.InvalidClassFileException
 import phenan.prj.state.JState
 

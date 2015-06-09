@@ -1,4 +1,4 @@
-package phenan.prj.internal
+package phenan.prj.combinator
 
 import scala.util._
 

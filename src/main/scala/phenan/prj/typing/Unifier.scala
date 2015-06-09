@@ -6,6 +6,7 @@ class Unifier (compiler: JCompiler) {
   type MetaArgs = Map[String, MetaValue]
 
   def unify (t: JType, gt: JGenericType): Option[MetaArgs] = TypeUnifier.check(t, gt.signature, gt.env)
+  def infer (t: JType, gt: JGenericType): Option[MetaArgs] = TypeInferencer.check(t, gt.signature, gt.env)
 
   object TypeUnifier extends TypeChecker[Option[MetaArgs]] {
 
@@ -375,7 +376,7 @@ class Unifier (compiler: JCompiler) {
       }
       case WildcardArgument(None, None) => Some(args)
     }
-    
+
     def check (ary: JArrayType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(ary, tvs, args)
     def check (ary: JArrayType, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = ExactTypeUnifier.check(ary.componentType, ats.component, args)
     def check (ary: JArrayType, pvs: PureVariableSignature, args: MetaArgs): Option[MetaArgs] = None

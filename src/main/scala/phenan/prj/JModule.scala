@@ -76,7 +76,7 @@ sealed trait JType extends JModule {
   def isAssignableTo (that: JType): Boolean
 
   def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = compiler.unifier.unify(this, t)
-  def unifyL (t: JGenericType): Option[Map[String, MetaValue]] = ???
+  def unifyL (t: JGenericType): Option[Map[String, MetaValue]] = compiler.unifier.infer(this, t)
 
   def <:< (t: JType): Boolean = this.isSubtypeOf(t)
   def >:> (t: JType): Boolean = t.isSubtypeOf(this)

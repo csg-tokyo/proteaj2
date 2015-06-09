@@ -46,11 +46,10 @@ class JCompiler (implicit val state: JState) {
 
   }
 
+  val unifier = new Unifier(this)
   val classLoader: JClassLoader = new JClassLoaderImpl(this)
   val typeLoader: JTypeLoader = new JTypeLoaderImpl(this)
   val declarationCompiler = new DeclarationCompiler(this)
-
-  val unifier = new Unifier(this)
 
   private var modules: Map[String, IRClass] = Map.empty
   private var compiled: Map[String, IRClass] = Map.empty
