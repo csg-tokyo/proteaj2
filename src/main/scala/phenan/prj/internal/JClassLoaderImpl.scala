@@ -1,6 +1,7 @@
 package phenan.prj.internal
 
 import phenan.prj._
+import phenan.prj.signature._
 import phenan.prj.state._
 import phenan.prj.exception._
 

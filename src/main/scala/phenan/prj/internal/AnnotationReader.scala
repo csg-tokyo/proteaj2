@@ -1,6 +1,7 @@
 package phenan.prj.internal
 
 import phenan.prj._
+import phenan.prj.signature._
 import phenan.prj.state.JState
 
 import scalaz._
@@ -140,8 +141,7 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   private lazy val elementReader = Reader(identity[Map[String, BAnnotationElement]])
 
   private def required [T] (name: String)(reader: Reader[BAnnotationElement, Option[T]])(default: => T) = element(name)(reader) {
-    state.error("invalid generic parameter annotation : name field does not exist")
-    default
+    state.errorAndReturn("required annotation element " + name + " is not found", default)
   }
 
   private def optional [T] (name: String)(reader: Reader[BAnnotationElement, Option[T]]): Reader[Map[String, BAnnotationElement], Option[T]] = {

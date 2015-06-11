@@ -1,4 +1,4 @@
-package phenan.prj.internal
+package phenan.prj.signature
 
 import phenan.prj._
 import phenan.prj.state.JState
@@ -20,13 +20,6 @@ object SignatureParsers extends PackratParsers {
   def parseClassTypeSignature (sig: String)(implicit state: JState): Option[JClassTypeSignature] = parse(sig, "class type signature", classType)
 
   def parseParameterSignature (sig: String)(implicit state: JState): Option[JParameterSignature] = parse(sig, "parameter signature", parameterSignature)
-
-  private def parse[T] (sig: String, kind: String, parser: Parser[T])(implicit state: JState): Option[T] = parser(new PackratReader[Char](new CharSequenceReader(sig))) match {
-    case Success(ret, _)   => Some(ret)
-    case NoSuccess(msg, _) =>
-      state.error("fail to parse " + kind + " : " + sig + "\n" + msg)
-      None
-  }
 
   private lazy val classSignature = formalTypeParamList ~ classType ~ classType.* ^^ {
     case typeParams ~ superClass ~ interfaces => JClassSignature(typeParams, superClass, interfaces)
@@ -98,4 +91,9 @@ object SignatureParsers extends PackratParsers {
     elem("id start", Character.isJavaIdentifierStart) ~ elem("id part", Character.isJavaIdentifierPart).* ^^ {
       case s ~ ps => (s :: ps).mkString
     }
+
+  private def parse[T] (sig: String, kind: String, parser: Parser[T])(implicit state: JState): Option[T] = parser(new PackratReader[Char](new CharSequenceReader(sig))) match {
+    case Success(ret, _)   => Some(ret)
+    case NoSuccess(msg, _) => state.errorAndReturn("fail to parse " + kind + " : " + sig + "\n" + msg, None)
+  }
 }

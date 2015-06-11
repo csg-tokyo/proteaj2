@@ -1,7 +1,7 @@
 package phenan.prj.internal
 
 import phenan.prj._
-import phenan.prj.state.JState
+import phenan.prj.signature._
 
 class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler) extends JClass {
 
