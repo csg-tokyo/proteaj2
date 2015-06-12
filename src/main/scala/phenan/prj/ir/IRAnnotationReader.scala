@@ -9,6 +9,12 @@ import scalaz._
 import Scalaz._
 
 class IRAnnotationReader (resolver: NameResolver) {
+  
+  private lazy val pure = marker("Pure")
+
+  private lazy val context = marker("Context")
+
+  private lazy val finalizer = marker("Finalizer")
 
   private lazy val classSig = annotation("proteaj/lang/ClassSig") {
     for {
@@ -77,12 +83,41 @@ class IRAnnotationReader (resolver: NameResolver) {
     }
   }
 
+  private lazy val otherAnnotation: Annotation =?> IRAnnotation = for {
+    typ  <- annotationClass >==> { _.objectType(Nil) }
+    args <- annotationArguments(typ)
+  } yield IRAnnotation(typ, args)
+
+  private lazy val annotationClass: Annotation =?> JClass = read { ann => resolver.resolve(ann.name.names).toOption }
+
+  private def annotationArguments (annotationType: JObjectType): Annotation =?> Map[JMethod, MetaValue] = {
+    allAnnotationElements >=> rep(annotationElement(annotationType))
+  }.map(_.toMap)
+
+  private lazy val allAnnotationElements: Annotation =?> List[(String, AnnotationElement)] = lift {
+    case MarkerAnnotation(_)             => Nil
+    case SingleElementAnnotation(_, arg) => List("value" -> arg)
+    case FullAnnotation(_, args)         => args.toList
+  }
+
+  private def annotationElement (annotationType: JObjectType): (String, AnnotationElement) =?> (JMethod, MetaValue) = for {
+    method <- resolveAnnotationName(annotationType) <=< lift { pair: (String, AnnotationElement) => pair._1 }
+    value  <- expression(method.returnType.bind(Map.empty)) <=< lift { pair: (String, AnnotationElement) => pair._2 }
+  } yield method -> value
+
+  private def resolveAnnotationName (annotationType: JObjectType): String =?> JMethod = read { name =>
+    annotationType.methods.get(name).flatMap(_.headOption)
+  }
+
   private def annotation [T] (desc: String)(reader: Annotation =?> T): List[Annotation] =?> T = annotationReader >==> { as =>
     compiler.classLoader.loadClass_PE(desc).flatMap(as.get)
   } >=> reader
 
-  private lazy val annotationReader: List[Annotation] =?> Map[JClass, Annotation] = lift(_.flatMap { a => resolver.resolve(a.name.names).map(_ -> a).toOption }.toMap)
+  private def marker (desc: String): List[Annotation] =?> Boolean = annotationReader.map { as =>
+    compiler.classLoader.loadClass_PE(desc).exists(as.contains)
+  }
 
+  private lazy val annotationReader: List[Annotation] =?> Map[JClass, Annotation] = rep(annotationClass.flatMap(clazz => lift(clazz -> _))).map(_.toMap)
 
   private def enumSwitch [T] (name: String, enumTypeName: String)(readers: String => Annotation =?> T): Annotation =?> T = elem(name) >=> expression(enumTypeName) >=> collect {
     case ConcretePureValue(en: java.lang.Enum[_], _) => en.name
@@ -92,7 +127,7 @@ class IRAnnotationReader (resolver: NameResolver) {
 
   private def array [T] (name: String)(reader: AnnotationElement =?> T): Annotation =?> List[T] = opt(elem(name)).map {
     case Some(ArrayOfAnnotationElement(array)) => array
-    case _ => Nil
+    case elem => elem.toList
   } >=> rep(reader)
 
   private def optional [T] (name: String)(reader: AnnotationElement =?> T): Annotation =?> Option[T] = opt(elem(name) >=> reader)
@@ -133,7 +168,7 @@ class IRAnnotationReader (resolver: NameResolver) {
   private def collect [A, B](f: PartialFunction[A, B]): A =?> B = read(f.lift)
   private def partial [A, B](f: PartialFunction[A, Option[B]]): A =?> B = read { a => f.applyOrElse(a, { _:A => None }) }
 
-  private def rep [A, B](reader: A =?> B): List[A] =?> List[B] = read(_.traverse(reader(_)))
+  private def rep [A, B] (reader: A =?> B): List[A] =?> List[B] = read(_.traverse(reader(_)))
   private def opt [A, B] (reader: A =?> B): A =?> Option[B] = read { a => Some(reader(a)) }
 
   def compiler = resolver.root.compiler
