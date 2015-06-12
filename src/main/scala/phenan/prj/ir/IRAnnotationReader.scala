@@ -9,14 +9,103 @@ import scalaz._
 import Scalaz._
 
 class IRAnnotationReader (resolver: NameResolver) {
+
+  def classAnnotations (as: List[Annotation]): IRClassAnnotations = annotationReader(as).map(classAnnotations(_, defaultClassAnnotations)).getOrElse(defaultClassAnnotations)
+  def methodAnnotations (as: List[Annotation]): IRMethodAnnotations = annotationReader(as).map(methodAnnotations(_, defaultMethodAnnotations)).getOrElse(defaultMethodAnnotations)
+  def fieldAnnotations (as: List[Annotation]): IRFieldAnnotations = annotationReader(as).map(fieldAnnotations(_, defaultFieldAnnotations)).getOrElse(defaultFieldAnnotations)
   
-  private lazy val pure = marker("Pure")
+  private lazy val defaultClassAnnotations = IRClassAnnotations(None, None, false, false, Nil)
+  private lazy val defaultMethodAnnotations = IRMethodAnnotations(None, None, false, false, Nil)
+  private lazy val defaultFieldAnnotations = IRFieldAnnotations(None, false, Nil)
 
-  private lazy val context = marker("Context")
+  private def classAnnotations (as: List[(String, Annotation)], result: IRClassAnnotations): IRClassAnnotations = as match {
+    case ("proteaj/lang/ClassSig", ann) :: rest => classAnnotations(rest, IRClassAnnotations(classSignature(ann), result.dsl, result.isPure, result.isContext, result.others))
+    case ("proteaj/lang/DSL", ann) :: rest      => classAnnotations(rest, IRClassAnnotations(result.signature, dsl(ann), result.isPure, result.isContext, result.others))
+    case ("proteaj/lang/Pure", _) :: rest       => classAnnotations(rest, IRClassAnnotations(result.signature, result.dsl, true, result.isContext, result.others))
+    case ("proteaj/lang/Context", _) :: rest    => classAnnotations(rest, IRClassAnnotations(result.signature, result.dsl, result.isPure, true, result.others))
+    case (_, ann) :: rest                       => classAnnotations(rest, IRClassAnnotations(result.signature, result.dsl, result.isPure, result.isContext, result.others ++ otherAnnotation(ann)))
+    case Nil => result
+  }
 
-  private lazy val finalizer = marker("Finalizer")
+  private def methodAnnotations (as: List[(String, Annotation)], result: IRMethodAnnotations): IRMethodAnnotations = as match {
+    case ("proteaj/lang/MethodSig", ann) :: rest => methodAnnotations(rest, IRMethodAnnotations(methodSignature(ann), result.operator, result.isPure, result.isFinalizer, result.others))
+    case ("proteaj/lang/Operator", ann) :: rest  => methodAnnotations(rest, IRMethodAnnotations(result.signature, operator(ann), result.isPure, result.isFinalizer, result.others))
+    case ("proteaj/lang/Pure", _) :: rest        => methodAnnotations(rest, IRMethodAnnotations(result.signature, result.operator, true, result.isFinalizer, result.others))
+    case ("proteaj/lang/Finalizer", _) :: rest   => methodAnnotations(rest, IRMethodAnnotations(result.signature, result.operator, result.isPure, true, result.others))
+    case (_, ann) :: rest                        => methodAnnotations(rest, IRMethodAnnotations(result.signature, result.operator, result.isPure, result.isFinalizer, result.others ++ otherAnnotation(ann)))
+    case Nil => result
+  }
 
-  private lazy val classSig = annotation("proteaj/lang/ClassSig") {
+  private def fieldAnnotations (as: List[(String, Annotation)], result: IRFieldAnnotations): IRFieldAnnotations = as match {
+    case ("proteaj/lang/FieldSig", ann) :: rest => fieldAnnotations(rest, IRFieldAnnotations(fieldSignature(ann), result.isPure, result.others))
+    case ("proteaj/lang/Pure", _) :: rest       => fieldAnnotations(rest, IRFieldAnnotations(result.signature, true, result.others))
+    case (_, ann) :: rest                       => fieldAnnotations(rest, IRFieldAnnotations(result.signature, result.isPure, result.others ++ otherAnnotation(ann)))
+    case Nil => result
+  }
+
+  private lazy val annotationReader: List[Annotation] =?> List[(String, Annotation)] = rep(annotationClass.flatMap(clazz => lift(clazz.internalName -> _)))
+
+  private lazy val classSignature = for {
+    metaParams <- array("metaParameters")(elementAnnotation("proteaj/lang/MetaParameter", metaParameter))
+    supType    <- optional("superType")(classTypeSignature)
+    interfaces <- array("interfaces")(classTypeSignature)
+  } yield JClassSignature(metaParams, supType | JTypeSignature.objectTypeSig, interfaces)
+
+  private lazy val methodSignature: Annotation =?> JMethodSignature = for {
+    metaParams  <- array("metaParameters")(elementAnnotation("proteaj/lang/MetaParameter", metaParameter))
+    retType     <- required("returnType")(typeSignature)
+    parameters  <- array("parameters")(parameterSignature)
+    exceptions  <- array("throwsTypes")(typeSignature)
+    activates   <- array("activates")(typeSignature)
+    deactivates <- array("deactivates")(typeSignature)
+    requires    <- array("requires")(typeSignature)
+  } yield JMethodSignature(metaParams, parameters, retType, exceptions, activates, deactivates, requires)
+
+  private lazy val fieldSignature: Annotation =?> JTypeSignature = required("value")(typeSignature)
+
+  private lazy val dsl: Annotation =?> DSLInfo = for {
+    priorities <- array("priorities")(string)
+    withDSLs   <- array("with")(descriptor)
+  } yield DSLInfo(priorities, withDSLs)
+
+  private lazy val operator: Annotation =?> JOperatorSyntaxDef = optional("priority")(string).flatMap { priority =>
+    array("pattern")(elementAnnotation("proteaj/lang/OpElem", operatorElement)).flatMap { pattern =>
+      enumSwitch("level", "proteaj/lang/OpLevel") {
+        case "Statement"  => unit(JStatementSyntaxDef(priority, pattern))
+        case "Expression" => unit(JExpressionSyntaxDef(priority, pattern))
+        case "Literal"    => unit(JLiteralSyntaxDef(priority, pattern))
+        case _            => unit(JExpressionSyntaxDef(priority, pattern))
+      }
+    }
+  }
+
+  private lazy val metaParameter: Annotation =?> FormalMetaParameter = for {
+    name     <- required("name")(string)
+    metaType <- optional("type")(typeSignature)
+    priority <- optional("priority")(string)
+    bounds   <- array("bounds")(typeSignature)
+  } yield FormalMetaParameter(name, metaType | JTypeSignature.typeTypeSig, priority, bounds)
+
+  private lazy val operatorElement: Annotation =?> JSyntaxElementDef = enumSwitch("kind", "proteaj/lang/OpElemType") {
+    case "Name"         => required("name")(string).map(JOperatorNameDef)
+    case "Hole"         => unit(JOperandDef)
+    case "Star"         => unit(JRepetition0Def)
+    case "Plus"         => unit(JRepetition1Def)
+    case "Optional"     => unit(JOptionalOperandDef)
+    case "AndPredicate" => required("name")(parameterSignature).map(JAndPredicateDef)
+    case "NotPredicate" => required("name")(parameterSignature).map(JNotPredicateDef)
+    case "Reference"    => required("name")(string).map(JMetaValueRefDef)
+    case _              => state.errorAndReturn("invalid operator element type", unit(JOperandDef))
+  }
+
+  /*
+  private lazy val pure = marker("proteaj/lang/Pure")
+
+  private lazy val context = marker("proteaj/lang/Context")
+
+  private lazy val finalizer = marker("proteaj/lang/Finalizer")
+
+  private lazy val classSignature = annotation("proteaj/lang/ClassSig") {
     for {
       metaParams <- array("metaParameters")(elementAnnotation(metaParameter))
       supType    <- optional("superType")(classTypeSignature)
@@ -81,7 +170,7 @@ class IRAnnotationReader (resolver: NameResolver) {
       case "Reference"    => required("name")(string).map(JMetaValueRefDef)
       case _              => state.errorAndReturn("invalid operator element type", unit(JOperandDef))
     }
-  }
+  }*/
 
   private lazy val otherAnnotation: Annotation =?> IRAnnotation = for {
     typ  <- annotationClass >==> { _.objectType(Nil) }
@@ -109,16 +198,6 @@ class IRAnnotationReader (resolver: NameResolver) {
     annotationType.methods.get(name).flatMap(_.headOption)
   }
 
-  private def annotation [T] (desc: String)(reader: Annotation =?> T): List[Annotation] =?> T = annotationReader >==> { as =>
-    compiler.classLoader.loadClass_PE(desc).flatMap(as.get)
-  } >=> reader
-
-  private def marker (desc: String): List[Annotation] =?> Boolean = annotationReader.map { as =>
-    compiler.classLoader.loadClass_PE(desc).exists(as.contains)
-  }
-
-  private lazy val annotationReader: List[Annotation] =?> Map[JClass, Annotation] = rep(annotationClass.flatMap(clazz => lift(clazz -> _))).map(_.toMap)
-
   private def enumSwitch [T] (name: String, enumTypeName: String)(readers: String => Annotation =?> T): Annotation =?> T = elem(name) >=> expression(enumTypeName) >=> collect {
     case ConcretePureValue(en: java.lang.Enum[_], _) => en.name
   } flatMap readers
@@ -140,8 +219,8 @@ class IRAnnotationReader (resolver: NameResolver) {
     case FullAnnotation(_, args)       => args.get(name)
   }
 
-  private def elementAnnotation [T] (reader: List[Annotation] =?> T): AnnotationElement =?> T = reader <=< collect {
-    case ann: Annotation => List(ann)
+  private def elementAnnotation [T] (desc: String, reader: Annotation =?> T): AnnotationElement =?> T = reader <=< collect {
+    case ann: Annotation if resolver.resolve(ann.name.names).toOption.exists(_.internalName == desc) => ann
   }
 
   private lazy val typeSignature: AnnotationElement =?> JTypeSignature = string >==> SignatureParsers.parseTypeSignature
