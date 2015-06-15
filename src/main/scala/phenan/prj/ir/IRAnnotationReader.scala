@@ -13,7 +13,7 @@ class IRAnnotationReader (resolver: NameResolver) {
   def classAnnotations (as: List[Annotation]): IRClassAnnotations = annotationReader(as).map(classAnnotations(_, defaultClassAnnotations)).getOrElse(defaultClassAnnotations)
   def methodAnnotations (as: List[Annotation]): IRMethodAnnotations = annotationReader(as).map(methodAnnotations(_, defaultMethodAnnotations)).getOrElse(defaultMethodAnnotations)
   def fieldAnnotations (as: List[Annotation]): IRFieldAnnotations = annotationReader(as).map(fieldAnnotations(_, defaultFieldAnnotations)).getOrElse(defaultFieldAnnotations)
-  
+
   private lazy val defaultClassAnnotations = IRClassAnnotations(None, None, false, false, Nil)
   private lazy val defaultMethodAnnotations = IRMethodAnnotations(None, None, false, false, Nil)
   private lazy val defaultFieldAnnotations = IRFieldAnnotations(None, false, Nil)
@@ -97,80 +97,6 @@ class IRAnnotationReader (resolver: NameResolver) {
     case "Reference"    => required("name")(string).map(JMetaValueRefDef)
     case _              => state.errorAndReturn("invalid operator element type", unit(JOperandDef))
   }
-
-  /*
-  private lazy val pure = marker("proteaj/lang/Pure")
-
-  private lazy val context = marker("proteaj/lang/Context")
-
-  private lazy val finalizer = marker("proteaj/lang/Finalizer")
-
-  private lazy val classSignature = annotation("proteaj/lang/ClassSig") {
-    for {
-      metaParams <- array("metaParameters")(elementAnnotation(metaParameter))
-      supType    <- optional("superType")(classTypeSignature)
-      interfaces <- array("interfaces")(classTypeSignature)
-    } yield JClassSignature(metaParams, supType | JTypeSignature.objectTypeSig, interfaces)
-  }
-
-  private lazy val methodSignature: List[Annotation] =?> JMethodSignature = annotation("proteaj/lang/MethodSig") {
-    for {
-      metaParams  <- array("metaParameters")(elementAnnotation(metaParameter))
-      retType     <- required("returnType")(typeSignature)
-      parameters  <- array("parameters")(parameterSignature)
-      exceptions  <- array("throwsTypes")(typeSignature)
-      activates   <- array("activates")(typeSignature)
-      deactivates <- array("deactivates")(typeSignature)
-      requires    <- array("requires")(typeSignature)
-    } yield JMethodSignature(metaParams, parameters, retType, exceptions, activates, deactivates, requires)
-  }
-
-  private lazy val fieldSignature: List[Annotation] =?> JTypeSignature = annotation("proteaj/lang/FieldSig") {
-    required("value")(typeSignature)
-  }
-
-  private lazy val dsl: List[Annotation] =?> DSLInfo = annotation("proteaj/lang/DSL") {
-    for {
-      priorities <- array("priorities")(string)
-      withDSLs   <- array("with")(descriptor)
-    } yield DSLInfo(priorities, withDSLs)
-  }
-
-  private lazy val operator: List[Annotation] =?> JOperatorSyntaxDef = annotation("proteaj/lang/Operator") {
-    optional("priority")(string).flatMap { priority =>
-      array("pattern")(elementAnnotation(operatorElement)).flatMap { pattern =>
-        enumSwitch("level", "proteaj/lang/OpLevel") {
-          case "Statement"  => unit(JStatementSyntaxDef(priority, pattern))
-          case "Expression" => unit(JExpressionSyntaxDef(priority, pattern))
-          case "Literal"    => unit(JLiteralSyntaxDef(priority, pattern))
-          case _            => unit(JExpressionSyntaxDef(priority, pattern))
-        }
-      }
-    }
-  }
-
-  private lazy val metaParameter: List[Annotation] =?> FormalMetaParameter = annotation("proteaj/lang/MetaParameter") {
-    for {
-      name     <- required("name")(string)
-      metaType <- optional("type")(typeSignature)
-      priority <- optional("priority")(string)
-      bounds   <- array("bounds")(typeSignature)
-    } yield FormalMetaParameter(name, metaType | JTypeSignature.typeTypeSig, priority, bounds)
-  }
-
-  private lazy val operatorElement: List[Annotation] =?> JSyntaxElementDef = annotation("proteaj/lang/OpElem") {
-    enumSwitch("kind", "proteaj/lang/OpElemType") {
-      case "Name"         => required("name")(string).map(JOperatorNameDef)
-      case "Hole"         => unit(JOperandDef)
-      case "Star"         => unit(JRepetition0Def)
-      case "Plus"         => unit(JRepetition1Def)
-      case "Optional"     => unit(JOptionalOperandDef)
-      case "AndPredicate" => required("name")(parameterSignature).map(JAndPredicateDef)
-      case "NotPredicate" => required("name")(parameterSignature).map(JNotPredicateDef)
-      case "Reference"    => required("name")(string).map(JMetaValueRefDef)
-      case _              => state.errorAndReturn("invalid operator element type", unit(JOperandDef))
-    }
-  }*/
 
   private lazy val otherAnnotation: Annotation =?> IRAnnotation = for {
     typ  <- annotationClass >==> { _.objectType(Nil) }

@@ -30,19 +30,20 @@ trait IRClass extends JClass {
   def inners: List[IRClass]
 
   def simpleName: String
-  def superTypeSignature: JClassTypeSignature
-  def interfaceSignatures: List[JClassTypeSignature]
 
-  private[ir] def implicitClassModifier: Int
+  protected def superTypeSignature: JClassTypeSignature
+  protected def interfaceSignatures: List[JClassTypeSignature]
+
+  protected def implicitClassModifier: Int
   private[ir] def implicitMethodModifier: Int
   private[ir] def implicitFieldModifier: Int
 
-  private[ir] def modifiersAST: List[Modifier]
+  protected def modifiersAST: List[Modifier]
   private[ir] def metaParametersAST: List[MetaParameter]
 
   lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitClassModifier
 
-  lazy val annotations = modifiersAST.collect { case ann: Annotation => ann }
+  lazy val annotations = resolver.annotationReader.classAnnotations(modifiersAST.collect { case ann: Annotation => ann })
 
   lazy val name = internalName.replace('/', '.').replace('$', '.')
 
@@ -55,7 +56,7 @@ trait IRClass extends JClass {
 
   lazy val innerClasses = inners.map(m => m.simpleName -> m.internalName).toMap
 
-  lazy val signature: JClassSignature = JClassSignature(formalMetaParameters, superTypeSignature, interfaceSignatures)
+  lazy val signature: JClassSignature = annotations.signature.getOrElse(JClassSignature(formalMetaParameters, superTypeSignature, interfaceSignatures))
 
   import scalaz.Scalaz._
 
@@ -76,11 +77,11 @@ object IRClass {
 }
 
 trait IRClassLike extends IRClass {
-  private[ir] def defaultSuperTypeSignature: JClassTypeSignature
+  protected def defaultSuperTypeSignature: JClassTypeSignature
 
-  private[ir] def membersAST: List[ClassMember]
-  private[ir] def superTypeAST: Option[TypeName]
-  private[ir] def interfacesAST: List[TypeName]
+  protected def membersAST: List[ClassMember]
+  protected def superTypeAST: Option[TypeName]
+  protected def interfacesAST: List[TypeName]
 
   lazy val inners: List[IRClass] = membersAST.collect {
     case m: ModuleDeclaration => IRClass(m, Some(this), file)
@@ -119,31 +120,31 @@ trait IRClassLike extends IRClass {
 case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
   def simpleName: String = ast.name
 
-  private[ir] def implicitClassModifier = accSuper
+  protected def implicitClassModifier = accSuper
   private[ir] def implicitMethodModifier = 0
   private[ir] def implicitFieldModifier = 0
-  private[ir] def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
+  protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
 
-  private[ir] def modifiersAST = ast.modifiers
+  protected def modifiersAST = ast.modifiers
   private[ir] def metaParametersAST = ast.metaParameters
-  private[ir] def superTypeAST = ast.superClass
-  private[ir] def interfacesAST = ast.interfaces
-  private[ir] def membersAST = ast.members
+  protected def superTypeAST = ast.superClass
+  protected def interfacesAST = ast.interfaces
+  protected def membersAST = ast.members
 }
 
 case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
   def simpleName: String = ast.name
 
-  private[ir] def implicitClassModifier = accAbstract | accInterface
+  protected def implicitClassModifier = accAbstract | accInterface
   private[ir] def implicitMethodModifier: Int = accPublic | accAbstract
   private[ir] def implicitFieldModifier: Int = accPublic | accStatic | accFinal
-  private[ir] def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.objectTypeSig
+  protected def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.objectTypeSig
 
-  private[ir] def modifiersAST = ast.modifiers
+  protected def modifiersAST = ast.modifiers
   private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
-  private[ir] def superTypeAST: Option[TypeName] = None
-  private[ir] def interfacesAST: List[TypeName] = ast.superInterfaces
-  private[ir] def membersAST: List[ClassMember] = ast.members
+  protected def superTypeAST: Option[TypeName] = None
+  protected def interfacesAST: List[TypeName] = ast.superInterfaces
+  protected def membersAST: List[ClassMember] = ast.members
 }
 
 case class IRFieldDef (mod: JModifier, fieldType: JTypeSignature, ast: VariableDeclarator, declaringClass: IRClass) extends JFieldDef {
@@ -156,8 +157,8 @@ trait IRMethod extends JMethodDef {
   def returnTypeSignature: JTypeSignature
 
   private[ir] def metaParametersAST: List[MetaParameter]
-  private[ir] def formalParametersAST: List[FormalParameter]
-  private[ir] def clausesAST: List[MethodClause]
+  protected def formalParametersAST: List[FormalParameter]
+  protected def clausesAST: List[MethodClause]
 
   lazy val signature: JMethodSignature =
     JMethodSignature(formalMetaParameters, formalParameterSignatures, returnTypeSignature,
@@ -209,8 +210,8 @@ case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends
   lazy val returnTypeSignature = state.successOrError(resolver.typeSignature(ast.returnType), "invalid return type of method " + name, VoidTypeSignature)
 
   private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
-  private[ir] def formalParametersAST: List[FormalParameter] = ast.formalParameters
-  private[ir] def clausesAST: List[MethodClause] = ast.clauses
+  protected def formalParametersAST: List[FormalParameter] = ast.formalParameters
+  protected def clausesAST: List[MethodClause] = ast.clauses
 }
 
 case class IRConstructorDef (ast: ConstructorDeclaration, declaringClass: IRClass) extends IRMethod {
@@ -223,14 +224,14 @@ case class IRConstructorDef (ast: ConstructorDeclaration, declaringClass: IRClas
   override def syntax: Option[JOperatorSyntaxDef] = None
 
   override private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
-  override private[ir] def formalParametersAST: List[FormalParameter] = ast.formalParameters
-  override private[ir] def clausesAST: List[MethodClause] = ast.clauses
+  protected def formalParametersAST: List[FormalParameter] = ast.formalParameters
+  protected def clausesAST: List[MethodClause] = ast.clauses
 }
 
 trait IRInitializerMethod extends IRMethod {
   private[ir] def metaParametersAST: List[MetaParameter] = Nil
-  private[ir] def formalParametersAST: List[FormalParameter] = Nil
-  private[ir] def clausesAST: List[MethodClause] = Nil
+  protected def formalParametersAST: List[FormalParameter] = Nil
+  protected def clausesAST: List[MethodClause] = Nil
 
   override def syntax: Option[JOperatorSyntaxDef] = None
 }

@@ -21,6 +21,8 @@ trait NameResolver {
   def typeVariable (name: String): Option[JTypeVariable] = environment.get(name).collect { case v: JTypeVariable => v }
   def metaVariable (name: String): Option[PureVariableRef] = environment.get(name).collect { case v: PureVariableRef => v }
 
+  private[ir] lazy val annotationReader = new IRAnnotationReader(this)
+
   protected[ir] def metaVariableSignature (tn: TypeName): Try[JTypeArgument]
 
   def inClass (clazz: IRClass) = NameResolverInClass(clazz, this)
