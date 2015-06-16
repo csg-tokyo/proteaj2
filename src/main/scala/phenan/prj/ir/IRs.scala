@@ -26,30 +26,29 @@ case class IRFile (ast: CompilationUnit, root: RootResolver) {
   private[ir] def annotationReader = new IRAnnotationReader(this)
 }
 
-trait IRClass extends JClass {
+sealed trait IRMember
+
+trait IRClass extends JClass with IRMember {
   def file: IRFile
 
   def outer: Option[IRClass]
   def inners: List[IRClass]
 
   def simpleName: String
-
-  protected def defaultSuperTypeSignature: JClassTypeSignature
-  protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature]
-
+  
+  protected def modifiersAST: List[Modifier]
+  protected def metaParametersAST: List[MetaParameter]
   protected def superTypeAST: Option[TypeName]
   protected def interfacesAST: List[TypeName]
 
   protected def implicitClassModifier: Int
+  protected def defaultSuperTypeSignature: JClassTypeSignature
+  protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature]
+  
   private[ir] def implicitMethodModifier: Int
   private[ir] def implicitFieldModifier: Int
 
-  protected def modifiersAST: List[Modifier]
-  protected def metaParametersAST: List[MetaParameter]
-
   lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitClassModifier
-
-  lazy val annotations = file.annotationReader.classAnnotations(modifiersAST.collect { case ann: Annotation => ann })
 
   lazy val name = internalName.replace('/', '.').replace('$', '.')
 
@@ -62,10 +61,14 @@ trait IRClass extends JClass {
 
   lazy val innerClasses = inners.map(m => m.simpleName -> m.internalName).toMap
 
+  lazy val annotations = file.annotationReader.classAnnotations(modifiersAST.collect { case ann: Annotation => ann })
+
   lazy val (signature: JClassSignature, resolver: NameResolver) = annotations.signature match {
     case Some(sig) => (sig, sig.metaParams.foldLeft(file.resolver){ _.withMetaParameter(_) }.withInnerClasses(inners))
     case None      => constructResolver(metaParametersAST, Nil, file.resolver)
   }
+
+  lazy val dslInfo = annotations.dsl
 
   private def constructResolver (metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JClassSignature, NameResolver) = metaParametersAST match {
     case param :: rest => resolver.metaParameter(param) match {
@@ -115,11 +118,8 @@ trait IRClassLike extends IRClass {
     case m: ModuleDeclaration => IRClass(m, Some(this), file)
   }
 
-  lazy val fields: List[JFieldDef] = membersAST.collect {
-    case FieldDeclaration(mods, ft, ds) =>
-      val mod = IRModifiers.mod(mods)
-      val fieldType = state.successOrError(resolver.typeSignature(ft), "invalid type of field " + ds.head.name, JTypeSignature.objectTypeSig)
-      ds.map(IRFieldDef(mod, fieldType, _, this))
+  lazy val fields: List[IRField] = membersAST.collect {
+    case FieldDeclaration(mods, ft, ds) => ds.map(IRField(mods, ft, _, this))
   }.flatten
 
   lazy val methods: List[IRMethod] = collectMethods(declaredMethods ++ declaredConstructors ++ instanceInitializer ++ staticInitializer)
@@ -131,8 +131,6 @@ trait IRClassLike extends IRClass {
   lazy val instanceInitializer = membersAST.collect { case i: InstanceInitializer => IRInstanceInitializer(i, this) }
 
   lazy val staticInitializer = membersAST.collect { case s: StaticInitializer => IRStaticInitializer(s, this) }
-
-  def dslInfo = None
 
   private def collectMethods (methods: List[IRMethod]): List[IRMethod] = methods ++ methods.flatMap(_.paramInitializers)
 }
@@ -169,12 +167,16 @@ case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], fi
   protected def membersAST: List[ClassMember] = ast.members
 }
 
-case class IRFieldDef (mod: JModifier, fieldType: JTypeSignature, ast: VariableDeclarator, declaringClass: IRClass) extends JFieldDef {
-  def name: String = ast.name
-  def signature: JTypeSignature = JTypeSignature.arraySig(fieldType, ast.dim)
+case class IRField (modifierAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRClass) extends JFieldDef with IRMember {
+  def mod: JModifier = IRModifiers.mod(modifierAST)
+  def name = declaratorAST.name
+  lazy val signature: JTypeSignature = declaringClass.resolver.typeSignature(fieldTypeAST) match {
+    case Success(t) => JTypeSignature.arraySig(t, declaratorAST.dim)
+    case Failure(e) => state.errorAndReturn("invalid type of field : " + name, e, JTypeSignature.objectTypeSig)
+  }
 }
 
-trait IRMethod extends JMethodDef {
+trait IRMethod extends JMethodDef with IRMember {
   def declaringClass: IRClass
 
   protected def modifiersAST: List[Modifier]
