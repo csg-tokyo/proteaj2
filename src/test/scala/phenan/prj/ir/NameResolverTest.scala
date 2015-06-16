@@ -5,6 +5,7 @@ import java.io.StringReader
 import org.scalatest._
 
 import phenan.prj.JCompiler
+import phenan.prj.declaration.{QualifiedName, TypeName}
 import phenan.prj.state.JConfig
 
 import scala.util._
@@ -60,5 +61,27 @@ class NameResolverTest extends FunSuite with Matchers {
 
     resolver.resolve(List("Map", "Entry")) shouldBe a [Success[_]]
     resolver.resolve(List("Map", "Entry")).get shouldBe compiler.classLoader.load("java/util/Map$Entry").get
+  }
+
+  test ("クラス内") {
+    val program =
+      """package test.pack;
+        |import java.util.*;
+        |class Foo <T, U> {}
+      """.stripMargin
+
+    implicit val state = JConfig().configure.get
+    val compiler = new JCompiler
+    val file = compiler.declarationCompiler.compile(new StringReader(program), "testsrc.java")
+
+    file shouldBe a [Success[_]]
+    file.get.modules should have size 1
+
+    val foo = file.get.modules.head
+    val resolver = foo.resolver
+
+    resolver.typeSignature(TypeName(QualifiedName(List("T")), Nil, 0)) shouldBe a [Success[_]]
+    resolver.typeSignature(TypeName(QualifiedName(List("S")), Nil, 0)) shouldBe a [Failure[_]]
+    resolver.typeSignature(TypeName(QualifiedName(List("List")), List(TypeName(QualifiedName(List("T")), Nil, 0)), 0)) shouldBe a [Success[_]]
   }
 }

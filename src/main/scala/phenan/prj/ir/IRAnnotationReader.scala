@@ -8,7 +8,7 @@ import phenan.prj.state.JState
 import scalaz._
 import Scalaz._
 
-class IRAnnotationReader (resolver: NameResolver) {
+class IRAnnotationReader (file: IRFile) {
 
   def classAnnotations (as: List[Annotation]): IRClassAnnotations = annotationReader(as).map(classAnnotations(_, defaultClassAnnotations)).getOrElse(defaultClassAnnotations)
   def methodAnnotations (as: List[Annotation]): IRMethodAnnotations = annotationReader(as).map(methodAnnotations(_, defaultMethodAnnotations)).getOrElse(defaultMethodAnnotations)
@@ -164,7 +164,7 @@ class IRAnnotationReader (resolver: NameResolver) {
   private def expression (expected: => Option[JType]): AnnotationElement =?> MetaValue = read { _: AnnotationElement => expected } flatMap expression
 
   private def expression (expected: JType): AnnotationElement =?> MetaValue = partial { case ExpressionSnippet(snippet) =>
-    compiler.bodyCompiler.expression(snippet, expected, BaseEnvironment(resolver)).flatMap(_.eval).toOption
+    compiler.bodyCompiler.expression(snippet, expected, BaseEnvironment(file)).flatMap(_.eval).toOption
   }
 
   private def unit [A, B](b: => B): A =?> B = Kleisli { _ => Some(b) }
@@ -176,7 +176,8 @@ class IRAnnotationReader (resolver: NameResolver) {
   private def rep [A, B] (reader: A =?> B): List[A] =?> List[B] = read(_.traverse(reader(_)))
   private def opt [A, B] (reader: A =?> B): A =?> Option[B] = read { a => Some(reader(a)) }
 
-  def compiler = resolver.root.compiler
+  def compiler = file.compiler
+  def resolver = file.resolver
 
-  implicit def state: JState = compiler.state
+  implicit def state: JState = file.state
 }

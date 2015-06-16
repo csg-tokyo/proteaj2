@@ -3,7 +3,8 @@ package phenan.prj.ir
 import phenan.prj._
 import phenan.prj.JCompiler
 import phenan.prj.declaration._
-import phenan.util._
+
+import scala.util._
 
 import JModifier._
 
@@ -21,6 +22,8 @@ case class IRFile (ast: CompilationUnit, root: RootResolver) {
 
   def compiler = root.compiler
   def state = compiler.state
+
+  private[ir] def annotationReader = new IRAnnotationReader(this)
 }
 
 trait IRClass extends JClass {
@@ -31,19 +34,22 @@ trait IRClass extends JClass {
 
   def simpleName: String
 
-  protected def superTypeSignature: JClassTypeSignature
-  protected def interfaceSignatures: List[JClassTypeSignature]
+  protected def defaultSuperTypeSignature: JClassTypeSignature
+  protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature]
+
+  protected def superTypeAST: Option[TypeName]
+  protected def interfacesAST: List[TypeName]
 
   protected def implicitClassModifier: Int
   private[ir] def implicitMethodModifier: Int
   private[ir] def implicitFieldModifier: Int
 
   protected def modifiersAST: List[Modifier]
-  private[ir] def metaParametersAST: List[MetaParameter]
+  protected def metaParametersAST: List[MetaParameter]
 
   lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitClassModifier
 
-  lazy val annotations = resolver.annotationReader.classAnnotations(modifiersAST.collect { case ann: Annotation => ann })
+  lazy val annotations = file.annotationReader.classAnnotations(modifiersAST.collect { case ann: Annotation => ann })
 
   lazy val name = internalName.replace('/', '.').replace('$', '.')
 
@@ -56,14 +62,40 @@ trait IRClass extends JClass {
 
   lazy val innerClasses = inners.map(m => m.simpleName -> m.internalName).toMap
 
-  lazy val signature: JClassSignature = annotations.signature.getOrElse(JClassSignature(formalMetaParameters, superTypeSignature, interfaceSignatures))
+  lazy val (signature: JClassSignature, resolver: NameResolver) = annotations.signature match {
+    case Some(sig) => (sig, sig.metaParams.foldLeft(file.resolver){ _.withMetaParameter(_) }.withInnerClasses(inners))
+    case None      => constructResolver(metaParametersAST, Nil, file.resolver)
+  }
 
-  import scalaz.Scalaz._
+  private def constructResolver (metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JClassSignature, NameResolver) = metaParametersAST match {
+    case param :: rest => resolver.metaParameter(param) match {
+      case Success(fmp) => constructResolver(rest, fmp :: metaParams, resolver.withMetaParameter(fmp))
+      case Failure(e)   =>
+        state.error("invalid meta parameter : " + param, e)
+        constructResolver(rest, metaParams, resolver)
+    }
+    case Nil => (constructSignature(metaParams.reverse, resolver), resolver.withInnerClasses(inners))
+  }
 
-  lazy val formalMetaParameters = state.successOrError(metaParametersAST.traverse(resolver.metaParameter), "invalid meta parameters of class " + name, Nil)
+  private def constructSignature (metaParams: List[FormalMetaParameter], resolver: NameResolver): JClassSignature =
+    JClassSignature(metaParams, constructSuperSignature(resolver), constructInterfaceSignatures(resolver))
 
-  lazy val resolver = file.resolver.inClass(this)
-  
+  private def constructSuperSignature (resolver: NameResolver): JClassTypeSignature = superTypeAST.map { s =>
+    state.successOrError(resolver.classTypeSignature(s), "invalid super type of class " + name + " : " + s, defaultSuperTypeSignature)
+  }.getOrElse(defaultSuperTypeSignature)
+
+  private def constructInterfaceSignatures (resolver: NameResolver): List[JClassTypeSignature] = constructInterfaceSignatures(interfacesAST, Nil, resolver) ++ autoImplementedInterfaceSignatures
+
+  private def constructInterfaceSignatures (interfaces: List[TypeName], signatures: List[JClassTypeSignature], resolver: NameResolver): List[JClassTypeSignature] = interfaces match {
+    case t :: rest => resolver.classTypeSignature(t) match {
+      case Success(sig) => constructInterfaceSignatures(rest, sig :: signatures, resolver)
+      case Failure(e)   =>
+        state.error("invalid interface type name : " + t, e)
+        constructInterfaceSignatures(rest, signatures, resolver)
+    }
+    case Nil => signatures.reverse
+  }
+
   def compiler: JCompiler = file.compiler
 }
 
@@ -77,11 +109,7 @@ object IRClass {
 }
 
 trait IRClassLike extends IRClass {
-  protected def defaultSuperTypeSignature: JClassTypeSignature
-
   protected def membersAST: List[ClassMember]
-  protected def superTypeAST: Option[TypeName]
-  protected def interfacesAST: List[TypeName]
 
   lazy val inners: List[IRClass] = membersAST.collect {
     case m: ModuleDeclaration => IRClass(m, Some(this), file)
@@ -104,14 +132,6 @@ trait IRClassLike extends IRClass {
 
   lazy val staticInitializer = membersAST.collect { case s: StaticInitializer => IRStaticInitializer(s, this) }
 
-  import scalaz.Scalaz._
-
-  lazy val superTypeSignature = superTypeAST.map { s =>
-    state.successOrError(resolver.classTypeSignature(s), "invalid super type of class " + name + " : " + s, defaultSuperTypeSignature)
-  }.getOrElse(defaultSuperTypeSignature)
-
-  lazy val interfaceSignatures = state.successOrError(interfacesAST.traverse(resolver.classTypeSignature), "invalid interface types of class " + name, Nil)
-
   def dslInfo = None
 
   private def collectMethods (methods: List[IRMethod]): List[IRMethod] = methods ++ methods.flatMap(_.paramInitializers)
@@ -124,9 +144,10 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
   private[ir] def implicitMethodModifier = 0
   private[ir] def implicitFieldModifier = 0
   protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
+  protected def autoImplementedInterfaceSignatures = Nil
 
   protected def modifiersAST = ast.modifiers
-  private[ir] def metaParametersAST = ast.metaParameters
+  protected def metaParametersAST = ast.metaParameters
   protected def superTypeAST = ast.superClass
   protected def interfacesAST = ast.interfaces
   protected def membersAST = ast.members
@@ -138,10 +159,11 @@ case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], fi
   protected def implicitClassModifier = accAbstract | accInterface
   private[ir] def implicitMethodModifier: Int = accPublic | accAbstract
   private[ir] def implicitFieldModifier: Int = accPublic | accStatic | accFinal
-  protected def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.objectTypeSig
+  protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
+  protected def autoImplementedInterfaceSignatures = Nil
 
   protected def modifiersAST = ast.modifiers
-  private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
+  protected def metaParametersAST: List[MetaParameter] = ast.metaParameters
   protected def superTypeAST: Option[TypeName] = None
   protected def interfacesAST: List[TypeName] = ast.superInterfaces
   protected def membersAST: List[ClassMember] = ast.members
@@ -154,46 +176,71 @@ case class IRFieldDef (mod: JModifier, fieldType: JTypeSignature, ast: VariableD
 
 trait IRMethod extends JMethodDef {
   def declaringClass: IRClass
-  def returnTypeSignature: JTypeSignature
 
-  private[ir] def metaParametersAST: List[MetaParameter]
+  protected def modifiersAST: List[Modifier]
+  protected def returnTypeAST: Option[TypeName]
+  protected def metaParametersAST: List[MetaParameter]
   protected def formalParametersAST: List[FormalParameter]
   protected def clausesAST: List[MethodClause]
 
-  lazy val signature: JMethodSignature =
-    JMethodSignature(formalMetaParameters, formalParameterSignatures, returnTypeSignature,
-      throwsTypeSignatures, activatesTypeSignatures, deactivatesTypeSignatures, requiresTypeSignatures)
+  lazy val annotations = declaringClass.file.annotationReader.methodAnnotations(modifiersAST.collect { case ann: Annotation => ann })
 
-  lazy val resolver = declaringClass.resolver.inMethod(this)
+  lazy val (signature: JMethodSignature, paramInitializers: List[IRParameterInitializer], resolver: NameResolver) = annotations.signature match {
+    case Some(sig) => (sig, Nil, sig.metaParams.foldLeft(declaringClass.resolver){ _.withMetaParameter(_) })
+    case None      => constructResolver(metaParametersAST, Nil, declaringClass.resolver)
+  }
 
-  import scalaz.Scalaz._
+  private def constructResolver (metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JMethodSignature, List[IRParameterInitializer], NameResolver) = metaParametersAST match {
+    case param :: rest => resolver.metaParameter(param) match {
+      case Success(fmp) => constructResolver(rest, fmp :: metaParams, resolver.withMetaParameter(fmp))
+      case Failure(e)   =>
+        state.error("invalid meta parameter : " + param, e)
+        constructResolver(rest, metaParams, resolver)
+    }
+    case Nil =>
+      val formalParameters = formalParametersAST.map(param => new IRFormalParameter(param, resolver, this))
+      (constructSignature(metaParams.reverse, formalParameters, resolver), formalParameters.flatMap(_.initializerMethod), resolver)
+  }
 
-  lazy val formalMetaParameters = state.successOrError(metaParametersAST.traverse(resolver.metaParameter), "invalid meta parameters of method " + name, Nil)
-  lazy val formalParameters = formalParametersAST.map(param => new IRFormalParameter(param, this))
-  lazy val formalParameterSignatures = state.successOrError(formalParameters.traverse(_.signature), "invalid parameter types of method " + name, Nil)
+  private def constructSignature (metaParams: List[FormalMetaParameter], formalParameters: List[IRFormalParameter], resolver: NameResolver): JMethodSignature = {
+    JMethodSignature(metaParams, getFormalParameterSignatures(formalParameters, Nil), returnSignature(resolver),
+      readClause("throws", { case ThrowsClause(es) => es }, resolver), readClause("activates", { case ActivatesClause(es) => es }, resolver),
+      readClause("deactivates", { case DeactivatesClause(es) => es }, resolver), readClause("requires", { case RequiresClause(es) => es }, resolver))
+  }
 
-  lazy val throwsTypeSignatures = clausesAST.collectFirst { case ThrowsClause(es) =>
-    state.successOrError(es.traverse(resolver.typeSignature), "invalid throws clause of method " + name, Nil)
-  }.getOrElse(Nil)
+  private def getFormalParameterSignatures (formalParameters: List[IRFormalParameter], signatures: List[JParameterSignature]): List[JParameterSignature] = formalParameters match {
+    case param :: rest => param.signature match {
+      case Success(sig) => getFormalParameterSignatures(rest, sig :: signatures)
+      case Failure(e)   =>
+        state.error("invalid formal parameter " + param)
+        getFormalParameterSignatures(rest, signatures)
+    }
+    case Nil => signatures.reverse
+  } 
 
-  lazy val activatesTypeSignatures = clausesAST.collectFirst { case ActivatesClause(cs) =>
-    state.successOrError(cs.traverse(resolver.typeSignature), "invalid activates clause of method " + name, Nil)
-  }.getOrElse(Nil)
+  protected def returnSignature (resolver: NameResolver): JTypeSignature = returnTypeAST.map { t =>
+    resolver.typeSignature(t) match {
+      case Success(s) => s
+      case Failure(e) => state.errorAndReturn("invalid return type : " + t, e, VoidTypeSignature)
+    }
+  }.getOrElse(VoidTypeSignature)
 
-  lazy val deactivatesTypeSignatures = clausesAST.collectFirst { case DeactivatesClause(cs) =>
-    state.successOrError(cs.traverse(resolver.typeSignature), "invalid deactivates clause of method " + name, Nil)
-  }.getOrElse(Nil)
+  private def readClause (name: String, reader: PartialFunction[MethodClause, List[TypeName]], resolver: NameResolver): List[JTypeSignature] = clausesAST.collectFirst(reader).map(readClause(name, _, Nil, resolver)).getOrElse(Nil)
 
-  lazy val requiresTypeSignatures = clausesAST.collectFirst { case RequiresClause(cs) =>
-    state.successOrError(cs.traverse(resolver.typeSignature), "invalid requires clause of method " + name, Nil)
-  }.getOrElse(Nil)
-
-  private[ir] def paramInitializers: List[IRParameterInitializer] = formalParameters.flatMap(_.initializerMethod)
+  private def readClause (name: String, types: List[TypeName], signatures: List[JTypeSignature], resolver: NameResolver): List[JTypeSignature] = types match {
+    case t :: rest => resolver.typeSignature(t) match {
+      case Success(sig) => readClause(name, rest, sig :: signatures, resolver)
+      case Failure(e)   =>
+        state.error("invalid " + name + " clause of method " + this.name, e)
+        readClause(name, rest, signatures, resolver)
+    }
+    case Nil => signatures.reverse
+  }
 }
 
-class IRFormalParameter (ast: FormalParameter, method: IRMethod) {
+class IRFormalParameter (ast: FormalParameter, resolver: NameResolver, method: IRMethod) {
   private lazy val initializer = ast.initializer.map(snippet => (method.name + "$init$" + method.state.uniqueId, snippet))
-  lazy val signature = method.resolver.parameterSignature(ast, initializer.map(_._1))
+  lazy val signature = resolver.parameterSignature(ast, initializer.map(_._1))
   lazy val initializerMethod = for {
     returnType <- signature.map(_.actualTypeSignature).toOption
     (name, snippet) <- initializer
@@ -206,10 +253,10 @@ case class IRMethodDef (ast: MethodDeclaration, declaringClass: IRClass) extends
   def name: String = ast.name
 
   override def syntax: Option[JOperatorSyntaxDef] = None
-
-  lazy val returnTypeSignature = state.successOrError(resolver.typeSignature(ast.returnType), "invalid return type of method " + name, VoidTypeSignature)
-
-  private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
+  
+  protected def modifiersAST: List[Modifier] = ast.modifiers
+  protected def metaParametersAST: List[MetaParameter] = ast.metaParameters
+  protected def returnTypeAST: Option[TypeName] = Some(ast.returnType)
   protected def formalParametersAST: List[FormalParameter] = ast.formalParameters
   protected def clausesAST: List[MethodClause] = ast.clauses
 }
@@ -219,17 +266,18 @@ case class IRConstructorDef (ast: ConstructorDeclaration, declaringClass: IRClas
 
   def name = CommonNames.constructorName
 
-  override def returnTypeSignature: JTypeSignature = VoidTypeSignature
-
   override def syntax: Option[JOperatorSyntaxDef] = None
 
-  override private[ir] def metaParametersAST: List[MetaParameter] = ast.metaParameters
+  protected def modifiersAST: List[Modifier] = ast.modifiers
+  protected def metaParametersAST: List[MetaParameter] = ast.metaParameters
+  protected def returnTypeAST: Option[TypeName] = None
   protected def formalParametersAST: List[FormalParameter] = ast.formalParameters
   protected def clausesAST: List[MethodClause] = ast.clauses
 }
 
 trait IRInitializerMethod extends IRMethod {
-  private[ir] def metaParametersAST: List[MetaParameter] = Nil
+  protected def modifiersAST: List[Modifier] = Nil
+  protected def metaParametersAST: List[MetaParameter] = Nil
   protected def formalParametersAST: List[FormalParameter] = Nil
   protected def clausesAST: List[MethodClause] = Nil
 
@@ -239,18 +287,20 @@ trait IRInitializerMethod extends IRMethod {
 case class IRInstanceInitializer (ast: InstanceInitializer, declaringClass: IRClass) extends IRInitializerMethod {
   def mod: JModifier = JModifier(0)
   def name: String = ""
-  def returnTypeSignature: JTypeSignature = VoidTypeSignature
+  protected def returnTypeAST: Option[TypeName] = None
 }
 
 case class IRStaticInitializer (ast: StaticInitializer, declaringClass: IRClass) extends IRInitializerMethod {
   def mod: JModifier = JModifier(accStatic)
   def name: String = CommonNames.classInitializerName
-  def returnTypeSignature: JTypeSignature = VoidTypeSignature
+  protected def returnTypeAST: Option[TypeName] = None
 }
 
 case class IRParameterInitializer (method: IRMethod, returnTypeSignature: JTypeSignature, name: String, snippet: ExpressionSnippet) extends IRInitializerMethod {
   def mod = JModifier(accPublic | accStatic | accFinal)
   def declaringClass: IRClass = method.declaringClass
+  protected def returnTypeAST: Option[TypeName] = None
+  override protected def returnSignature (resolver: NameResolver): JTypeSignature = returnTypeSignature
 }
 
 object IRModifiers {

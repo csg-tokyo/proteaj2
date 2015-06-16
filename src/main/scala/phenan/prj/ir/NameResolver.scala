@@ -17,16 +17,13 @@ trait NameResolver {
   def root: RootResolver
 
   def isTypeVariable (name: String): Boolean
+  def isMetaVariable (name: String): Boolean
 
   def typeVariable (name: String): Option[JTypeVariable] = environment.get(name).collect { case v: JTypeVariable => v }
   def metaVariable (name: String): Option[PureVariableRef] = environment.get(name).collect { case v: PureVariableRef => v }
 
-  private[ir] lazy val annotationReader = new IRAnnotationReader(this)
-
-  protected[ir] def metaVariableSignature (tn: TypeName): Try[JTypeArgument]
-
-  def inClass (clazz: IRClass) = NameResolverInClass(clazz, this)
-  def inMethod (method: IRMethod) = NameResolverInMethod(method, this)
+  def withMetaParameter (param: FormalMetaParameter): NameResolver = new NameResolver_MetaParameter(param, this)
+  def withInnerClasses (inners: List[IRClass]): NameResolver = new NameResolver_InnerClasses (inners, this)
 
   def resolve (name: List[String]): Try[JClass] =
     resolve(name.head).flatMap(root.findInnerClass(_, name.tail)).orElse(root.findClass(name))
@@ -90,10 +87,11 @@ trait NameResolver {
   }
 
   private def typeArgument (arg: TypeArgument): Try[JTypeArgument] = arg match {
+    case TypeName(QualifiedName(List(name)), Nil, 0) if isMetaVariable(name) => Success(PureVariableSignature(name))
+    case tn: TypeName                  => typeSignature(tn)
     case UpperBoundWildcardType(bound) => typeSignature(bound).map(ub => WildcardArgument(Some(ub), None))
     case LowerBoundWildcardType(bound) => typeSignature(bound).map(lb => WildcardArgument(None, Some(lb)))
     case UnboundWildcardType           => Success(WildcardArgument(None, None))
-    case tn: TypeName                  => metaVariableSignature(tn)
   }
 }
 
@@ -107,6 +105,8 @@ class RootResolver private[ir] (val compiler: JCompiler) extends NameResolver {
   def environment: Map[String, MetaValue] = Map.empty
 
   def isTypeVariable (name: String) = false
+
+  def isMetaVariable (name: String) = false
 
   def resolve (name: String): Try[JClass] = abbreviated(name).orElse(findClass(name))
 
@@ -151,8 +151,6 @@ class RootResolver private[ir] (val compiler: JCompiler) extends NameResolver {
 
   def root = this
 
-  protected[ir] def metaVariableSignature (tn: TypeName) = typeSignature(tn)
-
   private val abbreviated: String => Try[JClass] = mutableHashMapMemo { name =>
     findClass("java/lang/" + name).orElse(findClass("proteaj/lang/" + name))
   }
@@ -168,9 +166,9 @@ case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameRes
 
   def isTypeVariable (name: String) = false
 
-  def resolve (name: String): Try[JClass] = abbreviated(name).orElse(root.resolve(name))
+  def isMetaVariable(name: String) = false
 
-  protected[ir] def metaVariableSignature (tn: TypeName) = root.metaVariableSignature(tn)
+  def resolve (name: String): Try[JClass] = abbreviated(name).orElse(root.resolve(name))
 
   private lazy val packageName = file.ast.header.pack.map(_.name.names)
 
@@ -199,65 +197,39 @@ case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameRes
   }
 }
 
-case class NameResolverInClass (clazz: IRClass, parent: NameResolver) extends MetaParametersResolver {
-  def resolve (name: String): Try[JClass] = abbreviated(name).orElse(parent.resolve(name))
+class NameResolver_MetaParameter (metaParameter: FormalMetaParameter, parent: NameResolver) extends NameResolver {
+  lazy val environment: Map[String, MetaValue] = parent.environment + (metaParameter.name -> metaValue)
 
-  def metaParameters: List[MetaParameter] = clazz.metaParametersAST
+  def isMetaVariable (name: String): Boolean = (metaParameter.name == name && metaParameter.metaType != JTypeSignature.typeTypeSig) || parent.isMetaVariable(name)
 
-  private val abbreviated: String => Try[JClass] = mutableHashMapMemo { name => root.findInnerClass(clazz, name) }
-}
+  def isTypeVariable (name: String): Boolean = (metaParameter.name == name && metaParameter.metaType == JTypeSignature.typeTypeSig) || parent.isTypeVariable(name)
 
-case class NameResolverInMethod (method: IRMethod, parent: NameResolver) extends MetaParametersResolver {
-  def resolve (name: String) = parent.resolve(name)
+  def resolve (name: String): Try[JClass] = parent.resolve(name)
 
-  def metaParameters: List[MetaParameter] = method.metaParametersAST
-}
-
-trait MetaParametersResolver extends NameResolver {
-  def metaParameters: List[MetaParameter]
-  def parent: NameResolver
-
-  lazy val environment: Map[String, MetaValue] = metaParameters.foldLeft(parent.environment) { (env, param) =>
-    env + ( param.name -> metaParameter(param, env) )
-  }
-
-  def isTypeVariable (name: String) = typeVariableNames.contains(name) || parent.isTypeVariable(name)
-
-  def root = parent.root
-
-  protected[ir] def metaVariableSignature (tn: TypeName): Try[JTypeArgument] = tn match {
-    case TypeName(QualifiedName(name :: Nil), Nil, 0) if metaVariableNames.contains(name) => Success(PureVariableSignature(name))
-    case _ => parent.metaVariableSignature(tn)
-  }
-
-  private lazy val typeVariableNames = metaParameters.collect {
-    case TypeParameter(name, _) => name
-    case MetaValueParameter(name, t, _) if isTypeType(t) => name
-  }.toSet
-
-  private lazy val metaVariableNames = metaParameters.collect {
-    case MetaValueParameter(name, t, _) if ! isTypeType(t) => name
-  }.toSet
-
-  private def isTypeType (t: TypeName): Boolean = parent.typeSignature(t).toOption.contains(JTypeSignature.typeTypeSig)
-
-  private def typeNameToType (name: TypeName, env: Map[String, MetaValue]): Option[JType] = typeSignature(name).toOption.flatMap(sig => root.compiler.typeLoader.fromTypeSignature(sig, env))
-  private def typeNameToRefType (name: TypeName, env: Map[String, MetaValue]): Option[JRefType] = typeSignature(name).toOption.flatMap(sig => root.compiler.typeLoader.fromTypeSignature_RefType(sig, env))
+  def root: RootResolver = parent.root
 
   import scalaz.Scalaz._
-  private def metaParameter (param: MetaParameter, env: Map[String, MetaValue]): MetaValue = param match {
-    case TypeParameter(name, bounds) => bounds.traverse(typeNameToRefType(_, env)) match {
-      case Some(bs) => JTypeVariable(name, bs, root.compiler)
-      case None     =>
-        state.error("invalid type bounds : " + bounds)
-        JTypeVariable(name, Nil, root.compiler)
-    }
-    case MetaValueParameter(name, tn, _) if isTypeType(tn) => JTypeVariable(name, Nil, root.compiler)
-    case MetaValueParameter(name, tn, _) => typeNameToType(tn, env) match {
-      case Some(t) => PureVariableRef(name, t)
-      case None    => JTypeVariable(name, Nil, root.compiler)
-    }
+  private def metaValue: MetaValue = if (metaParameter.metaType == JTypeSignature.typeTypeSig) {
+    compiler.state.someOrError(metaParameter.bounds.traverse(compiler.typeLoader.fromTypeSignature_RefType(_, parent.environment)).map(JTypeVariable(metaParameter.name, _, compiler)),
+      "invalid type bounds : " + metaParameter.bounds, JTypeVariable(metaParameter.name, Nil, compiler))
+  } else {
+    compiler.state.someOrError(compiler.typeLoader.fromTypeSignature(metaParameter.metaType, parent.environment).map(PureVariableRef(metaParameter.name, _)),
+      "invalid meta type : " + metaParameter.metaType, JTypeVariable(metaParameter.name, Nil, compiler))
   }
 
-  def state = root.compiler.state
+  private def compiler = root.compiler
+}
+
+class NameResolver_InnerClasses (inners: List[IRClass], parent: NameResolver) extends NameResolver {
+  def environment: Map[String, MetaValue] = parent.environment
+
+  def isMetaVariable(name: String): Boolean = parent.isMetaVariable(name)
+
+  def isTypeVariable(name: String): Boolean = parent.isTypeVariable(name)
+
+  def resolve(name: String): Try[JClass] = abbreviated(name).map(Success(_)).getOrElse(parent.resolve(name))
+
+  def root: RootResolver = parent.root
+
+  private val abbreviated: String => Option[JClass] = mutableHashMapMemo { name => inners.find(_.simpleName == name) }
 }
