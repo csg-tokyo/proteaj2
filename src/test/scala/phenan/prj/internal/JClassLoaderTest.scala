@@ -3,7 +3,7 @@ package phenan.prj.internal
 import org.scalatest._
 
 import phenan.prj._
-import phenan.prj.ir.IRClass
+import phenan.prj.ir._
 import phenan.prj.state._
 
 import scala.util._
@@ -42,7 +42,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
     val clazz = loader.load("test/Hello")
     clazz shouldBe a [Success[_]]
-    clazz.get shouldBe a [IRClass]
+    clazz.get shouldBe a [IRModule]
 
   }
 

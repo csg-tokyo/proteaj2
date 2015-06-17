@@ -23,7 +23,7 @@ trait NameResolver {
   def metaVariable (name: String): Option[PureVariableRef] = environment.get(name).collect { case v: PureVariableRef => v }
 
   def withMetaParameter (param: FormalMetaParameter): NameResolver = new NameResolver_MetaParameter(param, this)
-  def withInnerClasses (inners: List[IRClass]): NameResolver = new NameResolver_InnerClasses (inners, this)
+  def withInnerClasses (inners: List[IRModule]): NameResolver = new NameResolver_InnerClasses (inners, this)
 
   def resolve (name: List[String]): Try[JClass] =
     resolve(name.head).flatMap(root.findInnerClass(_, name.tail)).orElse(root.findClass(name))
@@ -220,7 +220,7 @@ class NameResolver_MetaParameter (metaParameter: FormalMetaParameter, parent: Na
   private def compiler = root.compiler
 }
 
-class NameResolver_InnerClasses (inners: List[IRClass], parent: NameResolver) extends NameResolver {
+class NameResolver_InnerClasses (inners: List[IRModule], parent: NameResolver) extends NameResolver {
   def environment: Map[String, MetaValue] = parent.environment
 
   def isMetaVariable(name: String): Boolean = parent.isMetaVariable(name)

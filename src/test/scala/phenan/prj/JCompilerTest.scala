@@ -15,7 +15,7 @@ class JCompilerTest extends FunSuite with Matchers {
     compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/java/test/Hello.java"))
     val clazz = compiler.findIR("test/Hello")
     clazz shouldBe a [Some[_]]
-    clazz.get shouldBe a [IRClass]
+    clazz.get shouldBe a [IRModule]
 
     clazz.get.methods should have (size (2))
   }
@@ -28,7 +28,7 @@ class JCompilerTest extends FunSuite with Matchers {
 
     val foo = compiler.findIR("test/Foo")
     foo shouldBe a [Some[_]]
-    foo.get shouldBe a [IRClass]
+    foo.get shouldBe a [IRModule]
 
     foo.get.fields should have (size (1))
 
@@ -36,7 +36,7 @@ class JCompilerTest extends FunSuite with Matchers {
 
     val hello = compiler.findIR("test/Hello")
     hello shouldBe a [Some[_]]
-    hello.get shouldBe a [IRClass]
+    hello.get shouldBe a [IRModule]
 
     hello.get.methods should have (size (2))
   }

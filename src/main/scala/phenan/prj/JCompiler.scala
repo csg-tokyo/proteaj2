@@ -32,7 +32,7 @@ class JCompiler (implicit val state: JState) {
     for (module <- ir.modules) modules += (module.internalName -> module)
   }
 
-  def findIR (name: String): Option[IRClass] = compiled.get(name).orElse(modules.get(name))
+  def findIR (name: String): Option[IRModule] = compiled.get(name).orElse(modules.get(name))
 
   def generateClassFile (): Unit = {
     while (modules.nonEmpty) {
@@ -43,7 +43,7 @@ class JCompiler (implicit val state: JState) {
     }
   }
 
-  private def generateClassFile (module: IRClass): Unit = {
+  private def generateClassFile (module: IRModule): Unit = {
 
   }
 
@@ -53,6 +53,6 @@ class JCompiler (implicit val state: JState) {
   val declarationCompiler = new DeclarationCompiler(this)
   val bodyCompiler = new BodyCompiler(this)
 
-  private var modules: Map[String, IRClass] = Map.empty
-  private var compiled: Map[String, IRClass] = Map.empty
+  private var modules: Map[String, IRModule] = Map.empty
+  private var compiled: Map[String, IRModule] = Map.empty
 }
