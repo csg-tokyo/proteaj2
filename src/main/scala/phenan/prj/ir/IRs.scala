@@ -31,7 +31,7 @@ trait IRClass extends JClass with IRMember {
   def file: IRFile
 
   def outer: Option[IRClass]
-  def inners: List[IRClass]
+  def declaredMembers: List[IRMember]
 
   def simpleName: String
   
@@ -58,6 +58,12 @@ trait IRClass extends JClass with IRMember {
   }
 
   lazy val innerClasses = inners.map(m => m.simpleName -> m.internalName).toMap
+
+  lazy val inners: List[IRClass] = declaredMembers.collect { case m: IRClass => m }
+
+  lazy val fields: List[IRField] = declaredMembers.collect { case f: IRField => f }
+
+  lazy val methods: List[IRMethod] = collectMethods(declaredMembers.collect { case m: IRMethod => m })
 
   lazy val annotations = file.annotationReader.classAnnotations(modifiersAST.collect { case ann: Annotation => ann })
 
@@ -97,6 +103,8 @@ trait IRClass extends JClass with IRMember {
     case Nil => signatures.reverse
   }
 
+  private def collectMethods (methods: List[IRMethod]): List[IRMethod] = methods ++ methods.flatMap(_.paramInitializers)
+
   def compiler: JCompiler = file.compiler
 }
 
@@ -109,35 +117,10 @@ object IRClass {
   }
 }
 
-trait IRClassLike extends IRClass {
-  protected def membersAST: List[ClassMember]
-  protected def makeField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator): IRField
-
-  lazy val inners: List[IRClass] = membersAST.collect {
-    case m: ModuleDeclaration => IRClass(m, Some(this), file)
-  }
-
-  lazy val fields: List[IRField] = membersAST.collect {
-    case FieldDeclaration(mods, ft, ds) => ds.map(makeField(mods, ft, _))
-  }.flatten
-
-  lazy val methods: List[IRMethod] = collectMethods(declaredMethods ++ declaredConstructors ++ instanceInitializer ++ staticInitializer)
-
-  lazy val declaredMethods = membersAST.collect { case m: MethodDeclaration => IRMethodDef(m, this) }
-
-  lazy val declaredConstructors = membersAST.collect { case c: ConstructorDeclaration => IRConstructorDef(c, this) }
-
-  lazy val instanceInitializer = membersAST.collect { case i: InstanceInitializer => IRInstanceInitializer(i, this) }
-
-  lazy val staticInitializer = membersAST.collect { case s: StaticInitializer => IRStaticInitializer(s, this) }
-
-  private def collectMethods (methods: List[IRMethod]): List[IRMethod] = methods ++ methods.flatMap(_.paramInitializers)
-}
-
-case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
+case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFile) extends IRClass {
   def simpleName: String = ast.name
 
-  protected def makeField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator): IRField = IRClassField(modifiersAST, fieldTypeAST, declaratorAST, this)
+  lazy val declaredMembers: List[IRMember] = declaredMembers(ast.members, Nil)
 
   protected def implicitModifier = accSuper
   private[ir] def implicitMethodModifier = 0
@@ -148,13 +131,22 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
   protected def metaParametersAST = ast.metaParameters
   protected def superTypeAST = ast.superClass
   protected def interfacesAST = ast.interfaces
-  protected def membersAST = ast.members
+
+  private def declaredMembers (membersAST: List[ClassMember], ms: List[IRMember]): List[IRMember] = membersAST match {
+    case (m: ModuleDeclaration) :: rest         => declaredMembers(rest, IRClass(m, Some(this), file) :: ms)
+    case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRClassField(mods, ft, _, this)) ++ ms)
+    case (m: MethodDeclaration) :: rest         => declaredMembers(rest, IRMethodDef(m, this) :: ms)
+    case (c: ConstructorDeclaration) :: rest    => declaredMembers(rest, IRConstructorDef(c, this) :: ms)
+    case (i: InstanceInitializer) :: rest       => declaredMembers(rest, IRInstanceInitializer(i, this) :: ms)
+    case (s: StaticInitializer) :: rest         => declaredMembers(rest, IRStaticInitializer(s, this) :: ms)
+    case Nil => ms.reverse
+  }
 }
 
-case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
+case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], file: IRFile) extends IRClass {
   def simpleName: String = ast.name
 
-  protected def makeField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator): IRField = IRInterfaceField(modifiersAST, fieldTypeAST, declaratorAST, this)
+  lazy val declaredMembers: List[IRMember] = declaredMembers(ast.members, Nil)
 
   protected def implicitModifier = accAbstract | accInterface
   private[ir] def implicitMethodModifier: Int = accPublic | accAbstract
@@ -165,7 +157,16 @@ case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], fi
   protected def metaParametersAST: List[MetaParameter] = ast.metaParameters
   protected def superTypeAST: Option[TypeName] = None
   protected def interfacesAST: List[TypeName] = ast.superInterfaces
-  protected def membersAST: List[ClassMember] = ast.members
+
+  private def declaredMembers (membersAST: List[ClassMember], ms: List[IRMember]): List[IRMember] = membersAST match {
+    case (m: ModuleDeclaration) :: rest         => declaredMembers(rest, IRClass(m, Some(this), file) :: ms)
+    case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRInterfaceField(mods, ft, _, this)) ++ ms)
+    case (m: MethodDeclaration) :: rest         => declaredMembers(rest, IRMethodDef(m, this) :: ms)
+    case (c: ConstructorDeclaration) :: rest    => declaredMembers(rest, IRConstructorDef(c, this) :: ms)
+    case (i: InstanceInitializer) :: rest       => declaredMembers(rest, IRInstanceInitializer(i, this) :: ms)
+    case (s: StaticInitializer) :: rest         => declaredMembers(rest, IRStaticInitializer(s, this) :: ms)
+    case Nil => ms.reverse
+  }
 }
 
 trait IRField extends JFieldDef with IRMember {
