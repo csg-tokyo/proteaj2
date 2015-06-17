@@ -96,7 +96,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   /* members*/
 
-  lazy val interfaceMember: HParser[ClassMember] = methodDeclaration | fieldDeclaration | moduleDeclaration
+  lazy val interfaceMember: HParser[InterfaceMember] = methodDeclaration | fieldDeclaration | moduleDeclaration
 
   lazy val annotationMember: HParser[AnnotationMember] = annotationElementDeclaration | fieldDeclaration | moduleDeclaration
 

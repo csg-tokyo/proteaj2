@@ -78,11 +78,12 @@ trait JMethodDef {
   lazy val erasedReturnType: JErasedType = compiler.classLoader.erase_Force(signature.returnType, signature.metaParams)
   lazy val erasedParameterTypes: List[JErasedType] = signature.parameters.map(param => compiler.classLoader.erase_Force(param.actualTypeSignature, signature.metaParams))
 
-  def isStatic: Boolean           = mod.check(JModifier.accStatic)
-  def isConstructor: Boolean      = name == constructorName
-  def isClassInitializer: Boolean = name == classInitializerName
-  def isInstanceMethod: Boolean   = ! (isStatic || isConstructor || isClassInitializer)
-  def isStaticMethod: Boolean     = isStatic && ! (isConstructor || isClassInitializer)
+  def isStatic: Boolean              = mod.check(JModifier.accStatic)
+  def isConstructor: Boolean         = name == constructorName
+  def isClassInitializer: Boolean    = name == classInitializerName
+  def isInstanceInitializer: Boolean = name == instanceInitializerName
+  def isInstanceMethod: Boolean      = ! (isStatic || isConstructor || isClassInitializer || isInstanceInitializer)
+  def isStaticMethod: Boolean        = isStatic && ! (isConstructor || isClassInitializer || isInstanceInitializer)
 
   def compiler = declaringClass.compiler
   implicit def state = declaringClass.state
