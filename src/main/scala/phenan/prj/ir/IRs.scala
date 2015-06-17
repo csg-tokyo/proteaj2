@@ -12,14 +12,13 @@ case class IRFile (ast: CompilationUnit, root: RootResolver) {
   lazy val modules: List[IRClass] = collectModules(ast.modules.map(IRClass(_, this)), Nil)
 
   lazy val internalName = ast.header.pack.map(_.name.names.mkString("/"))
-
-  lazy val resolver = root.file(this)
-
+  
   private def collectModules (modules: List[IRClass], result: List[IRClass]): List[IRClass] = modules match {
     case m :: ms => collectModules(ms ++ m.inners, result :+ m)
     case Nil     => result
   }
 
+  lazy val resolver = root.file(this)
   def compiler = root.compiler
   def state = compiler.state
 
@@ -41,14 +40,13 @@ trait IRClass extends JClass with IRMember {
   protected def superTypeAST: Option[TypeName]
   protected def interfacesAST: List[TypeName]
 
-  protected def implicitClassModifier: Int
+  protected def implicitModifier: Int
   protected def defaultSuperTypeSignature: JClassTypeSignature
   protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature]
   
   private[ir] def implicitMethodModifier: Int
-  private[ir] def implicitFieldModifier: Int
 
-  lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitClassModifier
+  lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifier
 
   lazy val name = internalName.replace('/', '.').replace('$', '.')
 
@@ -113,13 +111,14 @@ object IRClass {
 
 trait IRClassLike extends IRClass {
   protected def membersAST: List[ClassMember]
+  protected def makeField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator): IRField
 
   lazy val inners: List[IRClass] = membersAST.collect {
     case m: ModuleDeclaration => IRClass(m, Some(this), file)
   }
 
   lazy val fields: List[IRField] = membersAST.collect {
-    case FieldDeclaration(mods, ft, ds) => ds.map(IRField(mods, ft, _, this))
+    case FieldDeclaration(mods, ft, ds) => ds.map(makeField(mods, ft, _))
   }.flatten
 
   lazy val methods: List[IRMethod] = collectMethods(declaredMethods ++ declaredConstructors ++ instanceInitializer ++ staticInitializer)
@@ -138,9 +137,10 @@ trait IRClassLike extends IRClass {
 case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
   def simpleName: String = ast.name
 
-  protected def implicitClassModifier = accSuper
+  protected def makeField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator): IRField = IRClassField(modifiersAST, fieldTypeAST, declaratorAST, this)
+
+  protected def implicitModifier = accSuper
   private[ir] def implicitMethodModifier = 0
-  private[ir] def implicitFieldModifier = 0
   protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
   protected def autoImplementedInterfaceSignatures = Nil
 
@@ -154,9 +154,10 @@ case class IRClassDef (ast: ClassDeclaration, outer: Option[IRClass], file: IRFi
 case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], file: IRFile) extends IRClassLike {
   def simpleName: String = ast.name
 
-  protected def implicitClassModifier = accAbstract | accInterface
+  protected def makeField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator): IRField = IRInterfaceField(modifiersAST, fieldTypeAST, declaratorAST, this)
+
+  protected def implicitModifier = accAbstract | accInterface
   private[ir] def implicitMethodModifier: Int = accPublic | accAbstract
-  private[ir] def implicitFieldModifier: Int = accPublic | accStatic | accFinal
   protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
   protected def autoImplementedInterfaceSignatures = Nil
 
@@ -167,13 +168,31 @@ case class IRInterfaceDef (ast: InterfaceDeclaration, outer: Option[IRClass], fi
   protected def membersAST: List[ClassMember] = ast.members
 }
 
-case class IRField (modifierAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRClass) extends JFieldDef with IRMember {
-  def mod: JModifier = IRModifiers.mod(modifierAST)
-  def name = declaratorAST.name
+trait IRField extends JFieldDef with IRMember {
+  def declaringClass: IRClass
+
+  protected def modifiersAST: List[Modifier]
+  protected def fieldTypeAST: TypeName
+  protected def declaratorAST: VariableDeclarator
+
+  protected def implicitModifier: Int
+
+  def name: String = declaratorAST.name
+
   lazy val signature: JTypeSignature = declaringClass.resolver.typeSignature(fieldTypeAST) match {
     case Success(t) => JTypeSignature.arraySig(t, declaratorAST.dim)
     case Failure(e) => state.errorAndReturn("invalid type of field : " + name, e, JTypeSignature.objectTypeSig)
   }
+
+  lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifier
+}
+
+case class IRClassField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRClassDef) extends IRField {
+  protected def implicitModifier: Int = 0
+}
+
+case class IRInterfaceField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRInterfaceDef) extends IRField {
+  protected def implicitModifier: Int = accPublic | accStatic | accFinal
 }
 
 trait IRMethod extends JMethodDef with IRMember {
