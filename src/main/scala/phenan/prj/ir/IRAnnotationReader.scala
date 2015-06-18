@@ -98,10 +98,10 @@ class IRAnnotationReader (file: IRFile) {
     case _              => state.errorAndReturn("invalid operator element type", unit(JOperandDef))
   }
 
-  private lazy val otherAnnotation: Annotation =?> IRAnnotation = for {
+  private lazy val otherAnnotation: Annotation =?> IROtherAnnotation = for {
     typ  <- annotationClass >==> { _.objectType(Nil) }
     args <- annotationArguments(typ)
-  } yield IRAnnotation(typ, args)
+  } yield IROtherAnnotation(typ, args)
 
   private lazy val annotationClass: Annotation =?> JClass = read { ann => resolver.resolve(ann.name.names).toOption }
 

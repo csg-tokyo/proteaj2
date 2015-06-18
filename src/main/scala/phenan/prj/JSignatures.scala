@@ -33,6 +33,7 @@ object JTypeSignature {
   lazy val objectTypeSig = SimpleClassTypeSignature("java/lang/Object", Nil)
 
   def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature("java/util/function/Function", List(from, to))
+  def enumTypeSig (e: JTypeArgument): JClassTypeSignature = SimpleClassTypeSignature("java/lang/Enum", List(e))
 
   def arraySig (typeSig: JTypeSignature, dim: Int): JTypeSignature = {
     if (dim > 0) arraySig(JArrayTypeSignature(typeSig), dim - 1)
