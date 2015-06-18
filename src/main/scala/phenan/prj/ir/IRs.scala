@@ -13,7 +13,7 @@ case class IRFile (ast: CompilationUnit, root: RootResolver) {
 
   lazy val topLevelModules = ast.modules.map {
     case c: ClassDeclaration      => IRTopLevelClass(c, this)
-    case e: EnumDeclaration       => ???
+    case e: EnumDeclaration       => IRTopLevelEnum(e, this)
     case i: InterfaceDeclaration  => IRTopLevelInterface(i, this)
     case a: AnnotationDeclaration => ???
     case d: DSLDeclaration        => ???
@@ -38,13 +38,22 @@ sealed trait IRClassMember extends IRMember
 sealed trait IREnumMember extends IRMember
 sealed trait IRInterfaceMember extends IRMember
 
+sealed trait IRTopLevelModule extends IRModule {
+  def outer: Option[IRModule] = None
+}
+
+sealed trait IRInnerModule extends IRModule {
+  def declaring: IRModule
+
+  def file = declaring.file
+  def outer = Some(declaring)
+}
+
 trait IRModule extends JClass with IRMember {
   def file: IRFile
 
   def outer: Option[IRModule]
   def declaredMembers: List[IRMember]
-  
-  def syntheticMethods: List[IRSyntheticMethod]
 
   def simpleName: String
   
@@ -77,6 +86,7 @@ trait IRModule extends JClass with IRMember {
   lazy val methods: List[JMethodDef] = procedures ++ syntheticMethods
 
   lazy val procedures: List[IRProcedure] = declaredMembers.collect { case m: IRProcedure => m }
+  lazy val syntheticMethods: List[IRSyntheticMethod] = procedures.flatMap(_.paramInitializers)
 
   lazy val annotations = file.annotationReader.classAnnotations(modifiersAST.collect { case ann: Annotation => ann })
 
@@ -124,7 +134,6 @@ trait IRClass extends IRModule {
 
   def simpleName: String = classAST.name
   lazy val declaredMembers: List[IRClassMember] = declaredMembers(classAST.members, Nil)
-  lazy val syntheticMethods: List[IRSyntheticMethod] = procedures.flatMap(_.paramInitializers)
   
   protected def modifiersAST = classAST.modifiers
   protected def metaParametersAST = classAST.metaParameters
@@ -136,7 +145,7 @@ trait IRClass extends IRModule {
 
   private def declaredMembers (membersAST: List[ClassMember], ms: List[IRClassMember]): List[IRClassMember] = membersAST match {
     case (c: ClassDeclaration) :: rest          => declaredMembers(rest, IRClassInnerClass(c, this) :: ms)
-    case (e: EnumDeclaration) :: rest           => declaredMembers(rest, ??? :: ms)
+    case (e: EnumDeclaration) :: rest           => declaredMembers(rest, IRClassInnerEnum(e, this) :: ms)
     case (i: InterfaceDeclaration) :: rest      => declaredMembers(rest, IRClassInnerInterface(i, this) :: ms)
     case (a: AnnotationDeclaration) :: rest     => declaredMembers(rest, ??? :: ms)
     case (d: DSLDeclaration) :: rest            => declaredMembers(rest, ??? :: ms)
@@ -149,84 +158,12 @@ trait IRClass extends IRModule {
   }
 }
 
-case class IRTopLevelClass (classAST: ClassDeclaration, file: IRFile) extends IRClass {
-  def outer: Option[IRModule] = None
-  protected def implicitModifier: Int = accSuper
-}
-
-case class IRClassInnerClass (classAST: ClassDeclaration, declaringClass: IRClass) extends IRClass with IRClassMember {
-  def file: IRFile = declaringClass.file
-  def outer: Option[IRModule] = Some(declaringClass)
-  protected def implicitModifier: Int = accSuper
-}
-
-case class IREnumInnerClass (classAST: ClassDeclaration, declaringClass: IREnum) extends IRClass with IREnumMember {
-  def file: IRFile = declaringClass.file
-  def outer: Option[IRModule] = Some(declaringClass)
-  protected def implicitModifier: Int = accSuper
-}
-
-case class IRInterfaceInnerClass (classAST: ClassDeclaration, declaringInterface: IRInterface) extends IRClass with IRInterfaceMember {
-  def file: IRFile = declaringInterface.file
-  def outer: Option[IRModule] = Some(declaringInterface)
-  protected def implicitModifier = accSuper | accStatic | accPublic
-}
-
-trait IRInterface extends IRModule {
-  protected def interfaceAST: InterfaceDeclaration
-
-  def simpleName: String = interfaceAST.name
-  lazy val declaredMembers: List[IRInterfaceMember] = declaredMembers(interfaceAST.members, Nil)
-  def syntheticMethods: List[IRSyntheticMethod] = Nil
-
-  protected def modifiersAST = interfaceAST.modifiers
-  protected def metaParametersAST: List[MetaParameter] = interfaceAST.metaParameters
-  protected def superTypeAST: Option[TypeName] = None
-  protected def interfacesAST: List[TypeName] = interfaceAST.superInterfaces
-
-  protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
-  protected def autoImplementedInterfaceSignatures = Nil
-
-  private def declaredMembers (membersAST: List[InterfaceMember], ms: List[IRInterfaceMember]): List[IRInterfaceMember] = membersAST match {
-    case (c: ClassDeclaration) :: rest          => declaredMembers(rest, IRInterfaceInnerClass(c, this) :: ms)
-    case (e: EnumDeclaration) :: rest           => declaredMembers(rest, ??? :: ms)
-    case (i: InterfaceDeclaration) :: rest      => declaredMembers(rest, IRInterfaceInnerInterface(i, this) :: ms)
-    case (a: AnnotationDeclaration) :: rest     => declaredMembers(rest, ??? :: ms)
-    case (d: DSLDeclaration) :: rest            => declaredMembers(rest, ??? :: ms)
-    case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRInterfaceField(mods, ft, _, this)) ++ ms)
-    case (m: MethodDeclaration) :: rest         => declaredMembers(rest, IRInterfaceMethod(m, this) :: ms)
-    case Nil => ms.reverse
-  }
-}
-
-case class IRTopLevelInterface (interfaceAST: InterfaceDeclaration, file: IRFile) extends IRInterface {
-  def outer: Option[IRModule] = None
-  protected def implicitModifier = accAbstract | accInterface
-}
-
-case class IRClassInnerInterface (interfaceAST: InterfaceDeclaration, declaringClass: IRClass) extends IRInterface with IRClassMember {
-  def file: IRFile = declaringClass.file
-  def outer: Option[IRModule] = Some(declaringClass)
-  protected def implicitModifier: Int = accAbstract | accInterface | accStatic
-}
-
-case class IREnumInnerInterface (interfaceAST: InterfaceDeclaration, declaringClass: IREnum) extends IRInterface with IREnumMember {
-  def file: IRFile = declaringClass.file
-  def outer: Option[IRModule] = Some(declaringClass)
-  protected def implicitModifier: Int = accAbstract | accInterface | accStatic
-}
-
-case class IRInterfaceInnerInterface (interfaceAST: InterfaceDeclaration, declaringInterface: IRInterface) extends IRInterface with IRInterfaceMember {
-  def file: IRFile = declaringInterface.file
-  def outer: Option[IRModule] = Some(declaringInterface)
-  protected def implicitModifier = accAbstract | accInterface | accStatic | accPublic
-}
-
 trait IREnum extends IRModule {
   protected def enumAST: EnumDeclaration
 
   def simpleName: String = enumAST.name
 
+  lazy val declaredMembers: List[IREnumMember] = enumConstants ++ declaredMembers(enumAST.members, Nil)
   lazy val enumConstants: List[IREnumConstant] = enumAST.enumConstants.map(IREnumConstant(_, this))
 
   protected def modifiersAST: List[Modifier] = enumAST.modifiers
@@ -239,7 +176,7 @@ trait IREnum extends IRModule {
 
   private def declaredMembers (membersAST: List[ClassMember], ms: List[IREnumMember]): List[IREnumMember] = membersAST match {
     case (c: ClassDeclaration) :: rest          => declaredMembers(rest, IREnumInnerClass(c, this) :: ms)
-    case (e: EnumDeclaration) :: rest           => declaredMembers(rest, ??? :: ms)
+    case (e: EnumDeclaration) :: rest           => declaredMembers(rest, IREnumInnerEnum(e, this) :: ms)
     case (i: InterfaceDeclaration) :: rest      => declaredMembers(rest, IREnumInnerInterface(i, this) :: ms)
     case (a: AnnotationDeclaration) :: rest     => declaredMembers(rest, ??? :: ms)
     case (d: DSLDeclaration) :: rest            => declaredMembers(rest, ??? :: ms)
@@ -250,6 +187,80 @@ trait IREnum extends IRModule {
     case (s: StaticInitializer) :: rest         => declaredMembers(rest, IREnumStaticInitializer(s, this) :: ms)
     case Nil => ms.reverse
   }
+}
+
+trait IRInterface extends IRModule {
+  protected def interfaceAST: InterfaceDeclaration
+
+  def simpleName: String = interfaceAST.name
+  lazy val declaredMembers: List[IRInterfaceMember] = declaredMembers(interfaceAST.members, Nil)
+
+  protected def modifiersAST = interfaceAST.modifiers
+  protected def metaParametersAST: List[MetaParameter] = interfaceAST.metaParameters
+  protected def superTypeAST: Option[TypeName] = None
+  protected def interfacesAST: List[TypeName] = interfaceAST.superInterfaces
+
+  protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
+  protected def autoImplementedInterfaceSignatures = Nil
+
+  private def declaredMembers (membersAST: List[InterfaceMember], ms: List[IRInterfaceMember]): List[IRInterfaceMember] = membersAST match {
+    case (c: ClassDeclaration) :: rest          => declaredMembers(rest, IRInterfaceInnerClass(c, this) :: ms)
+    case (e: EnumDeclaration) :: rest           => declaredMembers(rest, IRInterfaceInnerEnum(e, this) :: ms)
+    case (i: InterfaceDeclaration) :: rest      => declaredMembers(rest, IRInterfaceInnerInterface(i, this) :: ms)
+    case (a: AnnotationDeclaration) :: rest     => declaredMembers(rest, ??? :: ms)
+    case (d: DSLDeclaration) :: rest            => declaredMembers(rest, ??? :: ms)
+    case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRInterfaceField(mods, ft, _, this)) ++ ms)
+    case (m: MethodDeclaration) :: rest         => declaredMembers(rest, IRInterfaceMethod(m, this) :: ms)
+    case Nil => ms.reverse
+  }
+}
+
+case class IRTopLevelClass (classAST: ClassDeclaration, file: IRFile) extends IRClass with IRTopLevelModule {
+  protected def implicitModifier: Int = accSuper
+}
+
+case class IRClassInnerClass (classAST: ClassDeclaration, declaring: IRClass) extends IRClass with IRInnerModule with IRClassMember {
+  protected def implicitModifier: Int = accSuper
+}
+
+case class IREnumInnerClass (classAST: ClassDeclaration, declaring: IREnum) extends IRClass with IRInnerModule with IREnumMember {
+  protected def implicitModifier: Int = accSuper
+}
+
+case class IRInterfaceInnerClass (classAST: ClassDeclaration, declaring: IRInterface) extends IRClass with IRInnerModule with IRInterfaceMember {
+  protected def implicitModifier = accSuper | accStatic | accPublic
+}
+
+case class IRTopLevelEnum (enumAST: EnumDeclaration, file: IRFile) extends IREnum with IRTopLevelModule {
+  protected def implicitModifier: Int = accSuper
+}
+
+case class IRClassInnerEnum (enumAST: EnumDeclaration, declaring: IRClass) extends IREnum with IRInnerModule with IRClassMember {
+  protected def implicitModifier: Int = accSuper | accStatic
+}
+
+case class IREnumInnerEnum (enumAST: EnumDeclaration, declaring: IREnum) extends IREnum with IRInnerModule with IREnumMember {
+  protected def implicitModifier: Int = accSuper | accStatic
+}
+
+case class IRInterfaceInnerEnum (enumAST: EnumDeclaration, declaring: IRInterface) extends IREnum with IRInnerModule with IRInterfaceMember {
+  protected def implicitModifier: Int = accSuper | accStatic
+}
+
+case class IRTopLevelInterface (interfaceAST: InterfaceDeclaration, file: IRFile) extends IRInterface with IRTopLevelModule {
+  protected def implicitModifier = accAbstract | accInterface
+}
+
+case class IRClassInnerInterface (interfaceAST: InterfaceDeclaration, declaring: IRClass) extends IRInterface with IRInnerModule with IRClassMember {
+  protected def implicitModifier: Int = accAbstract | accInterface | accStatic
+}
+
+case class IREnumInnerInterface (interfaceAST: InterfaceDeclaration, declaring: IREnum) extends IRInterface with IRInnerModule with IREnumMember {
+  protected def implicitModifier: Int = accAbstract | accInterface | accStatic
+}
+
+case class IRInterfaceInnerInterface (interfaceAST: InterfaceDeclaration, declaring: IRInterface) extends IRInterface with IRInnerModule with IRInterfaceMember {
+  protected def implicitModifier = accAbstract | accInterface | accStatic | accPublic
 }
 
 trait IRField extends JFieldDef with IRMember {
