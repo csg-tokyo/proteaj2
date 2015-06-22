@@ -3,9 +3,9 @@ package phenan.prj.ir
 import phenan.prj._
 
 trait Environment {
-  def highestPriority (expected: JType): Option[JPriority]
-  def nextPriority (expected: JType, priority: JPriority): Option[JPriority]
-  def expressionOperators (expected: JType, priority: JPriority): List[JSyntax]
+  def highestPriority (expected: JType): Option[String]
+  def nextPriority (expected: JType, priority: String): Option[String]
+  def expressionOperators (expected: JType, priority: String): List[JSyntax]
 
   def defineLocal (localType: JType, name: String): Environment
   def modifyContext (expression: IRExpression): Environment
@@ -17,9 +17,9 @@ trait Environment {
 }
 
 case class BaseEnvironment (file: IRFile) extends Environment {
-  def highestPriority (expected: JType): Option[JPriority] = ???
-  def nextPriority (expected: JType, priority: JPriority): Option[JPriority] = ???
-  def expressionOperators (expected: JType, priority: JPriority): List[JSyntax] = ???
+  def highestPriority (expected: JType): Option[String] = ???
+  def nextPriority (expected: JType, priority: String): Option[String] = ???
+  def expressionOperators (expected: JType, priority: String): List[JSyntax] = ???
 
   def defineLocal (localType: JType, name: String): Environment = ???
   def modifyContext(expression: IRExpression): Environment = ???

@@ -1,13 +1,13 @@
 package phenan.prj
 
-sealed trait JOperatorSyntaxDef {
-  def priority: Option[String]
+sealed trait JSyntaxDef {
+  def priority: String
   def syntax: List[JSyntaxElementDef]
 }
 
-case class JExpressionSyntaxDef (priority: Option[String], syntax: List[JSyntaxElementDef]) extends JOperatorSyntaxDef
-case class JLiteralSyntaxDef (priority: Option[String], syntax: List[JSyntaxElementDef]) extends JOperatorSyntaxDef
-case class JStatementSyntaxDef (priority: Option[String], syntax: List[JSyntaxElementDef]) extends JOperatorSyntaxDef
+case class JExpressionSyntaxDef (priority: String, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
+case class JLiteralSyntaxDef (priority: String, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
+case class JStatementSyntaxDef (priority: String, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
 
 sealed trait JSyntaxElementDef
 

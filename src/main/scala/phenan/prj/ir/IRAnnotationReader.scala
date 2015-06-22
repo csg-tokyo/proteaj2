@@ -68,7 +68,7 @@ class IRAnnotationReader (file: IRFile) {
     withDSLs   <- array("with")(descriptor)
   } yield DSLInfo(priorities, withDSLs)
 
-  private lazy val operator: Annotation =?> JOperatorSyntaxDef = optional("priority")(string).flatMap { priority =>
+  private lazy val operator: Annotation =?> JSyntaxDef = required("priority")(string).flatMap { priority =>
     array("pattern")(elementAnnotation("proteaj/lang/OpElem", operatorElement)).flatMap { pattern =>
       enumSwitch("level", "proteaj/lang/OpLevel") {
         case "Statement"  => unit(JStatementSyntaxDef(priority, pattern))

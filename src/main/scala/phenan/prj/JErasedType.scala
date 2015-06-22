@@ -73,7 +73,7 @@ trait JMethodDef {
   def declaringClass: JClass
 
   def signature: JMethodSignature
-  def syntax: Option[JOperatorSyntaxDef]
+  def syntax: Option[JSyntaxDef]
 
   lazy val erasedReturnType: JErasedType = compiler.classLoader.erase_Force(signature.returnType, signature.metaParams)
   lazy val erasedParameterTypes: List[JErasedType] = signature.parameters.map(param => compiler.classLoader.erase_Force(param.actualTypeSignature, signature.metaParams))

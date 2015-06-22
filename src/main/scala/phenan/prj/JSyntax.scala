@@ -1,12 +1,6 @@
 package phenan.prj
 
-case class JSyntax (priority: JPriority, pattern: List[JSyntaxElement]) {
-}
-
-trait JPriority
-
-class UnnamedPriority (id: Int, clazz: JClass) extends JPriority
-case class NamedPriority (name: String, clazz: JClass) extends JPriority
+case class JSyntax (priority: String, pattern: List[JSyntaxElement])
 
 sealed trait JSyntaxElement
 

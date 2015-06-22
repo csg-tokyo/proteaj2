@@ -80,8 +80,8 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
     } (expressionOperator)
   }
 
-  private def operatorAnnotation (f: (Option[String], List[JSyntaxElementDef]) => JOperatorSyntaxDef): Reader[Map[String, BAnnotationElement], JOperatorSyntaxDef] = for {
-    priority <- optional("priority")(string)
+  private def operatorAnnotation (f: (String, List[JSyntaxElementDef]) => JSyntaxDef): Reader[Map[String, BAnnotationElement], JSyntaxDef] = for {
+    priority <- required("priority")(string)("")
     pat <- pattern
   } yield f(priority, pat)
 

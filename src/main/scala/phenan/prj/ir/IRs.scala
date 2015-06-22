@@ -37,6 +37,7 @@ sealed trait IRMember
 sealed trait IRClassMember extends IRMember
 sealed trait IREnumMember extends IRMember
 sealed trait IRInterfaceMember extends IRMember
+sealed trait IRDSLMember extends IRMember
 
 sealed trait IRTopLevelModule extends IRModule {
   def outer: Option[IRModule] = None
@@ -63,8 +64,8 @@ trait IRModule extends JClass with IRMember {
   protected def interfacesAST: List[TypeName]
 
   protected def implicitModifier: Int
-  protected def defaultSuperTypeSignature: JClassTypeSignature
-  protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature]
+  protected def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.objectTypeSig
+  protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature] = Nil
 
   lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifier
 
@@ -140,9 +141,6 @@ trait IRClass extends IRModule {
   protected def superTypeAST = classAST.superClass
   protected def interfacesAST = classAST.interfaces
 
-  protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
-  protected def autoImplementedInterfaceSignatures = Nil
-
   private def declaredMembers (membersAST: List[ClassMember], ms: List[IRClassMember]): List[IRClassMember] = membersAST match {
     case (c: ClassDeclaration) :: rest          => declaredMembers(rest, IRClassInnerClass(c, this) :: ms)
     case (e: EnumDeclaration) :: rest           => declaredMembers(rest, IRClassInnerEnum(e, this) :: ms)
@@ -171,8 +169,7 @@ trait IREnum extends IRModule {
   protected def superTypeAST: Option[TypeName] = None
   protected def interfacesAST: List[TypeName] = enumAST.interfaces
 
-  protected def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.enumTypeSig(SimpleClassTypeSignature(internalName, Nil))
-  protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature] = Nil
+  override protected def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.enumTypeSig(SimpleClassTypeSignature(internalName, Nil))
 
   private def declaredMembers (membersAST: List[ClassMember], ms: List[IREnumMember]): List[IREnumMember] = membersAST match {
     case (c: ClassDeclaration) :: rest          => declaredMembers(rest, IREnumInnerClass(c, this) :: ms)
@@ -200,9 +197,6 @@ trait IRInterface extends IRModule {
   protected def superTypeAST: Option[TypeName] = None
   protected def interfacesAST: List[TypeName] = interfaceAST.superInterfaces
 
-  protected def defaultSuperTypeSignature = JTypeSignature.objectTypeSig
-  protected def autoImplementedInterfaceSignatures = Nil
-
   private def declaredMembers (membersAST: List[InterfaceMember], ms: List[IRInterfaceMember]): List[IRInterfaceMember] = membersAST match {
     case (c: ClassDeclaration) :: rest          => declaredMembers(rest, IRInterfaceInnerClass(c, this) :: ms)
     case (e: EnumDeclaration) :: rest           => declaredMembers(rest, IRInterfaceInnerEnum(e, this) :: ms)
@@ -212,6 +206,53 @@ trait IRInterface extends IRModule {
     case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRInterfaceField(mods, ft, _, this)) ++ ms)
     case (m: MethodDeclaration) :: rest         => declaredMembers(rest, IRInterfaceMethod(m, this) :: ms)
     case Nil => ms.reverse
+  }
+}
+
+trait IRDSL extends IRModule {
+  protected def dslAST: DSLDeclaration
+
+  def simpleName: String = dslAST.name
+  lazy val declaredMembers: List[IRDSLMember] = declaredMembers(dslAST.members, Nil)
+
+  override lazy val dslInfo: Option[DSLInfo] = Some(DSLInfo(priorities, withDSLs))
+
+  protected def modifiersAST: List[Modifier] = dslAST.modifiers
+  protected def metaParametersAST: List[MetaParameter] = Nil
+  protected def superTypeAST: Option[TypeName] = None
+  protected def interfacesAST: List[TypeName] = Nil
+
+  private def declaredMembers (membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
+    case (c: ContextDeclaration) :: rest        => declaredMembers(rest, ??? :: ms)
+    case (p: PrioritiesDeclaration) :: rest     => declaredMembers(rest, IRDSLPriorities(p, this) :: ms)
+    case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, ??? :: ms)
+    case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ??? :: ms)
+    case Nil => ms.reverse
+  }
+
+  private lazy val priorities: List[String] = ???
+  private lazy val withDSLs: List[JTypeSignature] = withDSLs(dslAST.withDSLs, Nil)
+
+  private def withDSLs (ast: List[QualifiedName], result: List[JTypeSignature]): List[JTypeSignature] = ast match {
+    case qualifiedName :: rest => resolver.classTypeSignature(qualifiedName) match {
+      case Success(sig) => withDSLs(rest, sig :: result)
+      case Failure(e)   =>
+        state.error("invalid DSL name : " + qualifiedName, e)
+        withDSLs(rest, result)
+    }
+    case Nil => result.reverse
+  }
+
+  private def sortPriorities (priorities: List[String], relations: List[List[String]]): List[String] = {
+    tsort(priorities.map(p => (p, relations.flatMap(_.dropWhile(_ != p)).toSet - p)), Nil, Nil)
+  }
+
+  private def tsort (gs: List[(String, Set[String])], checked: List[(String, Set[String])], sorted: List[String]): List[String] = gs match {
+    case (p, e) :: rest if e.isEmpty => tsort((checked.reverse ++ rest).map(a => (a._1, a._2 - p)), Nil, p :: sorted)
+    case h :: rest                   => tsort(rest, h :: checked, sorted)
+    case Nil                         =>
+      if (checked.nonEmpty) state.error("invalid priority : cyclic precedence")
+      sorted.reverse
   }
 }
 
@@ -464,10 +505,50 @@ case class IRClassStaticInitializer (staticInitializerAST: StaticInitializer, de
 
 case class IREnumStaticInitializer (staticInitializerAST: StaticInitializer, declaringClass: IREnum) extends IRStaticInitializer with IREnumMember
 
+trait IROperator extends IRProcedure {
+  def dsl: IRDSL
+  protected def operatorAST: OperatorDeclaration
+
+  lazy val name: String = operatorAST.label.getOrElse("ProteanOperator$" + state.uniqueId)
+
+  protected def modifiersAST: List[Modifier] = operatorAST.modifiers
+  protected def metaParametersAST: List[MetaParameter] = operatorAST.metaParameters
+  protected def returnTypeAST: Option[TypeName] = Some(operatorAST.returnType)
+  protected def formalParametersAST: List[FormalParameter] = operatorAST.formalParameters
+  protected def clausesAST: List[MethodClause] = operatorAST.clauses
+
+  override lazy val syntax = Some {
+    if (modifiersAST.contains(LiteralModifier)) JLiteralSyntaxDef(priority, pattern)
+    else JExpressionSyntaxDef(priority, pattern)
+  }
+
+  lazy val priority = dsl.name + '.' + operatorAST.priority.getOrElse("ProteanOperatorPriority$" + state.uniqueId)
+
+  lazy val pattern = operatorAST.syntax map {
+    case OperatorName(n) => JOperatorNameDef(n)
+    case MetaValueRef(n) => JMetaValueRefDef(n)
+    case Operand         => JOperandDef
+    case Repetition0     => JRepetition0Def
+    case Repetition1     => JRepetition1Def
+    case OptionalOperand => JOptionalOperandDef
+    case AndPredicate(t, p) => JAndPredicateDef(predicateSignature(t, p))
+    case NotPredicate(t, p) => JNotPredicateDef(predicateSignature(t, p))
+  }
+
+  private def predicateSignature (t: TypeName, p: Option[String]): JParameterSignature = {
+    val sig = state.successOrError(resolver.typeSignature(t), "invalid predicate type : " + t, VoidTypeSignature)
+    JParameterSignature(Nil, sig, p.map(dsl.name + _), false, None)
+  }
+}
+
+case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
+  lazy val priorities = prioritiesAST.names.map { declaringDSL.name + '.' + _ }
+}
+
 
 sealed trait IRSyntheticMethod extends JMethodDef with IRMember {
   def mod: JModifier = JModifier(modifiers)
-  def syntax: Option[JOperatorSyntaxDef] = None
+  def syntax: Option[JSyntaxDef] = None
   def signature: JMethodSignature = JMethodSignature(Nil, parameterSignatures, returnTypeSignature, Nil, Nil, Nil, Nil)
   
   protected def modifiers: Int

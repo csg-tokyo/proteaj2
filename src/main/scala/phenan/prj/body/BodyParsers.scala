@@ -99,11 +99,11 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     def expression: HParser[IRExpression] = env.highestPriority(expected).map(cached).getOrElse(hostExpression)
 
-    def expression (priority: JPriority): HParser[IRExpression] = cached(priority)
+    def expression (priority: String): HParser[IRExpression] = cached(priority)
 
     lazy val hostExpression: HParser[IRExpression] = ???
 
-    private val cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
+    private val cached: String => HParser[IRExpression] = mutableHashMapMemo { p =>
       env.expressionOperators(expected, p).map(OperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(expected, p).map(cached).getOrElse(hostExpression)
     }
   }

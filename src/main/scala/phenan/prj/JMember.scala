@@ -32,7 +32,7 @@ class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val d
   def erasedParameterTypes: List[JErasedType] = methodDef.erasedParameterTypes
 
   lazy val syntax: Option[JSyntax] = methodDef.syntax.map { s =>
-    JSyntax(s.priority.map(NamedPriority(_, clazz)).getOrElse(new UnnamedPriority(clazz.state.uniqueId, clazz)), translatePattern(s.syntax, Nil, parameterTypes))
+    JSyntax(s.priority, translatePattern(s.syntax, Nil, parameterTypes))
   }
 
   def overrides (that: JMethod): Boolean = {
