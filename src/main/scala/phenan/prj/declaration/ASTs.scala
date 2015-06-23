@@ -43,12 +43,12 @@ case class ConstructorDeclaration (modifiers: List[Modifier], metaParameters: Li
 case class FieldDeclaration (modifiers: List[Modifier], fieldType: TypeName, declarators: List[VariableDeclarator]) extends ClassMember with InterfaceMember with AnnotationMember with DSLMember with ContextMember
 case class MethodDeclaration (modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, name: String, formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends ClassMember with InterfaceMember
 case class AnnotationElementDeclaration (modifiers: List[Modifier], elementType: TypeName, name: String, dim: Int, defaultValue: Option[AnnotationElement]) extends AnnotationMember
-case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, priority: Option[String], syntax: List[SyntaxElement], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends DSLMember with ContextMember
-case class PrioritiesDeclaration (names: List[String]) extends DSLMember
+case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, priority: Option[QualifiedName], syntax: List[SyntaxElement], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends DSLMember with ContextMember
+case class PrioritiesDeclaration (names: List[String], constraints: List[List[QualifiedName]]) extends DSLMember
 
 case class ContextDeclaration (modifiers: List[Modifier], name: String, metaParameters: List[MetaParameter], members: List[ContextMember]) extends DSLMember
 
-case class FormalParameter (modifiers: List[Modifier], parameterType: ParameterType, priority: Option[String], varArgs: Boolean, name: String, dim: Int, initializer: Option[ExpressionSnippet])
+case class FormalParameter (modifiers: List[Modifier], parameterType: ParameterType, priority: Option[QualifiedName], varArgs: Boolean, name: String, dim: Int, initializer: Option[ExpressionSnippet])
 case class VariableDeclarator (name: String, dim: Int, initializer: Option[ExpressionSnippet])
 
 sealed trait MethodClause
@@ -67,8 +67,8 @@ case object Operand extends SyntaxElement
 case object Repetition0 extends SyntaxElement
 case object Repetition1 extends SyntaxElement
 case object OptionalOperand extends SyntaxElement
-case class AndPredicate (prd: TypeName, priority: Option[String]) extends SyntaxElement
-case class NotPredicate (prd: TypeName, priority: Option[String]) extends SyntaxElement
+case class AndPredicate (prd: TypeName, priority: Option[QualifiedName]) extends SyntaxElement
+case class NotPredicate (prd: TypeName, priority: Option[QualifiedName]) extends SyntaxElement
 
 sealed trait Modifier
 
@@ -105,7 +105,7 @@ sealed trait MetaParameter {
   def name: String
 }
 case class TypeParameter (name: String, bounds: List[TypeName]) extends MetaParameter
-case class MetaValueParameter (name: String, metaType: TypeName, priority: Option[String]) extends MetaParameter
+case class MetaValueParameter (name: String, metaType: TypeName, priority: Option[QualifiedName]) extends MetaParameter
 
 sealed trait ParameterType
 case class ContextualType (context: TypeName, paramType: ParameterType) extends ParameterType

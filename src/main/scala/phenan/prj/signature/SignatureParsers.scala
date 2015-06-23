@@ -31,8 +31,12 @@ object SignatureParsers extends PackratParsers {
     case typeParams ~ parameters ~ retType ~ throwsTypes => JMethodSignature(typeParams, parameters, retType, throwsTypes, Nil, Nil, Nil)
   }
 
-  private lazy val parameterSignature = ( '@' ~> typeSignature ).* ~ typeSignature ~ ( '#' ~> identifier ).? ~ ( '*'.? ^^ { _.nonEmpty } ) ~ ( '?' ~> identifier ).? ^^ {
+  private lazy val parameterSignature = ( '@' ~> typeSignature ).* ~ typeSignature ~ prioritySignature.? ~ ( '*'.? ^^ { _.nonEmpty } ) ~ ( '?' ~> identifier ).? ^^ {
     case contexts ~ sig ~ pri ~ va ~ df => JParameterSignature(contexts, sig, pri, va, df)
+  }
+
+  private lazy val prioritySignature = '#' ~> topLevelClassType ~ ( '.' ~> identifier ) ^^ {
+    case sig ~ name => JPriority(sig, name)
   }
 
   private lazy val typeSignature: PackratParser[JTypeSignature] = fieldType | baseType

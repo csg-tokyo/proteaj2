@@ -56,6 +56,8 @@ trait IRModule extends JClass with IRMember {
   def outer: Option[IRModule]
   def declaredMembers: List[IRMember]
 
+  def declaredPriorities: List[JPriority] = Nil
+
   def simpleName: String
   
   protected def modifiersAST: List[Modifier]
@@ -107,7 +109,7 @@ trait IRModule extends JClass with IRMember {
         state.error("invalid meta parameter : " + param, e)
         constructResolver(rest, metaParams, resolver)
     }
-    case Nil => (constructSignature(metaParams.reverse, resolver), resolver.withInnerClasses(inners))
+    case Nil => (constructSignature(metaParams.reverse, resolver), resolver.withInnerClasses(inners).withPriorities(declaredPriorities))
   }
 
   private def constructSignature (metaParams: List[FormalMetaParameter], resolver: NameResolver): JClassSignature =
@@ -215,22 +217,36 @@ trait IRDSL extends IRModule {
   def simpleName: String = dslAST.name
   lazy val declaredMembers: List[IRDSLMember] = declaredMembers(dslAST.members, Nil)
 
-  override lazy val dslInfo: Option[DSLInfo] = Some(DSLInfo(priorities, withDSLs))
-
   protected def modifiersAST: List[Modifier] = dslAST.modifiers
   protected def metaParametersAST: List[MetaParameter] = Nil
   protected def superTypeAST: Option[TypeName] = None
   protected def interfacesAST: List[TypeName] = Nil
 
+  override lazy val dslInfo: Option[DSLInfo] = Some(DSLInfo(priorities.map(_.name), priorityDeclarations.flatMap(_.constraints), withDSLs))
+
+  override def declaredPriorities = priorityDeclarations.flatMap(_.priorities)
+
   private def declaredMembers (membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
     case (c: ContextDeclaration) :: rest        => declaredMembers(rest, ??? :: ms)
     case (p: PrioritiesDeclaration) :: rest     => declaredMembers(rest, IRDSLPriorities(p, this) :: ms)
-    case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, ??? :: ms)
+    case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, IRDSLOperator(o, this) :: ms)
     case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ??? :: ms)
     case Nil => ms.reverse
   }
 
-  private lazy val priorities: List[String] = ???
+  private lazy val priorityDeclarations = declaredMembers.collect { case p: IRDSLPriorities => p }
+
+  private lazy val priorities = collectPriorities(declaredMembers, Set.empty)
+
+  private def collectPriorities (ms: List[IRDSLMember], ps: Set[JPriority]): List[JPriority] = ms match {
+    case (op: IRDSLOperator) :: rest if op.priority.clazz.internalName == internalName => collectPriorities(rest, ps + op.priority)
+    case (_: IRDSLOperator) :: rest   => collectPriorities(rest, ps)
+    case (p: IRDSLPriorities) :: rest => collectPriorities(rest, ps ++ p.priorities)
+
+    case Nil => ps.toList
+  }
+
+
   private lazy val withDSLs: List[JTypeSignature] = withDSLs(dslAST.withDSLs, Nil)
 
   private def withDSLs (ast: List[QualifiedName], result: List[JTypeSignature]): List[JTypeSignature] = ast match {
@@ -522,7 +538,9 @@ trait IROperator extends IRProcedure {
     else JExpressionSyntaxDef(priority, pattern)
   }
 
-  lazy val priority = dsl.name + '.' + operatorAST.priority.getOrElse("ProteanOperatorPriority$" + state.uniqueId)
+  lazy val priority: JPriority = operatorAST.priority.flatMap(resolver.priority).getOrElse {
+    JPriority(SimpleClassTypeSignature(dsl.internalName, Nil), "ProteanOperatorPriority$" + state.uniqueId)
+  }
 
   lazy val pattern = operatorAST.syntax map {
     case OperatorName(n) => JOperatorNameDef(n)
@@ -535,14 +553,35 @@ trait IROperator extends IRProcedure {
     case NotPredicate(t, p) => JNotPredicateDef(predicateSignature(t, p))
   }
 
-  private def predicateSignature (t: TypeName, p: Option[String]): JParameterSignature = {
+  private def predicateSignature (t: TypeName, p: Option[QualifiedName]): JParameterSignature = {
     val sig = state.successOrError(resolver.typeSignature(t), "invalid predicate type : " + t, VoidTypeSignature)
-    JParameterSignature(Nil, sig, p.map(dsl.name + _), false, None)
+    JParameterSignature(Nil, sig, p.flatMap(resolver.priority), false, None)
   }
 }
 
+case class IRDSLOperator (operatorAST: OperatorDeclaration, declaringClass: IRDSL) extends IROperator with IRDSLMember {
+  def dsl: IRDSL = declaringClass
+  protected def implicitModifiers: Int = accStatic | accFinal
+}
+
 case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
-  lazy val priorities = prioritiesAST.names.map { declaringDSL.name + '.' + _ }
+  lazy val priorities: List[JPriority] = prioritiesAST.names.map { JPriority(SimpleClassTypeSignature(declaringDSL.internalName, Nil), _) }
+  lazy val constraints: List[List[JPriority]] = constraints(prioritiesAST.constraints, Nil)
+
+  private def constraints (ast: List[List[QualifiedName]], cs: List[List[JPriority]]): List[List[JPriority]] = ast match {
+    case c :: rest => constraints(rest, resolveConstraint(c, Nil) :: cs)
+    case Nil       => cs
+  }
+
+  private def resolveConstraint (c: List[QualifiedName], result: List[JPriority]): List[JPriority] = c match {
+    case p :: rest => declaringDSL.resolver.priority(p) match {
+      case Some(r) => resolveConstraint(rest, r :: result)
+      case None    =>
+        declaringDSL.state.error("invalid priority name : " + p)
+        resolveConstraint(rest, result)
+    }
+    case Nil => result.reverse
+  }
 }
 
 
@@ -581,3 +620,5 @@ object IRModifiers {
     case _ => 0
   }
 }
+
+case class IRUnknownAnnotation (annotationType: JObjectType, args: Map[JMethod, MetaValue]) extends UnknownAnnotation

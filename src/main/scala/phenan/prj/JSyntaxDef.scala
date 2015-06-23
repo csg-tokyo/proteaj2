@@ -1,13 +1,13 @@
 package phenan.prj
 
 sealed trait JSyntaxDef {
-  def priority: String
+  def priority: JPriority
   def syntax: List[JSyntaxElementDef]
 }
 
-case class JExpressionSyntaxDef (priority: String, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
-case class JLiteralSyntaxDef (priority: String, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
-case class JStatementSyntaxDef (priority: String, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
+case class JExpressionSyntaxDef (priority: JPriority, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
+case class JLiteralSyntaxDef (priority: JPriority, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
+case class JStatementSyntaxDef (priority: JPriority, syntax: List[JSyntaxElementDef]) extends JSyntaxDef
 
 sealed trait JSyntaxElementDef
 

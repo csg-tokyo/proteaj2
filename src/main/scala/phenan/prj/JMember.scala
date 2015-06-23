@@ -81,7 +81,7 @@ class JConstructor (val methodDef: JMethodDef, val env: Map[String, MetaValue], 
 class JParameter (signature: JParameterSignature, env: Map[String, MetaValue], compiler: JCompiler) {
   lazy val contexts: List[JGenericType] = signature.contexts.map(sig => JGenericType(sig, env, compiler))
   lazy val genericType: JGenericType = JGenericType(signature.typeSig, env, compiler)
-  def priority: Option[String] = signature.priority
+  def priority: Option[JPriority] = signature.priority
   def varArgs: Boolean = signature.varArgs
   def defaultArg: Option[String] = signature.defaultArg
 }

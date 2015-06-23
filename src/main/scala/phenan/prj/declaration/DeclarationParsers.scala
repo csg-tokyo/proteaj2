@@ -1,5 +1,6 @@
 package phenan.prj.declaration
 
+import phenan.prj.JPriority
 import phenan.prj.combinator.TwoLevelParsers
 import phenan.prj.exception.ParseException
 
@@ -122,11 +123,15 @@ object DeclarationParsers extends TwoLevelParsers {
     case label ~ mods ~ mps ~ tn ~ pri ~ syn ~ params ~ clauses ~ body => OperatorDeclaration(label, mods, mps, tn, pri, syn, params, clauses, body)
   }
 
-  lazy val prioritiesDeclaration = prioritiesDeclaration_ascending | prioritiesDeclaration_descending
+  lazy val prioritiesDeclaration = ("priority" | "priorities") ~> identifier.+(',') ~ ( '{' ~> constraint.*(';') <~ '}' ) ^^ {
+    case names ~ constraints => PrioritiesDeclaration(names, constraints)
+  }
 
-  lazy val prioritiesDeclaration_ascending = "priority" ~> identifier.+('<') <~ ';' ^^ { priorities => PrioritiesDeclaration(priorities) }
+  lazy val constraint = ascendingConstraint | descendingConstraint
 
-  lazy val prioritiesDeclaration_descending = "priority" ~> identifier.+('>') <~ ';' ^^ { priorities => PrioritiesDeclaration(priorities.reverse) }
+  lazy val ascendingConstraint = qualifiedName.+('<')
+
+  lazy val descendingConstraint = qualifiedName.+('>') ^^ { _.reverse }
 
   lazy val formalParameters = '(' ~> formalParameter.*(',') <~ ')'
 
@@ -160,7 +165,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val dots = (elem('.') ~> elem('.') ~> elem('.')).?.map(_.nonEmpty).^
 
-  lazy val priority = ( '[' ~> identifier <~ ']' ).?
+  lazy val priority = ( '[' ~> qualifiedName <~ ']' ).?
 
   lazy val emptyBrackets = ('[' ~> ']').* ^^ { _.size }
 

@@ -6,6 +6,6 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Operator {
   OpLevel level () default OpLevel.Expression;
-  String priority ();
+  Priority priority ();
   OpElem[] pattern ();
 }

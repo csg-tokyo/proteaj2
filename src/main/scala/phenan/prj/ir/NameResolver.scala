@@ -14,6 +14,7 @@ trait NameResolver {
   def environment: Map[String, MetaValue]
 
   def resolve (name: String): Try[JClass]
+  def priority (name: String): Option[JPriority]
   def root: RootResolver
 
   def isTypeVariable (name: String): Boolean
@@ -22,17 +23,26 @@ trait NameResolver {
   def typeVariable (name: String): Option[JTypeVariable] = environment.get(name).collect { case v: JTypeVariable => v }
   def metaVariable (name: String): Option[PureVariableRef] = environment.get(name).collect { case v: PureVariableRef => v }
 
-  def withMetaParameter (param: FormalMetaParameter): NameResolver = new NameResolver_MetaParameter(param, this)
+  def withMetaParameter (param: FormalMetaParameter): NameResolver = new NameResolver_MetaParameter (param, this)
   def withInnerClasses (inners: List[IRModule]): NameResolver = new NameResolver_InnerClasses (inners, this)
+  def withPriorities (priorities: List[JPriority]): NameResolver = new NameResolver_Priorities (priorities, this)
 
   def resolve (name: List[String]): Try[JClass] =
     resolve(name.head).flatMap(root.findInnerClass(_, name.tail)).orElse(root.findClass(name))
+
+  def priority (name: QualifiedName): Option[JPriority] = {
+    if (name.names.size > 1) resolve(name.names.init) match {
+      case Success(clazz) if clazz.dslInfo.exists(_.priorities.contains(name.names.last)) => Some(JPriority(SimpleClassTypeSignature(clazz.internalName, Nil), name.names.last))
+      case _ => root.compiler.state.errorAndReturn("invalid priority name " + name, None)
+    }
+    else name.names.headOption.flatMap(priority)
+  }
 
   import scalaz.Scalaz._
 
   def metaParameter (mp: MetaParameter): Try[FormalMetaParameter] = mp match {
     case TypeParameter(name, bounds)       => bounds.traverse(typeSignature).map(FormalMetaParameter(name, JTypeSignature.typeTypeSig, None, _))
-    case MetaValueParameter(name, mt, pri) => typeSignature(mt).map(FormalMetaParameter(name, _, pri, Nil))
+    case MetaValueParameter(name, mt, pri) => typeSignature(mt).map(FormalMetaParameter(name, _, pri.flatMap(priority), Nil))
   }
 
   def typeSignature (tn: TypeName): Try[JTypeSignature] = nonArrayTypeSignature(tn.name, tn.args).map(JTypeSignature.arraySig(_, tn.dim))
@@ -55,12 +65,12 @@ trait NameResolver {
     parameterSignature(Nil, param.parameterType, param.priority, param.varArgs, param.dim, initializer)
   }
 
-  private def parameterSignature (contexts: List[TypeName], parameterType: ParameterType, priority: Option[String], varArgs: Boolean, dim: Int, initializer: Option[String]): Try[JParameterSignature] = parameterType match {
-    case ContextualType(c, p) => parameterSignature(contexts :+ c, p, priority, varArgs, dim, initializer)
+  private def parameterSignature (contexts: List[TypeName], parameterType: ParameterType, pri: Option[QualifiedName], varArgs: Boolean, dim: Int, initializer: Option[String]): Try[JParameterSignature] = parameterType match {
+    case ContextualType(c, p) => parameterSignature(contexts :+ c, p, pri, varArgs, dim, initializer)
     case tn: TypeName => for {
       cs  <- contexts.traverse(typeSignature)
       sig <- typeSignature(tn).map(JTypeSignature.arraySig(_, dim))
-    } yield JParameterSignature(cs, sig, priority, varArgs, initializer)
+    } yield JParameterSignature(cs, sig, pri.flatMap(priority), varArgs, initializer)
   }
 
   private def nonArrayTypeSignature (name: QualifiedName, args: List[TypeArgument]): Try[JTypeSignature] = {
@@ -109,6 +119,8 @@ class RootResolver private[ir] (val compiler: JCompiler) extends NameResolver {
   def isMetaVariable (name: String) = false
 
   def resolve (name: String): Try[JClass] = abbreviated(name).orElse(findClass(name))
+
+  def priority (name: String): Option[JPriority] = None
 
   def findClass (name: List[String]): Try[JClass] = {
     if (name.size > 1) findClass(List(name.head), name.tail.head, name.tail.tail)
@@ -170,6 +182,8 @@ case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameRes
 
   def resolve (name: String): Try[JClass] = abbreviated(name).orElse(root.resolve(name))
 
+  def priority (name: String): Option[JPriority] = root.priority(name)
+
   private lazy val packageName = file.ast.header.pack.map(_.name.names)
 
   private lazy val importedClasses: Map[String, List[String]] = file.ast.header.imports.collect {
@@ -206,6 +220,8 @@ class NameResolver_MetaParameter (metaParameter: FormalMetaParameter, parent: Na
 
   def resolve (name: String): Try[JClass] = parent.resolve(name)
 
+  def priority (name: String): Option[JPriority] = parent.priority(name)
+
   def root: RootResolver = parent.root
 
   import scalaz.Scalaz._
@@ -223,13 +239,29 @@ class NameResolver_MetaParameter (metaParameter: FormalMetaParameter, parent: Na
 class NameResolver_InnerClasses (inners: List[IRModule], parent: NameResolver) extends NameResolver {
   def environment: Map[String, MetaValue] = parent.environment
 
-  def isMetaVariable(name: String): Boolean = parent.isMetaVariable(name)
+  def isMetaVariable (name: String): Boolean = parent.isMetaVariable(name)
+  def isTypeVariable (name: String): Boolean = parent.isTypeVariable(name)
 
-  def isTypeVariable(name: String): Boolean = parent.isTypeVariable(name)
+  def resolve (name: String): Try[JClass] = abbreviated(name).map(Success(_)).getOrElse(parent.resolve(name))
 
-  def resolve(name: String): Try[JClass] = abbreviated(name).map(Success(_)).getOrElse(parent.resolve(name))
+  def priority (name: String): Option[JPriority] = parent.priority(name)
 
   def root: RootResolver = parent.root
 
   private val abbreviated: String => Option[JClass] = mutableHashMapMemo { name => inners.find(_.simpleName == name) }
+}
+
+class NameResolver_Priorities (priorities: List[JPriority], parent: NameResolver) extends NameResolver {
+  def environment: Map[String, MetaValue] = parent.environment
+
+  def isMetaVariable (name: String): Boolean = parent.isMetaVariable(name)
+  def isTypeVariable (name: String): Boolean = parent.isTypeVariable(name)
+
+  def resolve (name: String): Try[JClass] = parent.resolve(name)
+
+  def priority (name: String): Option[JPriority] = abbreviated(name).orElse(parent.priority(name))
+
+  def root: RootResolver = parent.root
+
+  private val abbreviated: String => Option[JPriority] = mutableHashMapMemo { name => priorities.find(_.name == name) }
 }

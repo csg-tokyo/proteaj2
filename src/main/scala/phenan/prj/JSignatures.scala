@@ -1,6 +1,10 @@
 package phenan.prj
 
-case class JClassSignature (metaParams: List[FormalMetaParameter], superClass: JClassTypeSignature, interfaces: List[JClassTypeSignature])
+case class JClassSignature (metaParams: List[FormalMetaParameter], superClass: JClassTypeSignature, interfaces: List[JClassTypeSignature]) {
+  override def toString = {
+    metaParams.mkString("<", ", ", ">") + " : " + superClass + interfaces.map(" : " + _).mkString
+  }
+}
 
 object JClassSignature {
   def apply (superClassName: Option[String], interfaceNames: List[String]): JClassSignature = {
@@ -16,14 +20,23 @@ case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: 
   }
 }
 
-case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, priority: Option[String], varArgs: Boolean, defaultArg: Option[String]) {
+case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, priority: Option[JPriority], varArgs: Boolean, defaultArg: Option[String]) {
   def actualTypeSignature: JTypeSignature = {
     val target = if (varArgs) JArrayTypeSignature(typeSig) else typeSig
     contexts.foldRight(target)(JTypeSignature.functionTypeSig)
   }
 }
 
-case class FormalMetaParameter (name: String, metaType: JTypeSignature, priority: Option[String], bounds: List[JTypeSignature])
+case class FormalMetaParameter (name: String, metaType: JTypeSignature, priority: Option[JPriority], bounds: List[JTypeSignature]) {
+  override def toString = {
+    if (bounds.nonEmpty) name + bounds.mkString(" extends ", " & ", "")
+    else priority match {
+      case None if metaType == JTypeSignature.typeTypeSig => name
+      case Some(p) => name + " : " + metaType + '[' + p + ']'
+      case None    => name + " : " + metaType
+    }
+  }
+}
 
 sealed trait JTypeSignature extends JTypeArgument
 
@@ -47,6 +60,10 @@ sealed trait JClassTypeSignature extends JTypeSignature {
 
 case class SimpleClassTypeSignature (clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature {
   def internalName = clazz
+  override def toString = {
+    if (args.isEmpty) clazz
+    else clazz + args.mkString("<", ",", ">")
+  }
 }
 
 case class MemberClassTypeSignature (outer: JClassTypeSignature, clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature {

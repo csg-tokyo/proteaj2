@@ -39,7 +39,7 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler) extends 
 
   def dslInfo = annotations.dsl
 
-  private lazy val annotations = readClassAnnotations(attributes.annotations)
+  lazy val annotations = classAnnotations(attributes.annotations)
 
   private lazy val attributes = parseClassAttributes(classFile.attributes)
 
@@ -65,7 +65,7 @@ class JLoadedFieldDef (val field: BField, val declaringClass: JLoadedClass, val 
     attributes.signature.flatMap(sig => parseFieldSignature(readUTF(sig.signature)))
   } getOrElse descriptor
 
-  private lazy val annotations = readFieldAnnotations(attributes.annotations)
+  lazy val annotations = fieldAnnotations(attributes.annotations)
 
   private lazy val attributes = parseFieldAttribute(field.attributes)
 }
@@ -89,7 +89,7 @@ class JLoadedMethodDef (val method: BMethod, val declaringClass: JLoadedClass, v
 
   def syntax = annotations.operator
 
-  private lazy val annotations = readMethodAnnotations(attributes.annotations)
+  lazy val annotations = methodAnnotations(attributes.annotations)
 
   private lazy val attributes = parseMethodAttribute(method.attributes)
 }
