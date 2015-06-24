@@ -16,7 +16,7 @@ case class IRFile (ast: CompilationUnit, root: RootResolver) {
     case e: EnumDeclaration       => IRTopLevelEnum(e, this)
     case i: InterfaceDeclaration  => IRTopLevelInterface(i, this)
     case a: AnnotationDeclaration => ???
-    case d: DSLDeclaration        => ???
+    case d: DSLDeclaration        => IRTopLevelDSL(d, this)
   }
 
   lazy val internalName = ast.header.pack.map(_.name.names.mkString("/"))
@@ -38,6 +38,7 @@ sealed trait IRClassMember extends IRMember
 sealed trait IREnumMember extends IRMember
 sealed trait IRInterfaceMember extends IRMember
 sealed trait IRDSLMember extends IRMember
+sealed trait IRContextMember extends IRMember
 
 sealed trait IRTopLevelModule extends IRModule {
   def outer: Option[IRModule] = None
@@ -148,7 +149,7 @@ trait IRClass extends IRModule {
     case (e: EnumDeclaration) :: rest           => declaredMembers(rest, IRClassInnerEnum(e, this) :: ms)
     case (i: InterfaceDeclaration) :: rest      => declaredMembers(rest, IRClassInnerInterface(i, this) :: ms)
     case (a: AnnotationDeclaration) :: rest     => declaredMembers(rest, ??? :: ms)
-    case (d: DSLDeclaration) :: rest            => declaredMembers(rest, ??? :: ms)
+    case (d: DSLDeclaration) :: rest            => declaredMembers(rest, IRClassInnerDSL(d, this) :: ms)
     case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRClassField(mods, ft, _, this)) ++ ms)
     case (m: MethodDeclaration) :: rest         => declaredMembers(rest, IRClassMethod(m, this) :: ms)
     case (c: ConstructorDeclaration) :: rest    => declaredMembers(rest, IRClassConstructor(c, this) :: ms)
@@ -178,7 +179,7 @@ trait IREnum extends IRModule {
     case (e: EnumDeclaration) :: rest           => declaredMembers(rest, IREnumInnerEnum(e, this) :: ms)
     case (i: InterfaceDeclaration) :: rest      => declaredMembers(rest, IREnumInnerInterface(i, this) :: ms)
     case (a: AnnotationDeclaration) :: rest     => declaredMembers(rest, ??? :: ms)
-    case (d: DSLDeclaration) :: rest            => declaredMembers(rest, ??? :: ms)
+    case (d: DSLDeclaration) :: rest            => declaredMembers(rest, IREnumInnerDSL(d, this) :: ms)
     case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IREnumField(mods, ft, _, this)) ++ ms)
     case (m: MethodDeclaration) :: rest         => declaredMembers(rest, IREnumMethod(m, this) :: ms)
     case (c: ConstructorDeclaration) :: rest    => declaredMembers(rest, IREnumConstructor(c, this) :: ms)
@@ -204,7 +205,7 @@ trait IRInterface extends IRModule {
     case (e: EnumDeclaration) :: rest           => declaredMembers(rest, IRInterfaceInnerEnum(e, this) :: ms)
     case (i: InterfaceDeclaration) :: rest      => declaredMembers(rest, IRInterfaceInnerInterface(i, this) :: ms)
     case (a: AnnotationDeclaration) :: rest     => declaredMembers(rest, ??? :: ms)
-    case (d: DSLDeclaration) :: rest            => declaredMembers(rest, ??? :: ms)
+    case (d: DSLDeclaration) :: rest            => declaredMembers(rest, IRInterfaceInnerDSL(d, this) :: ms)
     case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRInterfaceField(mods, ft, _, this)) ++ ms)
     case (m: MethodDeclaration) :: rest         => declaredMembers(rest, IRInterfaceMethod(m, this) :: ms)
     case Nil => ms.reverse
@@ -227,10 +228,10 @@ trait IRDSL extends IRModule {
   override def declaredPriorities = priorityDeclarations.flatMap(_.priorities)
 
   private def declaredMembers (membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
-    case (c: ContextDeclaration) :: rest        => declaredMembers(rest, ??? :: ms)
+    case (c: ContextDeclaration) :: rest        => declaredMembers(rest, IRContext(c, this) :: ms)
     case (p: PrioritiesDeclaration) :: rest     => declaredMembers(rest, IRDSLPriorities(p, this) :: ms)
     case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, IRDSLOperator(o, this) :: ms)
-    case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ??? :: ms)
+    case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRDSLField(mods, ft, _, this)) ++ ms)
     case Nil => ms.reverse
   }
 
@@ -240,9 +241,9 @@ trait IRDSL extends IRModule {
 
   private def collectPriorities (ms: List[IRDSLMember], ps: Set[JPriority]): List[JPriority] = ms match {
     case (op: IRDSLOperator) :: rest if op.priority.clazz.internalName == internalName => collectPriorities(rest, ps + op.priority)
-    case (_: IRDSLOperator) :: rest   => collectPriorities(rest, ps)
     case (p: IRDSLPriorities) :: rest => collectPriorities(rest, ps ++ p.priorities)
-
+    case (c: IRContext) :: rest       => collectPriorities(rest, ps ++ c.priorities)
+    case (_: IRDSLOperator | _: IRDSLField) :: rest   => collectPriorities(rest, ps)
     case Nil => ps.toList
   }
 
@@ -258,30 +259,48 @@ trait IRDSL extends IRModule {
     }
     case Nil => result.reverse
   }
+}
 
-  private def sortPriorities (priorities: List[String], relations: List[List[String]]): List[String] = {
-    tsort(priorities.map(p => (p, relations.flatMap(_.dropWhile(_ != p)).toSet - p)), Nil, Nil)
+case class IRContext (contextAST: ContextDeclaration, dsl: IRDSL) extends IRModule with IRDSLMember {
+  def file: IRFile = dsl.file
+  def outer: Option[IRModule] = Some(dsl)
+
+  def simpleName: String = contextAST.name
+  lazy val declaredMembers: List[IRContextMember] = declaredMembers(contextAST.members, Nil)
+
+  lazy val priorities: Set[JPriority] = collectPriorities(declaredMembers, Set.empty)
+
+  protected def modifiersAST: List[Modifier] = contextAST.modifiers
+  protected def metaParametersAST: List[MetaParameter] = contextAST.metaParameters
+  protected def superTypeAST: Option[TypeName] = None
+  protected def interfacesAST: List[TypeName] = Nil
+
+  protected def implicitModifier = accSuper
+
+  private def declaredMembers (membersAST: List[ContextMember], ms: List[IRContextMember]): List[IRContextMember] = membersAST match {
+    case (c: ConstructorDeclaration) :: rest    => declaredMembers(rest, IRContextConstructor(c, this) :: ms)
+    case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRContextField(mods, ft, _, this)) ++ ms)
+    case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, IRContextOperator(o, this) :: ms)
+    case Nil => ms.reverse
   }
 
-  private def tsort (gs: List[(String, Set[String])], checked: List[(String, Set[String])], sorted: List[String]): List[String] = gs match {
-    case (p, e) :: rest if e.isEmpty => tsort((checked.reverse ++ rest).map(a => (a._1, a._2 - p)), Nil, p :: sorted)
-    case h :: rest                   => tsort(rest, h :: checked, sorted)
-    case Nil                         =>
-      if (checked.nonEmpty) state.error("invalid priority : cyclic precedence")
-      sorted.reverse
+  private def collectPriorities (ms: List[IRContextMember], ps: Set[JPriority]): Set[JPriority] = ms match {
+    case (o: IRContextOperator) :: rest if o.priority.clazz.internalName == dsl.internalName => collectPriorities(rest, ps + o.priority)
+    case (_: IRContextOperator | _: IRContextConstructor | _: IRContextField) :: rest => collectPriorities(rest, ps)
+    case Nil => ps
   }
 }
 
 case class IRTopLevelClass (classAST: ClassDeclaration, file: IRFile) extends IRClass with IRTopLevelModule {
-  protected def implicitModifier: Int = accSuper
+  protected def implicitModifier = accSuper
 }
 
 case class IRClassInnerClass (classAST: ClassDeclaration, declaring: IRClass) extends IRClass with IRInnerModule with IRClassMember {
-  protected def implicitModifier: Int = accSuper
+  protected def implicitModifier = accSuper
 }
 
 case class IREnumInnerClass (classAST: ClassDeclaration, declaring: IREnum) extends IRClass with IRInnerModule with IREnumMember {
-  protected def implicitModifier: Int = accSuper
+  protected def implicitModifier = accSuper
 }
 
 case class IRInterfaceInnerClass (classAST: ClassDeclaration, declaring: IRInterface) extends IRClass with IRInnerModule with IRInterfaceMember {
@@ -289,19 +308,19 @@ case class IRInterfaceInnerClass (classAST: ClassDeclaration, declaring: IRInter
 }
 
 case class IRTopLevelEnum (enumAST: EnumDeclaration, file: IRFile) extends IREnum with IRTopLevelModule {
-  protected def implicitModifier: Int = accSuper
+  protected def implicitModifier = accSuper
 }
 
 case class IRClassInnerEnum (enumAST: EnumDeclaration, declaring: IRClass) extends IREnum with IRInnerModule with IRClassMember {
-  protected def implicitModifier: Int = accSuper | accStatic
+  protected def implicitModifier = accSuper | accStatic
 }
 
 case class IREnumInnerEnum (enumAST: EnumDeclaration, declaring: IREnum) extends IREnum with IRInnerModule with IREnumMember {
-  protected def implicitModifier: Int = accSuper | accStatic
+  protected def implicitModifier = accSuper | accStatic
 }
 
 case class IRInterfaceInnerEnum (enumAST: EnumDeclaration, declaring: IRInterface) extends IREnum with IRInnerModule with IRInterfaceMember {
-  protected def implicitModifier: Int = accSuper | accStatic
+  protected def implicitModifier = accSuper | accStatic
 }
 
 case class IRTopLevelInterface (interfaceAST: InterfaceDeclaration, file: IRFile) extends IRInterface with IRTopLevelModule {
@@ -309,15 +328,31 @@ case class IRTopLevelInterface (interfaceAST: InterfaceDeclaration, file: IRFile
 }
 
 case class IRClassInnerInterface (interfaceAST: InterfaceDeclaration, declaring: IRClass) extends IRInterface with IRInnerModule with IRClassMember {
-  protected def implicitModifier: Int = accAbstract | accInterface | accStatic
+  protected def implicitModifier = accAbstract | accInterface | accStatic
 }
 
 case class IREnumInnerInterface (interfaceAST: InterfaceDeclaration, declaring: IREnum) extends IRInterface with IRInnerModule with IREnumMember {
-  protected def implicitModifier: Int = accAbstract | accInterface | accStatic
+  protected def implicitModifier = accAbstract | accInterface | accStatic
 }
 
 case class IRInterfaceInnerInterface (interfaceAST: InterfaceDeclaration, declaring: IRInterface) extends IRInterface with IRInnerModule with IRInterfaceMember {
   protected def implicitModifier = accAbstract | accInterface | accStatic | accPublic
+}
+
+case class IRTopLevelDSL (dslAST: DSLDeclaration, file: IRFile) extends IRDSL with IRTopLevelModule {
+  protected def implicitModifier = accSuper
+}
+
+case class IRClassInnerDSL (dslAST: DSLDeclaration, declaring: IRClass) extends IRDSL with IRInnerModule with IRClassMember {
+  protected def implicitModifier: Int = accSuper | accStatic
+}
+
+case class IREnumInnerDSL (dslAST: DSLDeclaration, declaring: IREnum) extends IRDSL with IRInnerModule with IREnumMember {
+  protected def implicitModifier: Int = accSuper | accStatic
+}
+
+case class IRInterfaceInnerDSL (dslAST: DSLDeclaration, declaring: IRInterface) extends IRDSL with IRInnerModule with IRInterfaceMember {
+  protected def implicitModifier: Int = accSuper | accStatic
 }
 
 trait IRField extends JFieldDef with IRMember {
@@ -344,15 +379,23 @@ trait IRMemberVariable extends IRField {
 }
 
 case class IRClassField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRClass) extends IRMemberVariable with IRClassMember {
-  protected def implicitModifiers: Int = 0
+  protected def implicitModifiers = 0
 }
 
 case class IREnumField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IREnum) extends IRMemberVariable with IREnumMember {
-  protected def implicitModifiers: Int = 0
+  protected def implicitModifiers = 0
 }
 
 case class IRInterfaceField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRInterface) extends IRMemberVariable with IRInterfaceMember {
-  protected def implicitModifiers: Int = accPublic | accStatic | accFinal
+  protected def implicitModifiers = accPublic | accStatic | accFinal
+}
+
+case class IRDSLField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRDSL) extends IRMemberVariable with IRDSLMember {
+  protected def implicitModifiers = accStatic
+}
+
+case class IRContextField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRContext) extends IRMemberVariable with IRContextMember {
+  protected def implicitModifiers = 0
 }
 
 case class IREnumConstant (constantAST: EnumConstant, declaringClass: IREnum) extends IRField with IREnumMember {
@@ -454,15 +497,15 @@ trait IRMethod extends IRProcedure {
 }
 
 case class IRClassMethod (methodAST: MethodDeclaration, declaringClass: IRClass) extends IRMethod with IRClassMember {
-  protected def implicitModifiers: Int = 0
+  protected def implicitModifiers = 0
 }
 
 case class IREnumMethod (methodAST: MethodDeclaration, declaringClass: IREnum) extends IRMethod with IREnumMember {
-  protected def implicitModifiers: Int = 0
+  protected def implicitModifiers = 0
 }
 
 case class IRInterfaceMethod (methodAST: MethodDeclaration, declaringClass: IRInterface) extends IRMethod with IRInterfaceMember {
-  protected def implicitModifiers: Int = accPublic | accAbstract
+  protected def implicitModifiers = accPublic | accAbstract
 }
 
 trait IRConstructor extends IRProcedure {
@@ -478,11 +521,15 @@ trait IRConstructor extends IRProcedure {
 }
 
 case class IRClassConstructor (constructorAST: ConstructorDeclaration, declaringClass: IRClass) extends IRConstructor with IRClassMember {
-  protected def implicitModifiers: Int = 0
+  protected def implicitModifiers = 0
 }
 
 case class IREnumConstructor (constructorAST: ConstructorDeclaration, declaringClass: IREnum) extends IRConstructor with IREnumMember {
-  protected def implicitModifiers: Int = 0
+  protected def implicitModifiers = 0
+}
+
+case class IRContextConstructor (constructorAST: ConstructorDeclaration, declaringClass: IRContext) extends IRConstructor with IRContextMember {
+  protected def implicitModifiers = 0
 }
 
 trait IRInstanceInitializer extends IRProcedure {
@@ -562,6 +609,11 @@ trait IROperator extends IRProcedure {
 case class IRDSLOperator (operatorAST: OperatorDeclaration, declaringClass: IRDSL) extends IROperator with IRDSLMember {
   def dsl: IRDSL = declaringClass
   protected def implicitModifiers: Int = accStatic | accFinal
+}
+
+case class IRContextOperator (operatorAST: OperatorDeclaration, declaringClass: IRContext) extends IROperator with IRContextMember {
+  def dsl: IRDSL = declaringClass.dsl
+  protected def implicitModifiers = 0
 }
 
 case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
