@@ -147,8 +147,8 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
     case e => state.errorAndReturn("invalid annotation element : expected string, but found " + e, None)
   }
 
-  private lazy val descriptor: BAnnotationElement =?> JTypeSignature = read {
-    case BAnnotationElement_Class(ref) => DescriptorParsers.parseReturnDescriptor(readUTF(ref))
+  private lazy val descriptor: BAnnotationElement =?> JClassTypeSignature = read {
+    case BAnnotationElement_Class(ref) => DescriptorParsers.parseClassTypeDescriptor(readUTF(ref))
     case e => state.errorAndReturn("invalid annotation element : expected class, but found " + e, None)
   }
 

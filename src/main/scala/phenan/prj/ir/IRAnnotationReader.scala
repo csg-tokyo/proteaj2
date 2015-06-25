@@ -172,8 +172,8 @@ class IRAnnotationReader (file: IRFile) {
   private lazy val string: AnnotationElement =?> String =
     expression(compiler.typeLoader.stringType) >=> collect { case ConcretePureValue(str: java.lang.String, _) => str }
 
-  private lazy val descriptor: AnnotationElement =?> JTypeSignature =
-    expression(compiler.typeLoader.anyClassType) >=> collect { case ConcretePureValue(cls: java.lang.Class[_], _) => cls.getName } >==> BinaryNameParsers.parseBinaryName
+  private lazy val descriptor: AnnotationElement =?> JClassTypeSignature =
+    expression(compiler.typeLoader.anyClassType) >=> collect { case ConcretePureValue(cls: java.lang.Class[_], _) => cls.getName } >==> BinaryNameParsers.parseBinaryClassName
 
   private def expression (expected: String): AnnotationElement =?> MetaValue = expression(compiler.classLoader.loadClass_PE(expected).flatMap(_.objectType(Nil)))
 

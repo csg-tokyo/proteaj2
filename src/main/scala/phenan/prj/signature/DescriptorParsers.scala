@@ -17,6 +17,8 @@ object DescriptorParsers extends PackratParsers {
 
   def parseReturnDescriptor (desc: String)(implicit state: JState): Option[JTypeSignature] = parse(desc, "return descriptor", returnDesc)
 
+  def parseClassTypeDescriptor (desc: String)(implicit state: JState): Option[JClassTypeSignature] = parse(desc, "class type descriptor", objectDesc)
+
   private lazy val methodDesc: PackratParser[JMethodSignature] =
     ( '(' ~> typeDesc.* <~ ')' ) ~ returnDesc ^^ { case paramTypes ~ retType => JMethodSignature(Nil, paramTypes.map(sig => JParameterSignature(Nil, sig, None, false, None)), retType, Nil, Nil, Nil, Nil) }
 

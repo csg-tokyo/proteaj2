@@ -21,7 +21,7 @@ case class ImportStaticMemberDeclaration (name: QualifiedName) extends StaticImp
 case class ImportStaticStarDeclaration (name: QualifiedName) extends StaticImportDeclaration
 
 // ascending order
-case class ImportDSLsDeclaration (dsls: List[QualifiedName]) extends ImportDeclaration
+case class ImportDSLsDeclaration (dsls: List[QualifiedName], constraints: List[List[QualifiedName]]) extends ImportDeclaration
 
 sealed trait ModuleDeclaration extends ClassMember with InterfaceMember with AnnotationMember
 

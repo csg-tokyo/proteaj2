@@ -13,6 +13,8 @@ object BinaryNameParsers extends PackratParsers {
 
   def parseBinaryName (name: String)(implicit state: JState): Option[JTypeSignature] = parse(name, binaryName)
 
+  def parseBinaryClassName (name: String)(implicit state: JState): Option[JClassTypeSignature] = parse(name, className)
+
   private lazy val binaryName: PackratParser[JTypeSignature] = arrayName | primitiveName | className
 
   private lazy val className: PackratParser[JClassTypeSignature] = qualifiedName ^^ { name =>

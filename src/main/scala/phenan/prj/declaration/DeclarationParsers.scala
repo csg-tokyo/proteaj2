@@ -1,6 +1,5 @@
 package phenan.prj.declaration
 
-import phenan.prj.JPriority
 import phenan.prj.combinator.TwoLevelParsers
 import phenan.prj.exception.ParseException
 
@@ -43,11 +42,13 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val importStaticStar = "import" ~> "static" ~> qualifiedName <~ '.' <~ '*' <~ ';' ^^ ImportStaticStarDeclaration
 
-  lazy val importDSLs = importDSLs_ascending | importDSLs_descending
+  lazy val importDSLs = importDSLs_Simple | importDSLs_Constraints
 
-  lazy val importDSLs_ascending = "import" ~> "dsl" ~> qualifiedName.+('<') <~ ';' ^^ { dsls => ImportDSLsDeclaration(dsls) }
+  lazy val importDSLs_Simple = "import" ~> ( "dsl" | "dsls" ) ~> qualifiedName.+(',') <~ ';' ^^ { dsls => ImportDSLsDeclaration(dsls, Nil) }
 
-  lazy val importDSLs_descending = "import" ~> "dsl" ~> qualifiedName.+('>') <~ ';' ^^ { dsls => ImportDSLsDeclaration(dsls.reverse) }
+  lazy val importDSLs_Constraints = "import" ~> ( "dsl" | "dsls" ) ~> qualifiedName.+(',') ~ ( '{' ~> constraint.*(';') <~ '}' ) ^^ {
+    case dsls ~ constraints => ImportDSLsDeclaration(dsls, constraints)
+  }
 
   lazy val importClass = "import" ~> qualifiedName <~ ';' ^^ ClassImportDeclaration
 
@@ -88,11 +89,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val extendsInterfaces = ( "extends" ~> typeName.+(',')).? ^^ { _.getOrElse(Nil) }
 
-  lazy val mixinDSLs = ( mixinDSLs_ascending | mixinDSLs_descending ).? ^^ { _.getOrElse(Nil) }
-
-  lazy val mixinDSLs_ascending = "with" ~> qualifiedName.+('<')
-
-  lazy val mixinDSLs_descending = "with" ~> qualifiedName.+('>') ^^ { _.reverse }
+  lazy val mixinDSLs = ( "with" ~> qualifiedName.+(',') ).? ^^ { _.getOrElse(Nil) }
 
 
   /* members*/
@@ -123,7 +120,7 @@ object DeclarationParsers extends TwoLevelParsers {
     case label ~ mods ~ mps ~ tn ~ pri ~ syn ~ params ~ clauses ~ body => OperatorDeclaration(label, mods, mps, tn, pri, syn, params, clauses, body)
   }
 
-  lazy val prioritiesDeclaration = ("priority" | "priorities") ~> identifier.+(',') ~ ( '{' ~> constraint.*(';') <~ '}' ) ^^ {
+  lazy val prioritiesDeclaration = ("priority" | "priorities") ~> identifier.*(',') ~ ( '{' ~> constraint.*(';') <~ '}' ) ^^ {
     case names ~ constraints => PrioritiesDeclaration(names, constraints)
   }
 

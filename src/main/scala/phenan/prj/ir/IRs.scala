@@ -76,6 +76,8 @@ trait IRModule extends JClass with IRMember {
 
   def priorityConstraints = annotations.dsl.map(_.constraints).getOrElse(Nil)
 
+  def withDSLs = annotations.dsl.map(_.withDSLs).getOrElse(Nil)
+
   lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifier
 
   lazy val name = internalName.replace('/', '.').replace('$', '.')
@@ -238,6 +240,8 @@ trait IRDSL extends IRModule {
 
   override lazy val priorityConstraints: List[List[JPriority]] = priorityDeclarations.flatMap(_.constraints)
 
+  override lazy val withDSLs: List[JClassTypeSignature] = withDSLs(dslAST.withDSLs, Nil)
+
   private def declaredMembers (membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
     case (c: ContextDeclaration) :: rest        => declaredMembers(rest, IRContext(c, this) :: ms)
     case (p: PrioritiesDeclaration) :: rest     => declaredMembers(rest, IRDSLPriorities(p, this) :: ms)
@@ -248,9 +252,7 @@ trait IRDSL extends IRModule {
 
   private lazy val priorityDeclarations = declaredMembers.collect { case p: IRDSLPriorities => p }
 
-  lazy val withDSLs: List[JTypeSignature] = withDSLs(dslAST.withDSLs, Nil)
-
-  private def withDSLs (ast: List[QualifiedName], result: List[JTypeSignature]): List[JTypeSignature] = ast match {
+  private def withDSLs (ast: List[QualifiedName], result: List[JClassTypeSignature]): List[JClassTypeSignature] = ast match {
     case qualifiedName :: rest => resolver.classTypeSignature(qualifiedName) match {
       case Success(sig) => withDSLs(rest, sig :: result)
       case Failure(e)   =>

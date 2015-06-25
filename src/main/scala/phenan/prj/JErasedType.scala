@@ -24,6 +24,7 @@ trait JClass extends JErasedType {
   def declaredPriorities: Set[JPriority]
   def memberPriorities: Set[JPriority]
   def priorityConstraints: List[List[JPriority]]
+  def withDSLs: List[JClassTypeSignature]
 
   lazy val priorities: Set[JPriority] = declaredPriorities ++ memberPriorities
 

@@ -38,16 +38,7 @@ class DeclarationParsersTest extends FunSuite with Matchers with ASTUtil {
   test ("import dsl") {
     val r = parse(importDSLs, "import dsl sql.DSL;")
     assert(r.successful)
-    r.get shouldBe ImportDSLsDeclaration(List(qName("sql", "DSL")))
-  }
-
-  test ("import dsls") {
-    val r1 = parse(importDSLs, "import dsl sql.DSL > file.DSL > regex.DSL;")
-    val r2 = parse(importDSLs, "import dsl regex.DSL < file.DSL < sql.DSL;")
-    assert(r1.successful)
-    assert(r2.successful)
-    r1.get shouldBe ImportDSLsDeclaration(List(qName("regex", "DSL"), qName("file", "DSL"), qName("sql", "DSL")))
-    r2.get shouldBe ImportDSLsDeclaration(List(qName("regex", "DSL"), qName("file", "DSL"), qName("sql", "DSL")))
+    r.get shouldBe ImportDSLsDeclaration(List(qName("sql", "DSL")), Nil)
   }
 
   test ("marker annotation") {
