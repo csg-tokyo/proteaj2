@@ -33,7 +33,7 @@ case class IRFile (ast: CompilationUnit, root: RootResolver) {
   private[ir] def annotationReader = new IRAnnotationReader(this)
 }
 
-sealed trait IRMember
+trait IRMember
 sealed trait IRClassMember extends IRMember
 sealed trait IREnumMember extends IRMember
 sealed trait IRInterfaceMember extends IRMember
@@ -57,8 +57,6 @@ trait IRModule extends JClass with IRMember {
   def outer: Option[IRModule]
   def declaredMembers: List[IRMember]
 
-  def declaredPriorities: List[JPriority] = Nil
-
   def simpleName: String
   
   protected def modifiersAST: List[Modifier]
@@ -69,6 +67,14 @@ trait IRModule extends JClass with IRMember {
   protected def implicitModifier: Int
   protected def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.objectTypeSig
   protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature] = Nil
+
+  protected def priorityNames = annotations.dsl.map(_.priorities).getOrElse(Nil)
+
+  lazy val declaredPriorities: Set[JPriority] = priorityNames.map(JPriority(SimpleClassTypeSignature(internalName, Nil), _)).toSet
+
+  def memberPriorities: Set[JPriority] = collectMemberPriorities(declaredMembers, Set.empty)
+
+  def priorityConstraints = annotations.dsl.map(_.constraints).getOrElse(Nil)
 
   lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifier
 
@@ -99,8 +105,6 @@ trait IRModule extends JClass with IRMember {
     case None      => constructResolver(metaParametersAST, Nil, file.resolver)
   }
 
-  lazy val dslInfo = annotations.dsl
-
   def compiler: JCompiler = file.compiler
 
   private def constructResolver (metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JClassSignature, NameResolver) = metaParametersAST match {
@@ -130,6 +134,13 @@ trait IRModule extends JClass with IRMember {
         constructInterfaceSignatures(rest, signatures, resolver)
     }
     case Nil => signatures.reverse
+  }
+
+  private def collectMemberPriorities(members: List[IRMember], ps: Set[JPriority]): Set[JPriority] = members match {
+    case (o: IROperator) :: rest if o.priority.clazz.internalName == internalName => collectMemberPriorities(rest, ps + o.priority)
+    case (m: IRModule) :: rest   => collectMemberPriorities(rest, m.memberPriorities ++ ps)
+    case _ :: rest               => collectMemberPriorities(rest, ps)
+    case Nil                     => ps
   }
 }
 
@@ -223,9 +234,9 @@ trait IRDSL extends IRModule {
   protected def superTypeAST: Option[TypeName] = None
   protected def interfacesAST: List[TypeName] = Nil
 
-  override lazy val dslInfo: Option[DSLInfo] = Some(DSLInfo(priorities.map(_.name), priorityDeclarations.flatMap(_.constraints), withDSLs))
+  override protected def priorityNames = priorityDeclarations.flatMap(_.priorityNames)
 
-  override def declaredPriorities = priorityDeclarations.flatMap(_.priorities)
+  override lazy val priorityConstraints: List[List[JPriority]] = priorityDeclarations.flatMap(_.constraints)
 
   private def declaredMembers (membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
     case (c: ContextDeclaration) :: rest        => declaredMembers(rest, IRContext(c, this) :: ms)
@@ -237,18 +248,7 @@ trait IRDSL extends IRModule {
 
   private lazy val priorityDeclarations = declaredMembers.collect { case p: IRDSLPriorities => p }
 
-  private lazy val priorities = collectPriorities(declaredMembers, Set.empty)
-
-  private def collectPriorities (ms: List[IRDSLMember], ps: Set[JPriority]): List[JPriority] = ms match {
-    case (op: IRDSLOperator) :: rest if op.priority.clazz.internalName == internalName => collectPriorities(rest, ps + op.priority)
-    case (p: IRDSLPriorities) :: rest => collectPriorities(rest, ps ++ p.priorities)
-    case (c: IRContext) :: rest       => collectPriorities(rest, ps ++ c.priorities)
-    case (_: IRDSLOperator | _: IRDSLField) :: rest   => collectPriorities(rest, ps)
-    case Nil => ps.toList
-  }
-
-
-  private lazy val withDSLs: List[JTypeSignature] = withDSLs(dslAST.withDSLs, Nil)
+  lazy val withDSLs: List[JTypeSignature] = withDSLs(dslAST.withDSLs, Nil)
 
   private def withDSLs (ast: List[QualifiedName], result: List[JTypeSignature]): List[JTypeSignature] = ast match {
     case qualifiedName :: rest => resolver.classTypeSignature(qualifiedName) match {
@@ -268,8 +268,6 @@ case class IRContext (contextAST: ContextDeclaration, dsl: IRDSL) extends IRModu
   def simpleName: String = contextAST.name
   lazy val declaredMembers: List[IRContextMember] = declaredMembers(contextAST.members, Nil)
 
-  lazy val priorities: Set[JPriority] = collectPriorities(declaredMembers, Set.empty)
-
   protected def modifiersAST: List[Modifier] = contextAST.modifiers
   protected def metaParametersAST: List[MetaParameter] = contextAST.metaParameters
   protected def superTypeAST: Option[TypeName] = None
@@ -282,12 +280,6 @@ case class IRContext (contextAST: ContextDeclaration, dsl: IRDSL) extends IRModu
     case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRContextField(mods, ft, _, this)) ++ ms)
     case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, IRContextOperator(o, this) :: ms)
     case Nil => ms.reverse
-  }
-
-  private def collectPriorities (ms: List[IRContextMember], ps: Set[JPriority]): Set[JPriority] = ms match {
-    case (o: IRContextOperator) :: rest if o.priority.clazz.internalName == dsl.internalName => collectPriorities(rest, ps + o.priority)
-    case (_: IRContextOperator | _: IRContextConstructor | _: IRContextField) :: rest => collectPriorities(rest, ps)
-    case Nil => ps
   }
 }
 
@@ -617,7 +609,8 @@ case class IRContextOperator (operatorAST: OperatorDeclaration, declaringClass: 
 }
 
 case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
-  lazy val priorities: List[JPriority] = prioritiesAST.names.map { JPriority(SimpleClassTypeSignature(declaringDSL.internalName, Nil), _) }
+  def priorityNames = prioritiesAST.names
+
   lazy val constraints: List[List[JPriority]] = constraints(prioritiesAST.constraints, Nil)
 
   private def constraints (ast: List[List[QualifiedName]], cs: List[List[JPriority]]): List[List[JPriority]] = ast match {

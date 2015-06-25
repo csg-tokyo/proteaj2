@@ -37,7 +37,11 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler) extends 
 
   lazy val outerClass = outerInfo.flatMap(info => readClassNameOption(info.outerClassInfo))
 
-  def dslInfo = annotations.dsl
+  lazy val declaredPriorities = annotations.dsl.map(_.priorities.map(JPriority(SimpleClassTypeSignature(internalName, Nil), _))).getOrElse(Nil).toSet
+
+  def memberPriorities = Set.empty
+
+  lazy val priorityConstraints = annotations.dsl.map(_.constraints).getOrElse(Nil)
 
   lazy val annotations = classAnnotations(attributes.annotations)
 

@@ -97,19 +97,19 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case id ~ dim => ( '=' ~> ExpressionParsers(expected.array(dim), env).expression ).? ^^ { IRVariableDeclarator(id, dim, _) }
     }
 
-    def expression: HParser[IRExpression] = env.highestPriority(expected).map(cached).getOrElse(hostExpression)
+    def expression: HParser[IRExpression] = env.highestPriority.map(cached).getOrElse(hostExpression)
 
-    def expression (priority: String): HParser[IRExpression] = cached(priority)
+    def expression (priority: JPriority): HParser[IRExpression] = cached(priority)
 
     lazy val hostExpression: HParser[IRExpression] = ???
 
-    private val cached: String => HParser[IRExpression] = mutableHashMapMemo { p =>
-      env.expressionOperators(expected, p).map(OperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(expected, p).map(cached).getOrElse(hostExpression)
+    private val cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
+      env.expressionOperators(expected, p).map(ExpressionOperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(p).map(cached).getOrElse(hostExpression)
     }
   }
 
-  class OperatorParsers private (syntax: JSyntax, env: Environment) {
-    lazy val operator: HParser[IROperation] = constructParser(syntax.pattern, Nil) ^^ { args => IROperation(syntax, args) }
+  class ExpressionOperatorParsers private (expressionOperator: ExpressionOperator, env: Environment) {
+    lazy val operator: HParser[IRExpression] = constructParser(expressionOperator.syntax.pattern, Nil) ^^ expressionOperator.semantics
 
     def constructParser (pattern: List[JSyntaxElement], operands: List[IRArgument]): HParser[List[IRArgument]] = pattern match {
       case (e: JOperand) :: rest          => parameter(e.parameter, operands) >> { arg => constructParser(rest, operands :+ IRNormalArgument(arg)) }
@@ -189,9 +189,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     private val cached : ((JType, Environment)) => ExpressionParsers = mutableHashMapMemo { pair => new ExpressionParsers(pair._1, pair._2) }
   }
 
-  object OperatorParsers {
-    def apply (syntax: JSyntax, env: Environment): OperatorParsers = cached((syntax, env))
-    private val cached : ((JSyntax, Environment)) => OperatorParsers = mutableHashMapMemo { pair => new OperatorParsers(pair._1, pair._2) }
+  object ExpressionOperatorParsers {
+    def apply (expressionOperator: ExpressionOperator, env: Environment): ExpressionOperatorParsers = cached((expressionOperator, env))
+    private val cached : ((ExpressionOperator, Environment)) => ExpressionOperatorParsers = mutableHashMapMemo { pair => new ExpressionOperatorParsers(pair._1, pair._2) }
   }
 
   object TypeParsers {

@@ -20,7 +20,12 @@ trait JClass extends JErasedType {
   def outerClass: Option[String]
 
   def signature: JClassSignature
-  def dslInfo: Option[DSLInfo]
+
+  def declaredPriorities: Set[JPriority]
+  def memberPriorities: Set[JPriority]
+  def priorityConstraints: List[List[JPriority]]
+
+  lazy val priorities: Set[JPriority] = declaredPriorities ++ memberPriorities
 
   lazy val superClass: Option[JClass] = compiler.classLoader.erase_PE(signature.superClass)
   lazy val interfaces: List[JClass] = signature.interfaces.flatMap(compiler.classLoader.erase_PE)

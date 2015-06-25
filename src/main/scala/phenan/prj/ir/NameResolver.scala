@@ -25,15 +25,15 @@ trait NameResolver {
 
   def withMetaParameter (param: FormalMetaParameter): NameResolver = new NameResolver_MetaParameter (param, this)
   def withInnerClasses (inners: List[IRModule]): NameResolver = new NameResolver_InnerClasses (inners, this)
-  def withPriorities (priorities: List[JPriority]): NameResolver = new NameResolver_Priorities (priorities, this)
+  def withPriorities (priorities: Set[JPriority]): NameResolver = new NameResolver_Priorities (priorities, this)
 
   def resolve (name: List[String]): Try[JClass] =
     resolve(name.head).flatMap(root.findInnerClass(_, name.tail)).orElse(root.findClass(name))
 
   def priority (name: QualifiedName): Option[JPriority] = {
     if (name.names.size > 1) resolve(name.names.init) match {
-      case Success(clazz) if clazz.dslInfo.exists(_.priorities.contains(name.names.last)) => Some(JPriority(SimpleClassTypeSignature(clazz.internalName, Nil), name.names.last))
-      case _ => root.compiler.state.errorAndReturn("invalid priority name " + name, None)
+      case Success(clazz) => clazz.declaredPriorities.find(_.name == name.names.last)
+      case Failure(e) => root.compiler.state.errorAndReturn("invalid priority " + name, e, None)
     }
     else name.names.headOption.flatMap(priority)
   }
@@ -251,7 +251,7 @@ class NameResolver_InnerClasses (inners: List[IRModule], parent: NameResolver) e
   private val abbreviated: String => Option[JClass] = mutableHashMapMemo { name => inners.find(_.simpleName == name) }
 }
 
-class NameResolver_Priorities (priorities: List[JPriority], parent: NameResolver) extends NameResolver {
+class NameResolver_Priorities (priorities: Set[JPriority], parent: NameResolver) extends NameResolver {
   def environment: Map[String, MetaValue] = parent.environment
 
   def isMetaVariable (name: String): Boolean = parent.isMetaVariable(name)

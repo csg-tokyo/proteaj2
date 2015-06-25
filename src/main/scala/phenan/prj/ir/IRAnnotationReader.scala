@@ -180,7 +180,7 @@ class IRAnnotationReader (file: IRFile) {
   private def expression (expected: => Option[JType]): AnnotationElement =?> MetaValue = read { _: AnnotationElement => expected } flatMap expression
 
   private def expression (expected: JType): AnnotationElement =?> MetaValue = partial { case ExpressionSnippet(snippet) =>
-    compiler.bodyCompiler.expression(snippet, expected, BaseEnvironment(file)).flatMap(_.eval).toOption
+    compiler.bodyCompiler.expression(snippet, expected, FileEnvironment(file)).flatMap(_.eval).toOption
   }
 
   private def unit [A, B](b: => B): A =?> B = Kleisli { _ => Some(b) }

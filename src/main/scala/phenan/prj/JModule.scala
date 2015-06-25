@@ -55,7 +55,8 @@ case class JClassModule (clazz: JClass) extends JModule {
   lazy val methods: Map[String, List[JMethod]] = declaredMethods.filterNot(_.isPrivate).groupBy(_.name)
   lazy val privateMethods: Map[String, List[JMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
 
-  lazy val priorities: List[String] = clazz.dslInfo.map(_.priorities).getOrElse(Nil)
+  def priorities = clazz.priorities
+  def constraints = clazz.priorityConstraints
 
   def compiler = clazz.compiler
 }
