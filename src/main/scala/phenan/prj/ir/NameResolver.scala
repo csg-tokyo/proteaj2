@@ -38,6 +38,8 @@ trait NameResolver {
     else name.names.headOption.flatMap(priority)
   }
 
+  def constraint (names: List[QualifiedName]): List[JPriority] = resolveConstraint (names, Nil)
+
   import scalaz.Scalaz._
 
   def metaParameter (mp: MetaParameter): Try[FormalMetaParameter] = mp match {
@@ -102,6 +104,16 @@ trait NameResolver {
     case UpperBoundWildcardType(bound) => typeSignature(bound).map(ub => WildcardArgument(Some(ub), None))
     case LowerBoundWildcardType(bound) => typeSignature(bound).map(lb => WildcardArgument(None, Some(lb)))
     case UnboundWildcardType           => Success(WildcardArgument(None, None))
+  }
+
+  private def resolveConstraint (c: List[QualifiedName], result: List[JPriority]): List[JPriority] = c match {
+    case p :: rest => priority(p) match {
+      case Some(r) => resolveConstraint(rest, r :: result)
+      case None    =>
+        root.compiler.state.error("invalid priority name : " + p)
+        resolveConstraint(rest, result)
+    }
+    case Nil => result.reverse
   }
 }
 
@@ -184,15 +196,11 @@ case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameRes
 
   def priority (name: String): Option[JPriority] = root.priority(name)
 
-  private lazy val packageName = file.ast.header.pack.map(_.name.names)
+  private lazy val packageName = file.packageName.map(_.names)
 
-  private lazy val importedClasses: Map[String, List[String]] = file.ast.header.imports.collect {
-    case ClassImportDeclaration(name) => name.names.last -> name.names
-  }.toMap
+  private lazy val importedClasses: Map[String, List[String]] = file.importedClassNames.map { name => name.names.last -> name.names }.toMap
 
-  private lazy val importedPackages: List[List[String]] = file.ast.header.imports.collect {
-    case PackageImportDeclaration(name) => name.names
-  }
+  private lazy val importedPackages: List[List[String]] = file.importedPackageNames.map(_.names)
 
   private val abbreviated: String => Try[JClass] = mutableHashMapMemo { name =>
     if (importedClasses.contains(name)) root.findClass(importedClasses(name))

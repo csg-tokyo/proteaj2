@@ -117,7 +117,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case (e: JRepetition0) :: rest      => parameter(e.parameter, operands).* >> { arg => constructParser(rest, operands :+ IRVariableArguments(arg)) }
       case (e: JRepetition1) :: rest      => parameter(e.parameter, operands).+ >> { arg => constructParser(rest, operands :+ IRVariableArguments(arg)) }
       case (e: JMetaOperand) :: rest      => parameter(e.parameter, operands) >> { arg => constructParser(rest, operands :+ IRMetaArgument(e, arg))}
-      case JMetaName(value) :: rest      => metaValue(value) ~> constructParser(rest, operands)
+      case JMetaName(value) :: rest       => metaValue(value) ~> constructParser(rest, operands)
       case JOperatorName(name) :: rest    => word(name).^ ~> constructParser(rest, operands)
       case JAndPredicate(param) :: rest   => parameter(param, operands).& ~> constructParser(rest, operands)
       case JNotPredicate(param) :: rest   => parameter(param, operands).! ~> constructParser(rest, operands)

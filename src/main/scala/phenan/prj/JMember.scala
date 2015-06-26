@@ -31,8 +31,10 @@ class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val d
   def erasedReturnType: JErasedType = methodDef.erasedReturnType
   def erasedParameterTypes: List[JErasedType] = methodDef.erasedParameterTypes
 
-  lazy val syntax: Option[JSyntax] = methodDef.syntax.map { s =>
-    JSyntax(s.priority, translatePattern(s.syntax, Nil, parameterTypes))
+  lazy val syntax: Option[JSyntax] = methodDef.syntax.map {
+    case JExpressionSyntaxDef(p, s) => JExpressionSyntax(p, translatePattern(s, Nil, parameterTypes))
+    case JLiteralSyntaxDef(p, s)    => JLiteralSyntax(p, translatePattern(s, Nil, parameterTypes))
+    case JStatementSyntaxDef(p, s)  => ???
   }
 
   def overrides (that: JMethod): Boolean = {

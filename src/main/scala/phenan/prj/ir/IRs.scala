@@ -20,15 +20,25 @@ case class IRFile (ast: CompilationUnit, root: RootResolver) {
   }
 
   lazy val internalName = ast.header.pack.map(_.name.names.mkString("/"))
+
+  def packageName = ast.header.pack.map(_.name)
+
+  def importedClassNames = ast.header.imports.collect { case ClassImportDeclaration(name) => name }
+
+  def importedPackageNames = ast.header.imports.collect { case PackageImportDeclaration(name) => name }
   
-  private def collectModules (modules: List[IRModule], result: List[IRModule]): List[IRModule] = modules match {
-    case m :: ms => collectModules(ms ++ m.inners, result :+ m)
-    case Nil     => result
-  }
+  def importedDSLNames = ast.header.imports.collect { case ImportDSLsDeclaration(dsls, _) => dsls }.flatten
+
+  def userConstraints = ast.header.imports.collect { case ImportDSLsDeclaration(_, cs) => cs }.flatten
 
   lazy val resolver = root.file(this)
   def compiler = root.compiler
   def state = compiler.state
+
+  private def collectModules (modules: List[IRModule], result: List[IRModule]): List[IRModule] = modules match {
+    case m :: ms => collectModules(ms ++ m.inners, result :+ m)
+    case Nil     => result
+  }
 
   private[ir] def annotationReader = new IRAnnotationReader(this)
 }
@@ -613,22 +623,7 @@ case class IRContextOperator (operatorAST: OperatorDeclaration, declaringClass: 
 case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
   def priorityNames = prioritiesAST.names
 
-  lazy val constraints: List[List[JPriority]] = constraints(prioritiesAST.constraints, Nil)
-
-  private def constraints (ast: List[List[QualifiedName]], cs: List[List[JPriority]]): List[List[JPriority]] = ast match {
-    case c :: rest => constraints(rest, resolveConstraint(c, Nil) :: cs)
-    case Nil       => cs
-  }
-
-  private def resolveConstraint (c: List[QualifiedName], result: List[JPriority]): List[JPriority] = c match {
-    case p :: rest => declaringDSL.resolver.priority(p) match {
-      case Some(r) => resolveConstraint(rest, r :: result)
-      case None    =>
-        declaringDSL.state.error("invalid priority name : " + p)
-        resolveConstraint(rest, result)
-    }
-    case Nil => result.reverse
-  }
+  lazy val constraints: List[List[JPriority]] = prioritiesAST.constraints.map(declaringDSL.resolver.constraint)
 }
 
 

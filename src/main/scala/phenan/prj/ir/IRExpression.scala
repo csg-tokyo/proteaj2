@@ -6,13 +6,17 @@ import scala.util._
 
 sealed trait IRExpression {
   def eval: Try[MetaValue] = ???
-  def activates: List[JObjectType] = ???
-  def deactivates: List[JObjectType] = ???
+  def activates: List[IRContextRef] = ???
+  def deactivates: List[IRContextRef] = ???
 }
 
-case class IROperation (syntax: JSyntax, args: List[IRArgument]) extends IRExpression
+case class IRDSLOperation (method: JMethod, args: List[IRArgument]) extends IRExpression
+
+case class IRContextOperation (context: IRContextRef, method: JMethod, args: List[IRArgument]) extends IRExpression
 
 case class IRLocalVariableRef (localType: JType, name: String) extends IRExpression
+
+case class IRContextRef (contextType: JObjectType, id: Int) extends IRExpression
 
 sealed trait IRArgument
 

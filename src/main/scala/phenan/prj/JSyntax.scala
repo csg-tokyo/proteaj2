@@ -1,6 +1,12 @@
 package phenan.prj
 
-case class JSyntax (priority: JPriority, pattern: List[JSyntaxElement])
+sealed trait JSyntax {
+  def priority: JPriority
+  def pattern: List[JSyntaxElement]
+}
+
+case class JExpressionSyntax (priority: JPriority, pattern: List[JSyntaxElement]) extends JSyntax
+case class JLiteralSyntax (priority: JPriority, pattern: List[JSyntaxElement]) extends JSyntax
 
 sealed trait JSyntaxElement
 

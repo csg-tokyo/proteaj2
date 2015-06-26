@@ -55,12 +55,32 @@ case class JClassModule (clazz: JClass) extends JModule {
   lazy val methods: Map[String, List[JMethod]] = declaredMethods.filterNot(_.isPrivate).groupBy(_.name)
   lazy val privateMethods: Map[String, List[JMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
 
+
   def priorities = clazz.priorities
   def constraints = clazz.priorityConstraints
 
   lazy val withDSLs = clazz.withDSLs.flatMap(compiler.classLoader.erase_PE).map(_.classModule)
 
   def compiler = clazz.compiler
+
+  lazy val expressionOperators = collectExpressionOperators(declaredMethods.filterNot(_.isPrivate), Nil)
+  lazy val literalOperators = collectLiteralOperators(declaredMethods.filterNot(_.isPrivate), Nil)
+
+  private def collectExpressionOperators (ms: List[JMethod], es: List[(JExpressionSyntax, JMethod)]): List[(JExpressionSyntax, JMethod)] = ms match {
+    case m :: rest => m.syntax match {
+      case Some(s: JExpressionSyntax) => collectExpressionOperators(rest, (s -> m) :: es)
+      case _ => collectExpressionOperators(rest, es)
+    }
+    case Nil => es
+  }
+
+  private def collectLiteralOperators (ms: List[JMethod], es: List[(JLiteralSyntax, JMethod)]): List[(JLiteralSyntax, JMethod)] = ms match {
+    case m :: rest => m.syntax match {
+      case Some(s: JLiteralSyntax) => collectLiteralOperators(rest, (s -> m) :: es)
+      case _ => collectLiteralOperators(rest, es)
+    }
+    case Nil => es
+  }
 }
 
 sealed trait JType extends JModule {
@@ -139,6 +159,25 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
   def isAssignableTo(that: JType): Boolean = ???
 
   def matches (that: MetaValue): Boolean = this == that
+
+  lazy val expressionOperators = collectExpressionOperators(nonPrivateMethodList, Nil)
+  lazy val literalOperators = collectLiteralOperators(nonPrivateMethodList, Nil)
+
+  private def collectExpressionOperators (ms: List[JMethod], es: List[(JExpressionSyntax, JMethod)]): List[(JExpressionSyntax, JMethod)] = ms match {
+    case m :: rest => m.syntax match {
+      case Some(s: JExpressionSyntax) => collectExpressionOperators(rest, (s -> m) :: es)
+      case _ => collectExpressionOperators(rest, es)
+    }
+    case Nil => es
+  }
+
+  private def collectLiteralOperators (ms: List[JMethod], es: List[(JLiteralSyntax, JMethod)]): List[(JLiteralSyntax, JMethod)] = ms match {
+    case m :: rest => m.syntax match {
+      case Some(s: JLiteralSyntax) => collectLiteralOperators(rest, (s -> m) :: es)
+      case _ => collectLiteralOperators(rest, es)
+    }
+    case Nil => es
+  }
 
   /* helper methods for collecting non-private inherited members */
 
