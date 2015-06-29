@@ -30,7 +30,24 @@ case class JGenericType (signature: JTypeSignature, env: Map[String, MetaValue],
   def bind (args: Map[String, MetaValue]): Option[JType] = {
     compiler.typeLoader.fromTypeSignature(signature, env ++ args)
   }
-  def unbound (args: Map[String, MetaValue]): List[String] = ???
+  def unbound (args: Map[String, MetaValue]): Set[String] = unbound(signature, args, Set.empty[String])
+
+  private def unbound (sig: JTypeSignature, args: Map[String, MetaValue], result: Set[String]): Set[String] = sig match {
+    case JTypeVariableSignature(name) if args.contains(name) || env.contains(name) => result
+    case JTypeVariableSignature(name)           => result + name
+    case SimpleClassTypeSignature(_, as)        => as.foldLeft(result) { (r, a) => unbound(a, args, r) }
+    case MemberClassTypeSignature(outer, _, as) => as.foldLeft(unbound(outer, args, result)) { (r, a) => unbound(a, args, r) }
+    case JArrayTypeSignature(component)         => unbound(component, args, result)
+    case JCapturedWildcardSignature(ub, lb)     => ub.map(unbound(_, args, result)).orElse(lb.map(unbound(_, args, result))).getOrElse(result)
+    case _ : JPrimitiveTypeSignature            => result
+  }
+
+  private def unbound (sig: JTypeArgument, args: Map[String, MetaValue], result: Set[String]): Set[String] = sig match {
+    case PureVariableSignature(name) if args.contains(name) || env.contains(name) => result
+    case PureVariableSignature(name) => result + name
+    case sig: JTypeSignature         => unbound(sig, args, result)
+    case WildcardArgument(ub, lb)    => ub.map(unbound(_, args, result)).orElse(lb.map(unbound(_, args, result))).getOrElse(result)
+  }
 }
 
 sealed trait JModule {

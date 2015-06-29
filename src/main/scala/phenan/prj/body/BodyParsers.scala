@@ -108,9 +108,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
   }
 
-  class ExpressionOperatorParsers private (expressionOperator: ExpressionOperator, env: Environment) {
-    lazy val operator: HParser[IRExpression] = constructParser(expressionOperator.syntax.pattern, Nil) ^^ expressionOperator.semantics
-
+  class ExpressionOperatorParsers private (eop: ExpressionOperator, env: Environment) {
+    lazy val operator: HParser[IRExpression] = constructParser(eop.syntax.pattern, eop.metaArgs, env, Nil)
+    /*
     def constructParser (pattern: List[JSyntaxElement], operands: List[IRArgument]): HParser[List[IRArgument]] = pattern match {
       case (e: JOperand) :: rest          => parameter(e.parameter, operands) >> { arg => constructParser(rest, operands :+ IRNormalArgument(arg)) }
       case (e: JOptionalOperand) :: rest  => parameter(e.parameter, operands).? >> { arg => constructParser(rest, operands :+ IROptionalArgument(e, arg)) }
@@ -130,10 +130,10 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
         case (e, IROptionalArgument(_, arg)) => arg.map(e.modifyContext).getOrElse(e)
         case (e, IRVariableArguments(args))  => args.foldLeft(e) { _.modifyContext(_) }
       }
-      val bindings = operands.collect { case arg: IRMetaArgument => arg.binding }.flatMap {
+      val bindings = expressionOperator.metaArgs ++ operands.collect { case arg: IRMetaArgument => arg.binding }.flatMap {
         case Success(bind) => Some(bind)
         case Failure(e)    => compiler.state.errorAndReturn("invalid meta argument", e, None)
-      }.toMap
+      }
       val unbound = param.genericType.unbound(bindings)
 
       ???
@@ -141,6 +141,28 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
 
     def metaValue (mv: MetaValue): HParser[MetaValue] = ???
+    */
+    private def constructParser (pattern: List[JSyntaxElement], binding: Map[String, MetaValue], environment: Environment, operands: List[IRExpression]): HParser[IRExpression] = pattern match {
+      case (e: JOperand) :: rest          => parameter(e.parameter, binding, environment) >> { arg =>
+        constructParser(rest, bind(e.parameter, arg, binding), environment.modifyContext(arg), arg :: operands)
+      }
+      case (e: JOptionalOperand) :: rest  => parameter(e.parameter, binding, environment).? >> {
+        case Some(arg) => constructParser(rest, bind(e.parameter, arg, binding), environment.modifyContext(arg), arg :: operands)
+        case None      => constructParser(rest, binding, environment, ??? :: operands)
+      }
+      case (e: JRepetition0) :: rest      => ???
+      case (e: JRepetition1) :: rest      => ???
+      case (e: JMetaOperand) :: rest      => ???
+      case JMetaName(value) :: rest       => ???
+      case JOperatorName(name) :: rest    => word(name).^ ~> constructParser(rest, binding, environment, operands)
+      case JAndPredicate(param) :: rest   => ???
+      case JNotPredicate(param) :: rest   => ???
+      case Nil                            => success(eop.semantics(binding, operands.reverse)).^
+    }
+
+    private def parameter (param: JParameter, binding: Map[String, MetaValue], environment: Environment): HParser[IRExpression] = ???
+
+    private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaValue]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
   }
 
   class TypeParsers private (resolver: NameResolver) {

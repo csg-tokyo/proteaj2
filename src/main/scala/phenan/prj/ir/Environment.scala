@@ -33,7 +33,7 @@ trait Environment {
 
   protected def collectDSLExpressions (t: JType, operators: List[(JExpressionSyntax, JMethod)], result: List[ExpressionOperator]): List[ExpressionOperator] = operators match {
     case (syntax, method) :: rest => unifier.unify(t, method.returnType) match {
-      case Some(metaArgs) => collectDSLExpressions(t, rest, ExpressionOperator(syntax, metaArgs, { args => IRDSLOperation(method, args) }) :: result)
+      case Some(metaArgs) => collectDSLExpressions(t, rest, ExpressionOperator(syntax, metaArgs, { (metaArgs, args) => IRDSLOperation(method, metaArgs, args) }) :: result)
       case None           => collectDSLExpressions(t, rest, result)
     }
     case Nil => result
@@ -41,7 +41,7 @@ trait Environment {
 
   protected def collectContextExpressions (t: JType, context: IRContextRef, operators: List[(JExpressionSyntax, JMethod)], result: List[ExpressionOperator]): List[ExpressionOperator] = operators match {
     case (syntax, method) :: rest => unifier.unify(t, method.returnType) match {
-      case Some(metaArgs) => collectContextExpressions(t, context, rest, ExpressionOperator(syntax, metaArgs, { args => IRContextOperation(context, method, args) }) :: result)
+      case Some(metaArgs) => collectContextExpressions(t, context, rest, ExpressionOperator(syntax, metaArgs, { (metaArgs, args) => IRContextOperation(context, method, metaArgs, args) }) :: result)
       case None           => collectContextExpressions(t, context, rest, result)
     }
     case Nil => result
@@ -113,4 +113,4 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
   }
 }
 
-case class ExpressionOperator (syntax: JExpressionSyntax, metaArgs: Map[String, MetaValue], semantics: List[IRArgument] => IRExpression)
+case class ExpressionOperator (syntax: JExpressionSyntax, metaArgs: Map[String, MetaValue], semantics: (Map[String, MetaValue], List[IRExpression]) => IRExpression)
