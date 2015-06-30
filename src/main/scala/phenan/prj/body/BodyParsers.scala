@@ -110,59 +110,62 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
   class ExpressionOperatorParsers private (eop: ExpressionOperator, env: Environment) {
     lazy val operator: HParser[IRExpression] = constructParser(eop.syntax.pattern, eop.metaArgs, env, Nil)
-    /*
-    def constructParser (pattern: List[JSyntaxElement], operands: List[IRArgument]): HParser[List[IRArgument]] = pattern match {
-      case (e: JOperand) :: rest          => parameter(e.parameter, operands) >> { arg => constructParser(rest, operands :+ IRNormalArgument(arg)) }
-      case (e: JOptionalOperand) :: rest  => parameter(e.parameter, operands).? >> { arg => constructParser(rest, operands :+ IROptionalArgument(e, arg)) }
-      case (e: JRepetition0) :: rest      => parameter(e.parameter, operands).* >> { arg => constructParser(rest, operands :+ IRVariableArguments(arg)) }
-      case (e: JRepetition1) :: rest      => parameter(e.parameter, operands).+ >> { arg => constructParser(rest, operands :+ IRVariableArguments(arg)) }
-      case (e: JMetaOperand) :: rest      => parameter(e.parameter, operands) >> { arg => constructParser(rest, operands :+ IRMetaArgument(e, arg))}
-      case JMetaName(value) :: rest       => metaValue(value) ~> constructParser(rest, operands)
-      case JOperatorName(name) :: rest    => word(name).^ ~> constructParser(rest, operands)
-      case JAndPredicate(param) :: rest   => parameter(param, operands).& ~> constructParser(rest, operands)
-      case JNotPredicate(param) :: rest   => parameter(param, operands).! ~> constructParser(rest, operands)
-      case Nil                            => success(operands).^
-    }
 
-    def parameter (param: JParameter, operands: List[IRArgument]): HParser[IRExpression] = {
-      val environment = operands.collect { case arg: IRRuntimeArgument => arg }.foldLeft(env) {
-        case (e, IRNormalArgument(arg))      => e.modifyContext(arg)
-        case (e, IROptionalArgument(_, arg)) => arg.map(e.modifyContext).getOrElse(e)
-        case (e, IRVariableArguments(args))  => args.foldLeft(e) { _.modifyContext(_) }
-      }
-      val bindings = expressionOperator.metaArgs ++ operands.collect { case arg: IRMetaArgument => arg.binding }.flatMap {
-        case Success(bind) => Some(bind)
-        case Failure(e)    => compiler.state.errorAndReturn("invalid meta argument", e, None)
-      }
-      val unbound = param.genericType.unbound(bindings)
-
-      ???
-      // ExpressionParsers(param.genericType.bind(operands.collect { case arg: IRMetaArgument => arg.binding }), env.modifyContext())
-    }
-
-    def metaValue (mv: MetaValue): HParser[MetaValue] = ???
-    */
     private def constructParser (pattern: List[JSyntaxElement], binding: Map[String, MetaValue], environment: Environment, operands: List[IRExpression]): HParser[IRExpression] = pattern match {
-      case (e: JOperand) :: rest          => parameter(e.parameter, binding, environment) >> { arg =>
-        constructParser(rest, bind(e.parameter, arg, binding), environment.modifyContext(arg), arg :: operands)
+      case JOperand(param) :: rest           => parameter(param, binding, environment) >> { arg =>
+        constructParser(rest, bind(param, arg, binding), environment.modifyContext(arg), arg :: operands)
       }
-      case (e: JOptionalOperand) :: rest  => parameter(e.parameter, binding, environment).? >> {
-        case Some(arg) => constructParser(rest, bind(e.parameter, arg, binding), environment.modifyContext(arg), arg :: operands)
-        case None      => constructParser(rest, binding, environment, ??? :: operands)
+      case JOptionalOperand(param) :: rest   => optional(param, binding, environment) >> {
+        case Some(arg) => constructParser(rest, bind(param, arg, binding), environment.modifyContext(arg), arg :: operands)
+        case None      => constructParser(rest, binding, environment, operands)
       }
-      case (e: JRepetition0) :: rest      => ???
-      case (e: JRepetition1) :: rest      => ???
-      case (e: JMetaOperand) :: rest      => ???
-      case JMetaName(value) :: rest       => ???
-      case JOperatorName(name) :: rest    => word(name).^ ~> constructParser(rest, binding, environment, operands)
-      case JAndPredicate(param) :: rest   => ???
-      case JNotPredicate(param) :: rest   => ???
-      case Nil                            => success(eop.semantics(binding, operands.reverse)).^
+      case JRepetition0(param) :: rest       => rep0(param, binding, environment, Nil) >> {
+        case (bnd, e, arg) => constructParser(rest, bnd, e, arg :: operands)
+      }
+      case JRepetition1(param) :: rest       => rep1(param, binding, environment) >> {
+        case (bnd, e, arg) => constructParser(rest, bnd, e, arg :: operands)
+      }
+      case JMetaOperand(name, param) :: rest => parameter(param, binding, environment) >> {
+        _.eval match {
+          case Success(mv) => constructParser(rest, binding + (name -> mv), environment, operands)
+          case Failure(e)  => compiler.state.errorAndReturn("invalid meta argument", e, constructParser(rest, binding, environment, operands))
+        }
+      }
+      case JMetaName(value) :: rest          => metaValue(value) ~> constructParser(rest, binding, environment, operands)
+      case JOperatorName(name) :: rest       => word(name).^ ~> constructParser(rest, binding, environment, operands)
+      case JAndPredicate(param) :: rest      => parameter(param, binding, environment).& ~> constructParser(rest, binding, environment, operands)
+      case JNotPredicate(param) :: rest      => parameter(param, binding, environment).! ~> constructParser(rest, binding, environment, operands)
+      case Nil                               => success(eop.semantics(binding, operands.reverse)).^
     }
 
-    private def parameter (param: JParameter, binding: Map[String, MetaValue], environment: Environment): HParser[IRExpression] = ???
+    private def parameter (param: JParameter, binding: Map[String, MetaValue], environment: Environment): HParser[IRExpression] = {
+      val expected = param.genericType.bind(binding ++ param.genericType.unbound(binding).flatMap(name => eop.method.metaParameters.get(name).map(name -> _)).toMap.mapValues {
+        case FormalMetaParameter(name, JTypeSignature.typeTypeSig, _, bounds) => JWildcard(bounds.headOption.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, binding)), None)
+        case FormalMetaParameter(name, metaType, _, _) => ???
+      })
+      val priority = param.priority.orElse(environment.nextPriority(eop.syntax.priority))
+      expected.map(t => priority.map(p => ExpressionParsers(t, environment).expression(p)).getOrElse(ExpressionParsers(t, environment).hostExpression)).getOrElse(???)
+    }
+
+    private def metaValue (mv: MetaValue): HParser[MetaValue] = TypeParsers(env.resolver).metaValue ^? {
+      case value if mv == value => value
+    }
+
+    private def optional (param: JParameter, binding: Map[String, MetaValue], environment: Environment) = parameter(param, binding, environment).? ^^ { _.orElse(defaultExpression(param)) }
+
+    private def rep0 (param: JParameter, binding: Map[String, MetaValue], environment: Environment, result: List[IRExpression]): HParser[(Map[String, MetaValue], Environment, IRExpression)] = {
+      parameter(param, binding, environment) >> { arg =>
+        rep0(param, bind(param, arg, binding), environment.modifyContext(arg), arg :: result)
+      } | success(binding, environment, IRVariableArguments(result.reverse)).^
+    }
+
+    private def rep1 (param: JParameter, binding: Map[String, MetaValue], environment: Environment): HParser[(Map[String, MetaValue], Environment, IRExpression)] = {
+      parameter(param, binding, environment) >> { arg => rep0(param, bind(param, arg, binding), environment.modifyContext(arg), List(arg)) }
+    }
 
     private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaValue]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
+
+    private def defaultExpression (param: JParameter) = param.defaultArg.flatMap(eop.method.clazz.classModule.methods.get).flatMap(_.find(_.erasedParameterTypes == Nil)).map(IRStaticMethodCall(_, Map.empty, Nil))
   }
 
   class TypeParsers private (resolver: NameResolver) {
