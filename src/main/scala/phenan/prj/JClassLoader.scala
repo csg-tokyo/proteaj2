@@ -39,17 +39,19 @@ trait JClassLoader {
     "long" -> long, "float" -> float, "double" -> double, "void" -> void
   )
 
-  lazy val objectClass: Option[JClass] = loadClass_PE("java/lang/Object")
-  lazy val stringClass: Option[JClass] = loadClass_PE("java/lang/String")
-  lazy val classClass: Option[JClass] = loadClass_PE("java/lang/Class")
-  lazy val iterableClass: Option[JClass] = loadClass_PE("java/lang/Iterable")
+  lazy val objectClass: Option[JClass] = loadClass_PE(CommonNames.objectClassName)
+  lazy val stringClass: Option[JClass] = loadClass_PE(CommonNames.stringClassName)
+  lazy val classClass: Option[JClass] = loadClass_PE(CommonNames.classClassName)
+  lazy val iterableClass: Option[JClass] = loadClass_PE(CommonNames.iterableClassName)
+
+  lazy val typeClass: JClass = new JTypeClass(compiler)
 
   def erase (signature: JTypeSignature, metaParams: List[FormalMetaParameter]): Try[JErasedType] = signature match {
     case prm: JPrimitiveTypeSignature => Success(erase(prm))
     case arr: JArrayTypeSignature     => erase(arr, metaParams)
     case cls: JClassTypeSignature     => erase(cls)
-    case cap: JCapturedWildcardSignature => cap.upperBound.map(erase(_, metaParams)).getOrElse(loadClass("java/lang/Object"))
-    case tvr: JTypeVariableSignature     => metaParams.find(_.name == tvr.name).flatMap(_.bounds.headOption).map(erase(_, metaParams)).getOrElse(loadClass("java/lang/Object"))
+    case cap: JCapturedWildcardSignature => cap.upperBound.map(erase(_, metaParams)).getOrElse(loadClass(CommonNames.objectClassName))
+    case tvr: JTypeVariableSignature     => metaParams.find(_.name == tvr.name).flatMap(_.bounds.headOption).map(erase(_, metaParams)).getOrElse(loadClass(CommonNames.objectClassName))
   }
 
   def erase (signature: JPrimitiveTypeSignature): JPrimitiveClass = signature match {
@@ -82,7 +84,7 @@ trait JClassLoader {
     case Success(t) => t
     case Failure(e) =>
       state.error("type not found : " + signature, e)
-      loadClass("java/lang/Object").get
+      objectClass.get
   }
 
   def compiler: JCompiler

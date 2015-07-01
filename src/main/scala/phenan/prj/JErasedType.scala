@@ -61,6 +61,26 @@ trait JArrayClass extends JErasedType {
   }
 }
 
+class JTypeClass (val compiler: JCompiler) extends JClass {
+  def mod: JModifier = JModifier(JModifier.accPublic | JModifier.accFinal | JModifier.accSuper)
+
+  def internalName: String = CommonNames.typeClassName
+  def name: String = internalName.replace('/', '.')
+
+  def outerClass: Option[String] = None
+  def innerClasses: Map[String, String] = Map.empty
+
+  def methods: List[JMethodDef] = Nil
+  def fields: List[JFieldDef] = Nil
+
+  def withDSLs: List[JClassTypeSignature] = Nil
+  def declaredPriorities: Set[JPriority] = Set.empty
+  def memberPriorities: Set[JPriority] = Set.empty
+  def priorityConstraints: List[List[JPriority]] = Nil
+
+  def signature: JClassSignature = JClassSignature(Nil, JTypeSignature.objectTypeSig, Nil)
+}
+
 trait JFieldDef {
   def mod: JModifier
   def name: String

@@ -41,12 +41,12 @@ case class FormalMetaParameter (name: String, metaType: JTypeSignature, priority
 sealed trait JTypeSignature extends JTypeArgument
 
 object JTypeSignature {
-  lazy val typeTypeSig = SimpleClassTypeSignature("proteaj/lang/Type", Nil)
-  lazy val classSigTypeSig = SimpleClassTypeSignature("proteaj/lang/ClassSig", Nil)
-  lazy val objectTypeSig = SimpleClassTypeSignature("java/lang/Object", Nil)
+  lazy val typeTypeSig = SimpleClassTypeSignature(CommonNames.typeClassName, Nil)
+  lazy val classSigTypeSig = SimpleClassTypeSignature(CommonNames.classSigClassName, Nil)
+  lazy val objectTypeSig = SimpleClassTypeSignature(CommonNames.objectClassName, Nil)
 
-  def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature("java/util/function/Function", List(from, to))
-  def enumTypeSig (e: JTypeArgument): JClassTypeSignature = SimpleClassTypeSignature("java/lang/Enum", List(e))
+  def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature(CommonNames.functionClassName, List(from, to))
+  def enumTypeSig (e: JTypeArgument): JClassTypeSignature = SimpleClassTypeSignature(CommonNames.enumClassName, List(e))
 
   def arraySig (typeSig: JTypeSignature, dim: Int): JTypeSignature = {
     if (dim > 0) arraySig(JArrayTypeSignature(typeSig), dim - 1)

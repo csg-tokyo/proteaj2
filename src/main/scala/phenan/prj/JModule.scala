@@ -308,4 +308,3 @@ case class JUnboundTypeVariable (name: String, bounds: List[JRefType], compiler:
 
   lazy val boundHead = bounds.headOption.orElse(compiler.typeLoader.objectType)
 }
-

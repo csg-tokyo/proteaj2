@@ -14,6 +14,7 @@ class JTypeLoader (compiler: JCompiler) {
     }
   }
 
+  lazy val typeType = compiler.classLoader.typeClass.objectType(Nil)
   lazy val objectType = compiler.classLoader.objectClass.flatMap(_.objectType(Nil))
   lazy val stringType = compiler.classLoader.stringClass.flatMap(_.objectType(Nil))
   lazy val anyClassType = compiler.classLoader.classClass.flatMap(_.objectType(List(JWildcard(None, None))))
@@ -43,6 +44,7 @@ class JTypeLoader (compiler: JCompiler) {
   }
 
   def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaValue]): Option[JObjectType] = sig match {
+    case JTypeSignature.typeTypeSig => typeType
     case SimpleClassTypeSignature(className, typeArgs) => for {
       clazz <- compiler.classLoader.loadClass_PE(className)
       args  <- fromTypeArguments(typeArgs, env)
