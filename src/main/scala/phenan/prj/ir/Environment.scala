@@ -12,6 +12,7 @@ trait Environment {
   def fileEnvironment: FileEnvironment
 
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator]
+  def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator]
 
   def resolver: NameResolver = fileEnvironment.file.resolver
 
@@ -40,9 +41,14 @@ case class FileEnvironment (file: IRFile) extends Environment {
   def fileEnvironment = this
 
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = dslExpressionOperators(expected).getOrElse(priority, Nil)
+  def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = dslLiteralOperators(expected).getOrElse(priority, Nil)
 
   val dslExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
     collectDSLExpressions(t, dsls.flatMap(_.expressionOperators), Nil).groupBy(_.syntax.priority)
+  }
+
+  val dslLiteralOperators: JType => Map[JPriority, List[LiteralOperator]] = mutableHashMapMemo { t =>
+    collectDSLLiterals(t, dsls.flatMap(_.literalOperators), Nil).groupBy(_.syntax.priority)
   }
 
   private def collectDSLs (names: List[QualifiedName], ds: List[JClassModule]): List[JClassModule] = names match {
@@ -59,6 +65,14 @@ case class FileEnvironment (file: IRFile) extends Environment {
     case (syntax, method) :: rest => resolver.root.compiler.unifier.unify(t, method.returnType) match {
       case Some(metaArgs) => collectDSLExpressions(t, rest, ExpressionOperator(syntax, metaArgs, method, { (metaArgs, args) => IRDSLOperation(method, metaArgs, args) }) :: result)
       case None           => collectDSLExpressions(t, rest, result)
+    }
+    case Nil => result
+  }
+
+  protected def collectDSLLiterals (t: JType, operators: List[(JLiteralSyntax, JMethod)], result: List[LiteralOperator]): List[LiteralOperator] = operators match {
+    case (syntax, method) :: rest => resolver.root.compiler.unifier.unify(t, method.returnType) match {
+      case Some(metaArgs) => collectDSLLiterals(t, rest, LiteralOperator(syntax, metaArgs, method, { (metaArgs, args) => IRDSLOperation(method, metaArgs, args) }) :: result)
+      case None           => collectDSLLiterals(t, rest, result)
     }
     case Nil => result
   }
@@ -85,6 +99,7 @@ class Environment_Local (localType: JType, name: String, parent: Environment) ex
   def contexts = parent.contexts
   def fileEnvironment = parent.fileEnvironment
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = parent.expressionOperators(expected, priority)
+  def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = parent.literalOperators(expected, priority)
 }
 
 class Environment_Context (activates: List[IRContextRef], deactivates: List[IRContextRef], parent: Environment) extends Environment {
@@ -96,8 +111,16 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
     fileEnvironment.dslExpressionOperators(expected).getOrElse(priority, Nil) ++ contextExpressionOperators(expected).getOrElse(priority, Nil)
   }
 
+  def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = {
+    fileEnvironment.dslLiteralOperators(expected).getOrElse(priority, Nil) ++ contextLiteralOperators(expected).getOrElse(priority, Nil)
+  }
+
   val contextExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
     contexts.flatMap(c => collectContextExpressions(t, c, c.contextType.expressionOperators, Nil)).groupBy(_.syntax.priority)
+  }
+
+  val contextLiteralOperators: JType => Map[JPriority, List[LiteralOperator]] = mutableHashMapMemo { t =>
+    contexts.flatMap(c => collectContextLiterals(t, c, c.contextType.literalOperators, Nil)).groupBy(_.syntax.priority)
   }
 
   protected def collectContextExpressions (t: JType, context: IRContextRef, operators: List[(JExpressionSyntax, JMethod)], result: List[ExpressionOperator]): List[ExpressionOperator] = operators match {
@@ -107,6 +130,15 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
     }
     case Nil => result
   }
+
+  protected def collectContextLiterals (t: JType, context: IRContextRef, operators: List[(JLiteralSyntax, JMethod)], result: List[LiteralOperator]): List[LiteralOperator] = operators match {
+    case (syntax, method) :: rest => resolver.root.compiler.unifier.unify(t, method.returnType) match {
+      case Some(metaArgs) => collectContextLiterals(t, context, rest, LiteralOperator(syntax, metaArgs, method, { (metaArgs, args) => IRContextOperation(context, method, metaArgs, args) }) :: result)
+      case None           => collectContextLiterals(t, context, rest, result)
+    }
+    case Nil => result
+  }
 }
 
 case class ExpressionOperator (syntax: JExpressionSyntax, metaArgs: Map[String, MetaValue], method: JMethod, semantics: (Map[String, MetaValue], List[IRExpression]) => IRExpression)
+case class LiteralOperator (syntax: JLiteralSyntax, metaArgs: Map[String, MetaValue], method: JMethod, semantics: (Map[String, MetaValue], List[IRExpression]) => IRExpression)

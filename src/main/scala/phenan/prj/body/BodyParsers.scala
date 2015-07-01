@@ -114,11 +114,15 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val hostExpression: HParser[IRExpression] = ???
 
+    lazy val hostLiteral: LParser[IRExpression] = ???
+
     private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
       env.expressionOperators(expected, p).map(ExpressionOperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
     }
 
-
+    private val literal_cached: JPriority => LParser[IRExpression] = mutableHashMapMemo { p =>
+      env.literalOperators(expected, p).map(LiteralOperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
+    }
   }
 
   object JavaExpressionParsers {
@@ -188,6 +192,10 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     private def defaultExpression (param: JParameter) = param.defaultArg.flatMap(eop.method.clazz.classModule.methods.get).flatMap(_.find(_.erasedParameterTypes == Nil)).map(IRStaticMethodCall(_, Map.empty, Nil))
   }
 
+  class LiteralOperatorParsers private (lop: LiteralOperator, env: Environment) {
+    lazy val operator: LParser[IRExpression] = ???
+  }
+
   class TypeParsers private (resolver: NameResolver) {
     lazy val metaValue: HParser[MetaValue] = wildcard | metaVariable | refType
     lazy val typeName: HParser[JType] = primitiveTypeName | refType
@@ -237,6 +245,11 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   object ExpressionOperatorParsers {
     def apply (expressionOperator: ExpressionOperator, env: Environment): ExpressionOperatorParsers = cached((expressionOperator, env))
     private val cached : ((ExpressionOperator, Environment)) => ExpressionOperatorParsers = mutableHashMapMemo { pair => new ExpressionOperatorParsers(pair._1, pair._2) }
+  }
+
+  object LiteralOperatorParsers {
+    def apply (literalOperator: LiteralOperator, env: Environment): LiteralOperatorParsers = cached((literalOperator, env))
+    private val cached : ((LiteralOperator, Environment)) => LiteralOperatorParsers = mutableHashMapMemo { pair => new LiteralOperatorParsers(pair._1, pair._2) }
   }
 
   object TypeParsers {

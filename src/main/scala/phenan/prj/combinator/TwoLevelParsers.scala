@@ -78,6 +78,7 @@ trait TwoLevelParsers {
     def <~ [U] (parser: => LParser[U]): LParser[T]
 
     def | [U >: T] (parser: => LParser[U]): LParser[U]
+    def ||| [U >: T] (parser: => LParser[U]): LParser[U]
 
     def ? : LParser[Option[T]]
     def ! : LParser[Unit]
@@ -157,6 +158,7 @@ trait TwoLevelParsers {
       def <~ [U] (that: => LParser[U]): LParser[T] = LParserImpl(this.parser <~ that.parser)
 
       def | [U >: T] (that: => LParser[U]): LParser[U] = LParserImpl(this.parser | that.parser)
+      def ||| [U >: T] (that: => LParser[U]): LParser[U] = LParserImpl(this.parser ||| that.parser)
 
       def ? : LParser[Option[T]] = LParserImpl(parser.?)
       def ! : LParser[Unit] = LParserImpl(not(parser))
