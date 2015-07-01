@@ -7,16 +7,16 @@ import scala.util._
 import scalaz.Memo._
 
 trait Environment {
-  def priorities: List[JPriority]
-  def dsls: List[JClassModule]
   def contexts: List[IRContextRef]
   def locals: Map[String, IRLocalVariableRef]
+  def fileEnvironment: FileEnvironment
 
-  def resolver: NameResolver
+  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator]
 
-  def highestPriority: Option[JPriority] = priorities.headOption
+  def resolver: NameResolver = fileEnvironment.file.resolver
+
+  def highestPriority: Option[JPriority] = fileEnvironment.priorities.headOption
   def nextPriority (priority: JPriority): Option[JPriority] = nextPriorities.get(priority)
-  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = getExpressionOperators(expected).getOrElse(priority, Nil)
 
   def localVariable (name: String): Option[IRLocalVariableRef] = locals.get(name)
 
@@ -27,40 +27,21 @@ trait Environment {
     e.defineLocal(locals.localType.array(d.dim), d.name)
   }
 
-  def getExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]]
-
-  private lazy val nextPriorities: Map[JPriority, JPriority] = priorities.zip(priorities.tail).toMap
-
-  protected def collectDSLExpressions (t: JType, operators: List[(JExpressionSyntax, JMethod)], result: List[ExpressionOperator]): List[ExpressionOperator] = operators match {
-    case (syntax, method) :: rest => unifier.unify(t, method.returnType) match {
-      case Some(metaArgs) => collectDSLExpressions(t, rest, ExpressionOperator(syntax, metaArgs, method, { (metaArgs, args) => IRDSLOperation(method, metaArgs, args) }) :: result)
-      case None           => collectDSLExpressions(t, rest, result)
-    }
-    case Nil => result
-  }
-
-  protected def collectContextExpressions (t: JType, context: IRContextRef, operators: List[(JExpressionSyntax, JMethod)], result: List[ExpressionOperator]): List[ExpressionOperator] = operators match {
-    case (syntax, method) :: rest => unifier.unify(t, method.returnType) match {
-      case Some(metaArgs) => collectContextExpressions(t, context, rest, ExpressionOperator(syntax, metaArgs, method, { (metaArgs, args) => IRContextOperation(context, method, metaArgs, args) }) :: result)
-      case None           => collectContextExpressions(t, context, rest, result)
-    }
-    case Nil => result
-  }
-
-  private def unifier = resolver.root.compiler.unifier
+  private lazy val nextPriorities: Map[JPriority, JPriority] = fileEnvironment.priorities.zip(fileEnvironment.priorities.tail).toMap
 }
 
 case class FileEnvironment (file: IRFile) extends Environment {
   lazy val dsls: List[JClassModule] = collectDSLs(file.importedDSLNames, Nil)
   lazy val userConstraints: List[List[JPriority]] = file.userConstraints.map(resolver.constraint)
+  lazy val priorities: List[JPriority] = sortPriorities(collectPriorities(dsls, Set.empty), dsls.flatMap(_.constraints) ++ userConstraints)
 
   def locals = Map.empty
   def contexts = Nil
-  def resolver = file.resolver
+  def fileEnvironment = this
 
-  lazy val priorities: List[JPriority] = sortPriorities(collectPriorities(dsls, Set.empty), dsls.flatMap(_.constraints) ++ userConstraints)
+  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = dslExpressionOperators(expected).getOrElse(priority, Nil)
 
-  val getExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
+  val dslExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
     collectDSLExpressions(t, dsls.flatMap(_.expressionOperators), Nil).groupBy(_.syntax.priority)
   }
 
@@ -72,6 +53,14 @@ case class FileEnvironment (file: IRFile) extends Environment {
         collectDSLs(rest, ds)
     }
     case Nil => ds
+  }
+
+  protected def collectDSLExpressions (t: JType, operators: List[(JExpressionSyntax, JMethod)], result: List[ExpressionOperator]): List[ExpressionOperator] = operators match {
+    case (syntax, method) :: rest => resolver.root.compiler.unifier.unify(t, method.returnType) match {
+      case Some(metaArgs) => collectDSLExpressions(t, rest, ExpressionOperator(syntax, metaArgs, method, { (metaArgs, args) => IRDSLOperation(method, metaArgs, args) }) :: result)
+      case None           => collectDSLExpressions(t, rest, result)
+    }
+    case Nil => result
   }
 
   private def collectPriorities (dsls: List[JClassModule], ps: Set[JPriority]): Set[JPriority] = dsls match {
@@ -92,24 +81,31 @@ case class FileEnvironment (file: IRFile) extends Environment {
 }
 
 class Environment_Local (localType: JType, name: String, parent: Environment) extends Environment {
-  def dsls = parent.dsls
-  def priorities = parent.priorities
   val locals: Map[String, IRLocalVariableRef] = parent.locals + (name -> IRLocalVariableRef(localType, name))
   def contexts = parent.contexts
-  def resolver = parent.resolver
-
-  def getExpressionOperators = parent.getExpressionOperators
+  def fileEnvironment = parent.fileEnvironment
+  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = parent.expressionOperators(expected, priority)
 }
 
 class Environment_Context (activates: List[IRContextRef], deactivates: List[IRContextRef], parent: Environment) extends Environment {
-  def dsls = parent.dsls
-  def priorities = parent.priorities
   def locals = parent.locals
   val contexts: List[IRContextRef] = activates ++ parent.contexts.diff(deactivates)
-  def resolver = parent.resolver
+  def fileEnvironment = parent.fileEnvironment
 
-  val getExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
-    (collectDSLExpressions(t, dsls.flatMap(_.expressionOperators), Nil) ++ contexts.flatMap(c => collectContextExpressions(t, c, c.contextType.expressionOperators, Nil))).groupBy(_.syntax.priority)
+  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = {
+    fileEnvironment.dslExpressionOperators(expected).getOrElse(priority, Nil) ++ contextExpressionOperators(expected).getOrElse(priority, Nil)
+  }
+
+  val contextExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
+    contexts.flatMap(c => collectContextExpressions(t, c, c.contextType.expressionOperators, Nil)).groupBy(_.syntax.priority)
+  }
+
+  protected def collectContextExpressions (t: JType, context: IRContextRef, operators: List[(JExpressionSyntax, JMethod)], result: List[ExpressionOperator]): List[ExpressionOperator] = operators match {
+    case (syntax, method) :: rest => resolver.root.compiler.unifier.unify(t, method.returnType) match {
+      case Some(metaArgs) => collectContextExpressions(t, context, rest, ExpressionOperator(syntax, metaArgs, method, { (metaArgs, args) => IRContextOperation(context, method, metaArgs, args) }) :: result)
+      case None           => collectContextExpressions(t, context, rest, result)
+    }
+    case Nil => result
   }
 }
 
