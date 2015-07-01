@@ -165,8 +165,8 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
   def isSubtypeOf (that: JType): Boolean = that match {
     case _ if this == that   => true
     case that: JObjectType   => isSubtypeOf(that)
-    case that: JCapturedWildcardType       => that.lowerBound.exists(lb => isSubtypeOf(lb))
-    case _: JPrimitiveType | _: JArrayType => false
+    case that: JCapturedWildcardType => that.lowerBound.exists(lb => isSubtypeOf(lb))
+    case _: JPrimitiveType | _: JArrayType | _: JUnboundTypeVariable => false
   }
 
   def isSubtypeOf (that: JObjectType): Boolean = {
@@ -243,10 +243,10 @@ case class JArrayType (componentType: JType) extends JRefType {
 
   def isSubtypeOf (that: JType): Boolean = that match {
     case _ if this == that => true
-    case _: JPrimitiveType => false
     case that: JArrayType  => componentType.isSubtypeOf(that.componentType)
     case that: JObjectType => superTypes.exists(_.isSubtypeOf(that))
     case that: JCapturedWildcardType => that.lowerBound.exists(lb => isSubtypeOf(lb))
+    case _: JPrimitiveType | _: JUnboundTypeVariable => false
   }
 
   def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
@@ -291,3 +291,21 @@ object JCapturedWildcardType {
   }
   private var id = 0
 }
+
+case class JUnboundTypeVariable (name: String, bounds: List[JRefType], compiler: JCompiler) extends JRefType {
+  def matches (v: MetaValue): Boolean = v match {
+    case that: JRefType  => bounds.forall(that <:< _)
+    case that: JWildcard => bounds.forall(ub => that.upperBound.exists(_ <:< ub))
+    case _: PureValue => false
+  }
+
+  def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
+
+  def isSubtypeOf (that: JType): Boolean = bounds.exists(_.isSubtypeOf(that)) | compiler.typeLoader.objectType.contains(that)
+
+  def methods = boundHead.map(_.methods).getOrElse(Map.empty)
+  def fields = boundHead.map(_.fields).getOrElse(Map.empty)
+
+  lazy val boundHead = bounds.headOption.orElse(compiler.typeLoader.objectType)
+}
+

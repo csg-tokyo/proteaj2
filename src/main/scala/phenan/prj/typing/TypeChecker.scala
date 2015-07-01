@@ -14,6 +14,7 @@ trait TypeChecker[T] {
     case ary: JArrayType    => check(ary, sig, args)
     case tvr: JTypeVariable => check(tvr, sig, args)
     case cap: JCapturedWildcardType => check(cap, sig, args)
+    case unb: JUnboundTypeVariable  => check(unb, sig, args)
   }
   def check (obj: JObjectType, sig: JTypeSignature, args: MetaArgs): T = sig match {
     case cts: JClassTypeSignature     => check(obj, cts, args)
@@ -42,6 +43,13 @@ trait TypeChecker[T] {
     case ats: JArrayTypeSignature     => check(cap, ats, args)
     case tvs: JTypeVariableSignature  => check(cap, tvs, args)
     case cws: JCapturedWildcardSignature => check(cap, cws, args)
+  }
+  def check (unb: JUnboundTypeVariable, sig: JTypeSignature, args: MetaArgs): T = sig match {
+    case cts: JClassTypeSignature     => check(unb, cts, args)
+    case pts: JPrimitiveTypeSignature => check(unb, pts, args)
+    case ats: JArrayTypeSignature     => check(unb, ats, args)
+    case tvs: JTypeVariableSignature  => check(unb, tvs, args)
+    case cws: JCapturedWildcardSignature => check(unb, cws, args)
   }
   def check (prm: JPrimitiveType, sig: JTypeSignature, args: MetaArgs): T = sig match {
     case cts: JClassTypeSignature     => check(prm, cts, args)
@@ -74,6 +82,12 @@ trait TypeChecker[T] {
   def check (cap: JCapturedWildcardType, ats: JArrayTypeSignature, args: MetaArgs): T
   def check (cap: JCapturedWildcardType, tvs: JTypeVariableSignature, args: MetaArgs): T
   def check (cap: JCapturedWildcardType, cws: JCapturedWildcardSignature, args: MetaArgs): T
+
+  def check (unb: JUnboundTypeVariable, cts: JClassTypeSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, pts: JPrimitiveTypeSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, ats: JArrayTypeSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, tvs: JTypeVariableSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, cws: JCapturedWildcardSignature, args: MetaArgs): T
 
   def check (prm: JPrimitiveType, cts: JClassTypeSignature, args: MetaArgs): T
   def check (prm: JPrimitiveType, pts: JPrimitiveTypeSignature, args: MetaArgs): T
@@ -110,6 +124,7 @@ trait MetaValueChecker[T] {
     case ary: JArrayType    => check(ary, sig, args)
     case tvr: JTypeVariable => check(tvr, sig, args)
     case cap: JCapturedWildcardType => check(cap, sig, args)
+    case unb: JUnboundTypeVariable  => check(unb, sig, args)
   }
   def check (obj: JObjectType, sig: JTypeSignature, args: MetaArgs): T = sig match {
     case cts: JClassTypeSignature     => check(obj, cts, args)
@@ -139,17 +154,26 @@ trait MetaValueChecker[T] {
     case tvs: JTypeVariableSignature  => check(cap, tvs, args)
     case cws: JCapturedWildcardSignature => check(cap, cws, args)
   }
+  def check (unb: JUnboundTypeVariable, sig: JTypeSignature, args: MetaArgs): T = sig match {
+    case cts: JClassTypeSignature     => check(unb, cts, args)
+    case pts: JPrimitiveTypeSignature => check(unb, pts, args)
+    case ats: JArrayTypeSignature     => check(unb, ats, args)
+    case tvs: JTypeVariableSignature  => check(unb, tvs, args)
+    case cws: JCapturedWildcardSignature => check(unb, cws, args)
+  }
   def check (ref: JRefType, pvs: PureVariableSignature, args: MetaArgs): T = ref match {
     case obj: JObjectType   => check(obj, pvs, args)
     case ary: JArrayType    => check(ary, pvs, args)
     case tvr: JTypeVariable => check(tvr, pvs, args)
     case cap: JCapturedWildcardType => check(cap, pvs, args)
+    case unb: JUnboundTypeVariable  => check(unb, pvs, args)
   }
   def check (ref: JRefType, wld: WildcardArgument, args: MetaArgs): T = ref match {
     case obj: JObjectType   => check(obj, wld, args)
     case ary: JArrayType    => check(ary, wld, args)
     case tvr: JTypeVariable => check(tvr, wld, args)
     case cap: JCapturedWildcardType => check(cap, wld, args)
+    case unb: JUnboundTypeVariable  => check(unb, wld, args)
   }
   def check (pv: PureValue, sig: JTypeSignature, args: MetaArgs): T = sig match {
     case cts: JClassTypeSignature     => check(pv, cts, args)
@@ -197,6 +221,14 @@ trait MetaValueChecker[T] {
   def check (cap: JCapturedWildcardType, ats: JArrayTypeSignature, args: MetaArgs): T
   def check (cap: JCapturedWildcardType, tvs: JTypeVariableSignature, args: MetaArgs): T
   def check (cap: JCapturedWildcardType, cws: JCapturedWildcardSignature, args: MetaArgs): T
+
+  def check (unb: JUnboundTypeVariable, pvs: PureVariableSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, wld: WildcardArgument, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, cts: JClassTypeSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, pts: JPrimitiveTypeSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, ats: JArrayTypeSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, tvs: JTypeVariableSignature, args: MetaArgs): T
+  def check (unb: JUnboundTypeVariable, cws: JCapturedWildcardSignature, args: MetaArgs): T
 
   def check (pv: PureValue, pvs: PureVariableSignature, args: MetaArgs): T
   def check (pv: PureValue, wld: WildcardArgument, args: MetaArgs): T

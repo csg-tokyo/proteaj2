@@ -97,15 +97,32 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case id ~ dim => ( '=' ~> ExpressionParsers(expected.array(dim), env).expression ).? ^^ { IRVariableDeclarator(id, dim, _) }
     }
 
-    def expression: HParser[IRExpression] = env.highestPriority.map(cached).getOrElse(hostExpression)
+    def expression: HParser[IRExpression] = env.highestPriority.map(expression_cached).getOrElse(hostExpression)
 
-    def expression (priority: JPriority): HParser[IRExpression] = cached(priority)
+    def expression (priority: JPriority): HParser[IRExpression] = expression_cached(priority)
+
+    def expression (priority: Option[JPriority]): HParser[IRExpression] = priority match {
+      case Some(p) => expression(p)
+      case None    => hostExpression
+    }
+
+    def literal: LParser[IRExpression] = ???
+
+    def literal (priority: JPriority): LParser[IRExpression] = ???
+
+    lazy val parenthesized: HParser[IRExpression] = '(' ~> expression <~ ')'
 
     lazy val hostExpression: HParser[IRExpression] = ???
 
-    private val cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
-      env.expressionOperators(expected, p).map(ExpressionOperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(p).map(cached).getOrElse(hostExpression)
+    private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
+      env.expressionOperators(expected, p).map(ExpressionOperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
     }
+
+
+  }
+
+  object JavaExpressionParsers {
+
   }
 
   class ExpressionOperatorParsers private (eop: ExpressionOperator, env: Environment) {
@@ -140,11 +157,14 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     private def parameter (param: JParameter, binding: Map[String, MetaValue], environment: Environment): HParser[IRExpression] = {
       val expected = param.genericType.bind(binding ++ param.genericType.unbound(binding).flatMap(name => eop.method.metaParameters.get(name).map(name -> _)).toMap.mapValues {
-        case FormalMetaParameter(name, JTypeSignature.typeTypeSig, _, bounds) => JWildcard(bounds.headOption.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, binding)), None)
+        case FormalMetaParameter(name, JTypeSignature.typeTypeSig, _, bounds) => JUnboundTypeVariable(name, bounds.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, binding)), compiler)
         case FormalMetaParameter(name, metaType, _, _) => ???
-      })
+      }).getOrElse {
+        compiler.state.error("expected type cannot be known")
+        compiler.typeLoader.void
+      }
       val priority = param.priority.orElse(environment.nextPriority(eop.syntax.priority))
-      expected.map(t => priority.map(p => ExpressionParsers(t, environment).expression(p)).getOrElse(ExpressionParsers(t, environment).hostExpression)).getOrElse(???)
+      ExpressionParsers(expected, environment).expression(priority)
     }
 
     private def metaValue (mv: MetaValue): HParser[MetaValue] = TypeParsers(env.resolver).metaValue ^? {

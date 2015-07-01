@@ -60,7 +60,7 @@ case class FileEnvironment (file: IRFile) extends Environment {
 
   lazy val priorities: List[JPriority] = sortPriorities(collectPriorities(dsls, Set.empty), dsls.flatMap(_.constraints) ++ userConstraints)
 
-  def getExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
+  val getExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
     collectDSLExpressions(t, dsls.flatMap(_.expressionOperators), Nil).groupBy(_.syntax.priority)
   }
 
@@ -108,7 +108,7 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
   val contexts: List[IRContextRef] = activates ++ parent.contexts.diff(deactivates)
   def resolver = parent.resolver
 
-  def getExpressionOperators = mutableHashMapMemo { t =>
+  val getExpressionOperators: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
     (collectDSLExpressions(t, dsls.flatMap(_.expressionOperators), Nil) ++ contexts.flatMap(c => collectContextExpressions(t, c, c.contextType.expressionOperators, Nil))).groupBy(_.syntax.priority)
   }
 }
