@@ -19,7 +19,7 @@ trait JProcedure extends JMember {
   def modifier: JModifier = methodDef.mod
   lazy val metaParameters = methodDef.signature.metaParams.map(param => param.name -> param).toMap
   lazy val returnType: JGenericType = JGenericType(methodDef.signature.returnType, env, compiler)
-  lazy val parameterTypes: List[JParameter] = methodDef.signature.parameters.map(sig => new JParameter(sig, env, compiler))
+  lazy val parameterTypes: List[JParameter] = methodDef.signature.parameters.map(sig => JParameter(sig, env, compiler))
   lazy val exceptionTypes: List[JGenericType] = methodDef.signature.throwTypes.map(sig => JGenericType(sig, env, compiler))
 
   def compiler = declaring.compiler
@@ -67,20 +67,20 @@ class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val d
     if (env.contains(mv.name)) Some(JMetaName(env(mv.name)))
     else if (metaParameters.contains(mv.name)) {
       val mp = metaParameters(mv.name)
-      Some(JMetaOperand(mv.name, new JParameter(JParameterSignature(Nil, mp.metaType, mp.priority, false, None), env, compiler)))
+      Some(JMetaOperand(mv.name, JParameter(JParameterSignature(Nil, mp.metaType, mp.priority, false, None), env, compiler)))
     }
     else None
   }
 
   private def translatePredicate (elem: JPredicateDef): JSyntaxElement = elem match {
-    case JAndPredicateDef(sig) => JAndPredicate(new JParameter(sig, env, compiler))
-    case JNotPredicateDef(sig) => JNotPredicate(new JParameter(sig, env, compiler))
+    case JAndPredicateDef(sig) => JAndPredicate(JParameter(sig, env, compiler))
+    case JNotPredicateDef(sig) => JNotPredicate(JParameter(sig, env, compiler))
   }
 }
 
 class JConstructor (val methodDef: JMethodDef, val env: Map[String, MetaValue], val declaring: JObjectType) extends JProcedure
 
-class JParameter (signature: JParameterSignature, env: Map[String, MetaValue], compiler: JCompiler) {
+case class JParameter (signature: JParameterSignature, env: Map[String, MetaValue], compiler: JCompiler) {
   lazy val contexts: List[JGenericType] = signature.contexts.map(sig => JGenericType(sig, env, compiler))
   lazy val genericType: JGenericType = JGenericType(signature.typeSig, env, compiler)
   def priority: Option[JPriority] = signature.priority

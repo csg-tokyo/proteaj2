@@ -12,7 +12,8 @@ case class PureVariableRef (name: String, valueType: JType) extends PureValue {
   def matches (v: MetaValue): Boolean = this == v
 }
 
-case class ConcretePureValue (value: Any, valueType: JType) extends PureValue {
+case class ConcretePureValue (value: Any, parameter: JParameter) extends PureValue {
+  def valueType: JType = ???
   override def matches(v: MetaValue): Boolean = this == v
 }
 
