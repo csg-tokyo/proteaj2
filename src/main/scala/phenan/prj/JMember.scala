@@ -14,7 +14,7 @@ class JField (fieldDef: JFieldDef, val fieldType: JType, val declaring: JModule)
 
 trait JProcedure extends JMember {
   def methodDef: JMethodDef
-  def env: Map[String, MetaValue]
+  def env: Map[String, MetaArgument]
 
   def modifier: JModifier = methodDef.mod
   lazy val metaParameters = methodDef.signature.metaParams.map(param => param.name -> param).toMap
@@ -25,7 +25,7 @@ trait JProcedure extends JMember {
   def compiler = declaring.compiler
 }
 
-class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val declaring: JModule, val clazz: JClass) extends JProcedure {
+class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaArgument], val declaring: JModule, val clazz: JClass) extends JProcedure {
   def name: String = methodDef.name
 
   def erasedReturnType: JErasedType = methodDef.erasedReturnType
@@ -78,9 +78,9 @@ class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaValue], val d
   }
 }
 
-class JConstructor (val methodDef: JMethodDef, val env: Map[String, MetaValue], val declaring: JObjectType) extends JProcedure
+class JConstructor (val methodDef: JMethodDef, val env: Map[String, MetaArgument], val declaring: JObjectType) extends JProcedure
 
-case class JParameter (signature: JParameterSignature, env: Map[String, MetaValue], compiler: JCompiler) {
+case class JParameter (signature: JParameterSignature, env: Map[String, MetaArgument], compiler: JCompiler) {
   lazy val contexts: List[JGenericType] = signature.contexts.map(sig => JGenericType(sig, env, compiler))
   lazy val genericType: JGenericType = JGenericType(signature.typeSig, env, compiler)
   def priority: Option[JPriority] = signature.priority

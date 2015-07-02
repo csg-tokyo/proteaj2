@@ -90,6 +90,6 @@ case class JCapturedWildcardSignature (upperBound: Option[JTypeSignature], lower
 
 sealed trait JTypeArgument
 
-case class PureVariableSignature (name: String) extends JTypeArgument
+case class MetaVariableSignature (name: String) extends JTypeArgument
 
 case class WildcardArgument (upperBound: Option[JTypeSignature], lowerBound: Option[JTypeSignature]) extends JTypeArgument

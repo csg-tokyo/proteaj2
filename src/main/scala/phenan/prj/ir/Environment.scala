@@ -140,5 +140,5 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
   }
 }
 
-case class ExpressionOperator (syntax: JExpressionSyntax, metaArgs: Map[String, MetaValue], method: JMethod, semantics: (Map[String, MetaValue], List[IRExpression]) => IRExpression)
-case class LiteralOperator (syntax: JLiteralSyntax, metaArgs: Map[String, MetaValue], method: JMethod, semantics: (Map[String, MetaValue], List[IRExpression]) => IRExpression)
+case class ExpressionOperator (syntax: JExpressionSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression)
+case class LiteralOperator (syntax: JLiteralSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression)

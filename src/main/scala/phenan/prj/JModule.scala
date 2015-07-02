@@ -1,39 +1,39 @@
 package phenan.prj
 
-sealed trait MetaValue {
-  def matches (v: MetaValue): Boolean
+sealed trait MetaArgument {
+  def matches (v: MetaArgument): Boolean
 }
 
-sealed trait PureValue extends MetaValue {
+sealed trait PureValue extends MetaArgument {
   def valueType: JType
 }
 
-case class PureVariableRef (name: String, valueType: JType) extends PureValue {
-  def matches (v: MetaValue): Boolean = this == v
+case class MetaVariableRef (name: String, valueType: JType) extends PureValue {
+  def matches (v: MetaArgument): Boolean = this == v
 }
 
 case class ConcretePureValue (value: Any, parameter: JParameter) extends PureValue {
   def valueType: JType = ???
-  override def matches(v: MetaValue): Boolean = this == v
+  override def matches(v: MetaArgument): Boolean = this == v
 }
 
-case class JWildcard (upperBound: Option[JRefType], lowerBound: Option[JRefType]) extends MetaValue {
+case class JWildcard (upperBound: Option[JRefType], lowerBound: Option[JRefType]) extends MetaArgument {
   def name = upperBound.map(ub => "? extends " + ub.name).orElse(lowerBound.map(lb => "? super " + lb.name)).getOrElse("?")
 
-  def matches (that: MetaValue): Boolean = that match {
+  def matches (that: MetaArgument): Boolean = that match {
     case that: JRefType  => upperBound.forall(that <:< _) && lowerBound.forall(_ <:< that)
     case that: JWildcard => upperBound.forall(ub => that.upperBound.exists(_ <:< ub)) && lowerBound.forall(lb => that.lowerBound.exists(lb <:< _))
     case _: PureValue => false
   }
 }
 
-case class JGenericType (signature: JTypeSignature, env: Map[String, MetaValue], compiler: JCompiler) {
-  def bind (args: Map[String, MetaValue]): Option[JType] = {
+case class JGenericType (signature: JTypeSignature, env: Map[String, MetaArgument], compiler: JCompiler) {
+  def bind (args: Map[String, MetaArgument]): Option[JType] = {
     compiler.typeLoader.fromTypeSignature(signature, env ++ args)
   }
-  def unbound (args: Map[String, MetaValue]): Set[String] = unbound(signature, args, Set.empty[String])
+  def unbound (args: Map[String, MetaArgument]): Set[String] = unbound(signature, args, Set.empty[String])
 
-  private def unbound (sig: JTypeSignature, args: Map[String, MetaValue], result: Set[String]): Set[String] = sig match {
+  private def unbound (sig: JTypeSignature, args: Map[String, MetaArgument], result: Set[String]): Set[String] = sig match {
     case JTypeVariableSignature(name) if args.contains(name) || env.contains(name) => result
     case JTypeVariableSignature(name)           => result + name
     case SimpleClassTypeSignature(_, as)        => as.foldLeft(result) { (r, a) => unbound(a, args, r) }
@@ -43,9 +43,9 @@ case class JGenericType (signature: JTypeSignature, env: Map[String, MetaValue],
     case _ : JPrimitiveTypeSignature            => result
   }
 
-  private def unbound (sig: JTypeArgument, args: Map[String, MetaValue], result: Set[String]): Set[String] = sig match {
-    case PureVariableSignature(name) if args.contains(name) || env.contains(name) => result
-    case PureVariableSignature(name) => result + name
+  private def unbound (sig: JTypeArgument, args: Map[String, MetaArgument], result: Set[String]): Set[String] = sig match {
+    case MetaVariableSignature(name) if args.contains(name) || env.contains(name) => result
+    case MetaVariableSignature(name) => result + name
     case sig: JTypeSignature         => unbound(sig, args, result)
     case WildcardArgument(ub, lb)    => ub.map(unbound(_, args, result)).orElse(lb.map(unbound(_, args, result))).getOrElse(result)
   }
@@ -114,8 +114,8 @@ sealed trait JType extends JModule {
   def isSubtypeOf (that: JType): Boolean
   def isAssignableTo (that: JType): Boolean
 
-  def unifyG (t: JGenericType): Option[Map[String, MetaValue]] = compiler.unifier.unify(this, t)
-  def unifyL (t: JGenericType): Option[Map[String, MetaValue]] = compiler.unifier.infer(this, t)
+  def unifyG (t: JGenericType): Option[Map[String, MetaArgument]] = compiler.unifier.unify(this, t)
+  def unifyL (t: JGenericType): Option[Map[String, MetaArgument]] = compiler.unifier.infer(this, t)
 
   def <:< (t: JType): Boolean = this.isSubtypeOf(t)
   def >:> (t: JType): Boolean = t.isSubtypeOf(this)
@@ -124,11 +124,11 @@ sealed trait JType extends JModule {
   def >=> (t: JGenericType) = unifyL(t)
 }
 
-sealed trait JRefType extends JType with MetaValue {
+sealed trait JRefType extends JType with MetaArgument {
   def boxed = Some(this)
 }
 
-case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRefType {
+case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends JRefType {
   def compiler = erase.compiler
 
   def name: String = {
@@ -176,7 +176,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
 
   def isAssignableTo(that: JType): Boolean = ???
 
-  def matches (that: MetaValue): Boolean = this == that
+  def matches (that: MetaArgument): Boolean = this == that
 
   lazy val expressionOperators = collectExpressionOperators(nonPrivateMethodList, Nil)
   lazy val literalOperators = collectLiteralOperators(nonPrivateMethodList, Nil)
@@ -214,7 +214,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaValue]) extends JRef
     }
   }
 
-  private def matchTypeArgs (args: Map[String, MetaValue]): Boolean = env.forall { case (key, value) =>
+  private def matchTypeArgs (args: Map[String, MetaArgument]): Boolean = env.forall { case (key, value) =>
     args.get(key).exists { arg => arg.matches(value) }
   }
 }
@@ -252,7 +252,7 @@ case class JArrayType (componentType: JType) extends JRefType {
 
   def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
 
-  def matches (that: MetaValue): Boolean = this == that
+  def matches (that: MetaArgument): Boolean = this == that
 
   def compiler: JCompiler = componentType.compiler
 }
@@ -261,7 +261,7 @@ case class JTypeVariable (name: String, bounds: List[JRefType], compiler: JCompi
   def isSubtypeOf(that: JType): Boolean = bounds.exists(_.isSubtypeOf(that)) | compiler.typeLoader.objectType.contains(that)
   def isAssignableTo(that: JType): Boolean = isSubtypeOf(that)
 
-  override def matches (v: MetaValue): Boolean = this == v
+  override def matches (v: MetaArgument): Boolean = this == v
 
   def methods = boundHead.map(_.methods).getOrElse(Map.empty)
   def fields = boundHead.map(_.fields).getOrElse(Map.empty)
@@ -275,7 +275,7 @@ case class JCapturedWildcardType private (upperBound: JRefType, lowerBound: Opti
   override def isSubtypeOf(that: JType): Boolean = upperBound.isSubtypeOf(that)
   override def isAssignableTo(that: JType): Boolean = isSubtypeOf(that)
 
-  override def matches(v: MetaValue): Boolean = this == v
+  override def matches(v: MetaArgument): Boolean = this == v
 
   override def methods: Map[String, List[JMethod]] = upperBound.methods
 
@@ -294,7 +294,7 @@ object JCapturedWildcardType {
 }
 
 case class JUnboundTypeVariable (name: String, bounds: List[JRefType], compiler: JCompiler) extends JRefType {
-  def matches (v: MetaValue): Boolean = v match {
+  def matches (v: MetaArgument): Boolean = v match {
     case that: JRefType  => bounds.forall(that <:< _)
     case that: JWildcard => bounds.forall(ub => that.upperBound.exists(_ <:< ub))
     case _: PureValue => false

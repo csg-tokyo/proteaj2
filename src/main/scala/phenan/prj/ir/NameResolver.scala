@@ -11,7 +11,7 @@ import scalaz.Memo._
 
 trait NameResolver {
 
-  def environment: Map[String, MetaValue]
+  def environment: Map[String, MetaArgument]
 
   def resolve (name: String): Try[JClass]
   def priority (name: String): Option[JPriority]
@@ -21,7 +21,7 @@ trait NameResolver {
   def isMetaVariable (name: String): Boolean
 
   def typeVariable (name: String): Option[JTypeVariable] = environment.get(name).collect { case v: JTypeVariable => v }
-  def metaVariable (name: String): Option[PureVariableRef] = environment.get(name).collect { case v: PureVariableRef => v }
+  def metaVariable (name: String): Option[MetaVariableRef] = environment.get(name).collect { case v: MetaVariableRef => v }
 
   def withMetaParameter (param: FormalMetaParameter): NameResolver = new NameResolver_MetaParameter (param, this)
   def withInnerClasses (inners: List[IRModule]): NameResolver = new NameResolver_InnerClasses (inners, this)
@@ -101,7 +101,7 @@ trait NameResolver {
   }
 
   private def typeArgument (arg: TypeArgument): Try[JTypeArgument] = arg match {
-    case TypeName(QualifiedName(List(name)), Nil, 0) if isMetaVariable(name) => Success(PureVariableSignature(name))
+    case TypeName(QualifiedName(List(name)), Nil, 0) if isMetaVariable(name) => Success(MetaVariableSignature(name))
     case tn: TypeName                  => typeSignature(tn)
     case UpperBoundWildcardType(bound) => typeSignature(bound).map(ub => WildcardArgument(Some(ub), None))
     case LowerBoundWildcardType(bound) => typeSignature(bound).map(lb => WildcardArgument(None, Some(lb)))
@@ -126,7 +126,7 @@ object NameResolver {
 class RootResolver private[ir] (val compiler: JCompiler) extends NameResolver {
   def file (file: IRFile): NameResolver = NameResolverInFile(file, this)
 
-  def environment: Map[String, MetaValue] = Map.empty
+  def environment: Map[String, MetaArgument] = Map.empty
 
   def isTypeVariable (name: String) = false
 
@@ -188,7 +188,7 @@ class RootResolver private[ir] (val compiler: JCompiler) extends NameResolver {
 }
 
 case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameResolver {
-  def environment: Map[String, MetaValue] = Map.empty
+  def environment: Map[String, MetaArgument] = Map.empty
 
   def isTypeVariable (name: String) = false
 
@@ -222,7 +222,7 @@ case class NameResolverInFile (file: IRFile, root: RootResolver) extends NameRes
 }
 
 class NameResolver_MetaParameter (metaParameter: FormalMetaParameter, parent: NameResolver) extends NameResolver {
-  lazy val environment: Map[String, MetaValue] = parent.environment + (metaParameter.name -> metaValue)
+  lazy val environment: Map[String, MetaArgument] = parent.environment + (metaParameter.name -> metaValue)
 
   def isMetaVariable (name: String): Boolean = (metaParameter.name == name && metaParameter.metaType != JTypeSignature.typeTypeSig) || parent.isMetaVariable(name)
 
@@ -235,11 +235,11 @@ class NameResolver_MetaParameter (metaParameter: FormalMetaParameter, parent: Na
   def root: RootResolver = parent.root
 
   import scalaz.Scalaz._
-  private def metaValue: MetaValue = if (metaParameter.metaType == JTypeSignature.typeTypeSig) {
+  private def metaValue: MetaArgument = if (metaParameter.metaType == JTypeSignature.typeTypeSig) {
     compiler.state.someOrError(metaParameter.bounds.traverse(compiler.typeLoader.fromTypeSignature_RefType(_, parent.environment)).map(JTypeVariable(metaParameter.name, _, compiler)),
       "invalid type bounds : " + metaParameter.bounds, JTypeVariable(metaParameter.name, Nil, compiler))
   } else {
-    compiler.state.someOrError(compiler.typeLoader.fromTypeSignature(metaParameter.metaType, parent.environment).map(PureVariableRef(metaParameter.name, _)),
+    compiler.state.someOrError(compiler.typeLoader.fromTypeSignature(metaParameter.metaType, parent.environment).map(MetaVariableRef(metaParameter.name, _)),
       "invalid meta type : " + metaParameter.metaType, JTypeVariable(metaParameter.name, Nil, compiler))
   }
 
@@ -247,7 +247,7 @@ class NameResolver_MetaParameter (metaParameter: FormalMetaParameter, parent: Na
 }
 
 class NameResolver_InnerClasses (inners: List[IRModule], parent: NameResolver) extends NameResolver {
-  def environment: Map[String, MetaValue] = parent.environment
+  def environment: Map[String, MetaArgument] = parent.environment
 
   def isMetaVariable (name: String): Boolean = parent.isMetaVariable(name)
   def isTypeVariable (name: String): Boolean = parent.isTypeVariable(name)
@@ -262,7 +262,7 @@ class NameResolver_InnerClasses (inners: List[IRModule], parent: NameResolver) e
 }
 
 class NameResolver_Priorities (priorities: Set[JPriority], parent: NameResolver) extends NameResolver {
-  def environment: Map[String, MetaValue] = parent.environment
+  def environment: Map[String, MetaArgument] = parent.environment
 
   def isMetaVariable (name: String): Boolean = parent.isMetaVariable(name)
   def isTypeVariable (name: String): Boolean = parent.isTypeVariable(name)

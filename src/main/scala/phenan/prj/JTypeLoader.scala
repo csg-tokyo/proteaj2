@@ -5,7 +5,7 @@ import scalaz.Memo._
 class JTypeLoader (compiler: JCompiler) {
   val arrayOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
 
-  def getObjectType (clazz: JClass, args: List[MetaValue]): Option[JObjectType] = {
+  def getObjectType (clazz: JClass, args: List[MetaArgument]): Option[JObjectType] = {
     val result = getLoadedObjectType(clazz, args)
     if (validTypeArgs(clazz.signature.metaParams, args, result.env)) Some(result)
     else {
@@ -28,12 +28,12 @@ class JTypeLoader (compiler: JCompiler) {
 
   def iterableOf (arg: JRefType) = compiler.classLoader.iterableClass.flatMap(_.objectType(List(arg)))
 
-  def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JType] = sig match {
+  def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaArgument]): Option[JType] = sig match {
     case p: JPrimitiveTypeSignature => Some(fromPrimitiveSignature(p))
     case s                          => fromTypeSignature_RefType(s, env)
   }
 
-  def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaValue]): Option[JRefType] = sig match {
+  def fromTypeSignature_RefType (sig: JTypeSignature, env: Map[String, MetaArgument]): Option[JRefType] = sig match {
     case cts: JClassTypeSignature        => fromClassTypeSignature(cts, env)
     case tvs: JTypeVariableSignature     => fromTypeVariableSignature(tvs, env)
     case JArrayTypeSignature(component)  => fromTypeSignature(component, env).map(_.array)
@@ -43,7 +43,7 @@ class JTypeLoader (compiler: JCompiler) {
       None
   }
 
-  def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaValue]): Option[JObjectType] = sig match {
+  def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaArgument]): Option[JObjectType] = sig match {
     case JTypeSignature.typeTypeSig => typeType
     case SimpleClassTypeSignature(className, typeArgs) => for {
       clazz <- compiler.classLoader.loadClass_PE(className)
@@ -52,7 +52,7 @@ class JTypeLoader (compiler: JCompiler) {
     case MemberClassTypeSignature(outer, name, typeArgs) => ???    // not supported yet
   }
 
-  def fromTypeVariableSignature (sig: JTypeVariableSignature, env: Map[String, MetaValue]): Option[JRefType] = env.get(sig.name).flatMap {
+  def fromTypeVariableSignature (sig: JTypeVariableSignature, env: Map[String, MetaArgument]): Option[JRefType] = env.get(sig.name).flatMap {
     case t: JRefType  => Some(t)
     case w: JWildcard => w.upperBound.orElse(objectType).map(ub => JCapturedWildcardType(ub, w.lowerBound))
     case p: PureValue =>
@@ -60,7 +60,7 @@ class JTypeLoader (compiler: JCompiler) {
       None
   }
 
-  def fromCapturedWildcardSignature (sig: JCapturedWildcardSignature, env: Map[String, MetaValue]): Option[JCapturedWildcardType] = {
+  def fromCapturedWildcardSignature (sig: JCapturedWildcardSignature, env: Map[String, MetaArgument]): Option[JCapturedWildcardType] = {
     sig.upperBound.flatMap(ub => fromTypeSignature_RefType(ub, env)).orElse(objectType).map { ub =>
       JCapturedWildcardType(ub, sig.lowerBound.flatMap(lb => fromTypeSignature_RefType(lb, env)))
     }
@@ -68,28 +68,28 @@ class JTypeLoader (compiler: JCompiler) {
 
   def fromPrimitiveSignature (p: JPrimitiveTypeSignature): JPrimitiveType = compiler.classLoader.erase(p).primitiveType
 
-  def fromTypeArguments (args: List[JTypeArgument], env: Map[String, MetaValue]): Option[List[MetaValue]] = {
+  def fromTypeArguments (args: List[JTypeArgument], env: Map[String, MetaArgument]): Option[List[MetaArgument]] = {
     import scalaz.Scalaz._
     args.traverse {
       case sig: JTypeSignature            => fromTypeSignature_RefType(sig, env)
       case WildcardArgument(upper, lower) => Some(JWildcard(upper.flatMap(fromTypeSignature_RefType(_, env)).filterNot(objectType.contains), lower.flatMap(fromTypeSignature_RefType(_, env))))
-      case PureVariableSignature(name)    => env.get(name)
+      case MetaVariableSignature(name)    => env.get(name)
     }
   }
 
-  def validTypeArgs (params: List[FormalMetaParameter], args: List[MetaValue], env: Map[String, MetaValue]): Boolean = {
+  def validTypeArgs (params: List[FormalMetaParameter], args: List[MetaArgument], env: Map[String, MetaArgument]): Boolean = {
     if (params.isEmpty || args.isEmpty) params.isEmpty && args.isEmpty
     else if (validTypeArg(params.head, args.head, env)) validTypeArgs(params.tail, args.tail, env)
     else false
   }
 
-  private def validTypeArg (param: FormalMetaParameter, arg: MetaValue, env: Map[String, MetaValue]): Boolean = arg match {
+  private def validTypeArg (param: FormalMetaParameter, arg: MetaArgument, env: Map[String, MetaArgument]): Boolean = arg match {
     case arg: JRefType => param.bounds.forall(withinBound(_, arg, env))
     case pv: PureValue => fromTypeSignature(param.metaType, env).exists(pv.valueType <:< _)
     case wc: JWildcard => param.bounds.forall(bound => wc.upperBound.orElse(objectType).exists(upper => withinBound(bound, upper, env)))
   }
 
-  private def withinBound (bound: JTypeSignature, arg: JRefType, env: Map[String, MetaValue]): Boolean = {
+  private def withinBound (bound: JTypeSignature, arg: JRefType, env: Map[String, MetaArgument]): Boolean = {
     arg.isSubtypeOf(fromTypeSignature(bound, env).get)
   }
 
@@ -97,7 +97,7 @@ class JTypeLoader (compiler: JCompiler) {
 
   private def getArrayType (component: JType): JArrayType = JArrayType(component)
 
-  private def getLoadedObjectType (clazz: JClass, args: List[MetaValue]): JObjectType = memoizedGetObjectType((clazz, clazz.signature.metaParams.map(_.name).zip(args).toMap))
+  private def getLoadedObjectType (clazz: JClass, args: List[MetaArgument]): JObjectType = memoizedGetObjectType((clazz, clazz.signature.metaParams.map(_.name).zip(args).toMap))
 
-  private val memoizedGetObjectType: ((JClass, Map[String, MetaValue])) => JObjectType = mutableHashMapMemo { pair => new JObjectType(pair._1, pair._2) }
+  private val memoizedGetObjectType: ((JClass, Map[String, MetaArgument])) => JObjectType = mutableHashMapMemo { pair => new JObjectType(pair._1, pair._2) }
 }

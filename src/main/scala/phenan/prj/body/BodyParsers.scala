@@ -132,7 +132,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   class ExpressionOperatorParsers private (eop: ExpressionOperator, env: Environment) {
     lazy val operator: HParser[IRExpression] = constructParser(eop.syntax.pattern, eop.metaArgs, env, Nil)
 
-    private def constructParser (pattern: List[JSyntaxElement], binding: Map[String, MetaValue], environment: Environment, operands: List[IRExpression]): HParser[IRExpression] = pattern match {
+    private def constructParser (pattern: List[JSyntaxElement], binding: Map[String, MetaArgument], environment: Environment, operands: List[IRExpression]): HParser[IRExpression] = pattern match {
       case JOperand(param) :: rest           => parameter(param, binding, environment) >> { arg =>
         constructParser(rest, bind(param, arg, binding), environment.modifyContext(arg), arg :: operands)
       }
@@ -159,7 +159,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case Nil                               => success(eop.semantics(binding, operands.reverse)).^
     }
 
-    private def parameter (param: JParameter, binding: Map[String, MetaValue], environment: Environment): HParser[IRExpression] = {
+    private def parameter (param: JParameter, binding: Map[String, MetaArgument], environment: Environment): HParser[IRExpression] = {
       val expected = param.genericType.bind(binding ++ param.genericType.unbound(binding).flatMap(name => eop.method.metaParameters.get(name).map(name -> _)).toMap.mapValues {
         case FormalMetaParameter(name, JTypeSignature.typeTypeSig, _, bounds) => JUnboundTypeVariable(name, bounds.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, binding)), compiler)
         case FormalMetaParameter(name, metaType, _, _) => ???
@@ -171,23 +171,23 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       ExpressionParsers(expected, environment).expression(priority)
     }
 
-    private def metaValue (mv: MetaValue): HParser[MetaValue] = TypeParsers(env.resolver).metaValue ^? {
+    private def metaValue (mv: MetaArgument): HParser[MetaArgument] = TypeParsers(env.resolver).metaValue ^? {
       case value if mv == value => value
     }
 
-    private def optional (param: JParameter, binding: Map[String, MetaValue], environment: Environment) = parameter(param, binding, environment).? ^^ { _.orElse(defaultExpression(param)) }
+    private def optional (param: JParameter, binding: Map[String, MetaArgument], environment: Environment) = parameter(param, binding, environment).? ^^ { _.orElse(defaultExpression(param)) }
 
-    private def rep0 (param: JParameter, binding: Map[String, MetaValue], environment: Environment, result: List[IRExpression]): HParser[(Map[String, MetaValue], Environment, IRExpression)] = {
+    private def rep0 (param: JParameter, binding: Map[String, MetaArgument], environment: Environment, result: List[IRExpression]): HParser[(Map[String, MetaArgument], Environment, IRExpression)] = {
       parameter(param, binding, environment) >> { arg =>
         rep0(param, bind(param, arg, binding), environment.modifyContext(arg), arg :: result)
       } | success(binding, environment, IRVariableArguments(result.reverse)).^
     }
 
-    private def rep1 (param: JParameter, binding: Map[String, MetaValue], environment: Environment): HParser[(Map[String, MetaValue], Environment, IRExpression)] = {
+    private def rep1 (param: JParameter, binding: Map[String, MetaArgument], environment: Environment): HParser[(Map[String, MetaArgument], Environment, IRExpression)] = {
       parameter(param, binding, environment) >> { arg => rep0(param, bind(param, arg, binding), environment.modifyContext(arg), List(arg)) }
     }
 
-    private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaValue]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
+    private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
 
     private def defaultExpression (param: JParameter) = param.defaultArg.flatMap(eop.method.clazz.classModule.methods.get).flatMap(_.find(_.erasedParameterTypes == Nil)).map(IRStaticMethodCall(_, Map.empty, Nil))
   }
@@ -197,7 +197,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   class TypeParsers private (resolver: NameResolver) {
-    lazy val metaValue: HParser[MetaValue] = wildcard | metaVariable | refType
+    lazy val metaValue: HParser[MetaArgument] = wildcard | metaVariable | refType
     lazy val typeName: HParser[JType] = primitiveTypeName | refType
     lazy val refType: HParser[JRefType] = arrayType | typeVariable | objectType
     lazy val objectType: HParser[JObjectType] = className ~ ( '<' ~> metaValue.+(',') <~ '>' ).? ^^? {
@@ -214,7 +214,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case name ~ id => name.innerClasses.get(id).flatMap(compiler.classLoader.loadClass_PE)
     }
     lazy val typeVariable: HParser[JTypeVariable] = identifier ^^? resolver.typeVariable
-    lazy val metaVariable: HParser[PureVariableRef] = identifier ^^? resolver.metaVariable
+    lazy val metaVariable: HParser[MetaVariableRef] = identifier ^^? resolver.metaVariable
     lazy val arrayType: HParser[JArrayType] = typeName <~ emptyBracket ^^ { _.array }
     lazy val primitiveTypeName: HParser[JPrimitiveType] = identifier ^? {
       case "byte"    => compiler.classLoader.byte.primitiveType

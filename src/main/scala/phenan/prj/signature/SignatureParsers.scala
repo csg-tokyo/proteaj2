@@ -87,7 +87,7 @@ object SignatureParsers extends PackratParsers {
 
   private lazy val unboundedWildcard = '*' ^^^ WildcardArgument(None, None)
 
-  private lazy val pureVariable = 'P' ~> identifier <~ ';' ^^ PureVariableSignature
+  private lazy val pureVariable = 'P' ~> identifier <~ ';' ^^ MetaVariableSignature
 
   private lazy val throwsType = '^' ~> (classType | typeVariable)
 

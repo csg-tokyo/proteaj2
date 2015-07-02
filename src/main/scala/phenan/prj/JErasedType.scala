@@ -36,7 +36,7 @@ trait JClass extends JErasedType {
   }
 
   def classModule: JClassModule = JClassModule(this)
-  def objectType (typeArgs: List[MetaValue]): Option[JObjectType] = compiler.typeLoader.getObjectType(this, typeArgs)
+  def objectType (typeArgs: List[MetaArgument]): Option[JObjectType] = compiler.typeLoader.getObjectType(this, typeArgs)
 
   lazy val classInitializer = methods.find(_.isClassInitializer)
   lazy val constructors     = methods.filter(_.isConstructor)
