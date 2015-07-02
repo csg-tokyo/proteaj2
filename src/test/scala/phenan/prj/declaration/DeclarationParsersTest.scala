@@ -50,7 +50,7 @@ class DeclarationParsersTest extends FunSuite with Matchers with ASTUtil {
   test ("single element annotation") {
     val r = parse(singleElementAnnotation, "@SuppressWarnings(\"unchecked\")")
     assert(r.successful)
-    r.get shouldBe SingleElementAnnotation(qName("SuppressWarnings"), ExpressionSnippet("\"unchecked\""))
+    r.get shouldBe SingleElementAnnotation(qName("SuppressWarnings"), StringLiteralExpression("unchecked"))
   }
 
   test ("block") {

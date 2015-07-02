@@ -78,15 +78,15 @@ trait IRModule extends JClass with IRMember {
   protected def defaultSuperTypeSignature: JClassTypeSignature = JTypeSignature.objectTypeSig
   protected def autoImplementedInterfaceSignatures: List[JClassTypeSignature] = Nil
 
-  protected def priorityNames = annotations.dsl.map(_.priorities).getOrElse(Nil)
+  protected def priorityNames = dslInfo.map(_.priorities).getOrElse(Nil)
 
   lazy val declaredPriorities: Set[JPriority] = priorityNames.map(JPriority(SimpleClassTypeSignature(internalName, Nil), _)).toSet
 
   def memberPriorities: Set[JPriority] = collectMemberPriorities(declaredMembers, Set.empty)
 
-  def priorityConstraints = annotations.dsl.map(_.constraints).getOrElse(Nil)
+  def priorityConstraints = dslInfo.map(_.constraints).getOrElse(Nil)
 
-  def withDSLs = annotations.dsl.map(_.withDSLs).getOrElse(Nil)
+  def withDSLs = dslInfo.map(_.withDSLs).getOrElse(Nil)
 
   lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifier
 
@@ -110,12 +110,14 @@ trait IRModule extends JClass with IRMember {
   lazy val procedures: List[IRProcedure] = declaredMembers.collect { case m: IRProcedure => m }
   lazy val syntheticMethods: List[IRSyntheticMethod] = procedures.flatMap(_.paramInitializers)
 
-  lazy val annotations = file.annotationReader.classAnnotations(modifiersAST.collect { case ann: Annotation => ann })
+  lazy val annotations = file.annotationReader.read(modifiersAST.collect { case ann: Annotation => ann })
 
-  lazy val (signature: JClassSignature, resolver: NameResolver) = annotations.signature match {
+  lazy val (signature: JClassSignature, resolver: NameResolver) = file.annotationReader.classSignature(annotations) match {
     case Some(sig) => (sig, sig.metaParams.foldLeft(file.resolver){ _.withMetaParameter(_) }.withInnerClasses(inners))
     case None      => constructResolver(metaParametersAST, Nil, file.resolver)
   }
+
+  lazy val dslInfo = file.annotationReader.dsl(annotations)
 
   def compiler: JCompiler = file.compiler
 
@@ -367,7 +369,7 @@ trait IRField extends JFieldDef with IRMember {
 
   lazy val mod = IRModifiers.mod(modifiersAST) | implicitModifiers
 
-  lazy val annotations = declaringClass.file.annotationReader.fieldAnnotations(modifiersAST.collect { case ann: Annotation => ann })
+  lazy val annotations = declaringClass.file.annotationReader.read(modifiersAST.collect { case ann: Annotation => ann })
 }
 
 trait IRMemberVariable extends IRField {
@@ -376,9 +378,11 @@ trait IRMemberVariable extends IRField {
 
   def name: String = declaratorAST.name
 
-  lazy val signature: JTypeSignature = declaringClass.resolver.typeSignature(fieldTypeAST) match {
-    case Success(t) => JTypeSignature.arraySig(t, declaratorAST.dim)
-    case Failure(e) => state.errorAndReturn("invalid type of field : " + name, e, JTypeSignature.objectTypeSig)
+  lazy val signature: JTypeSignature = declaringClass.file.annotationReader.fieldSignature(annotations).getOrElse {
+    declaringClass.resolver.typeSignature(fieldTypeAST) match {
+      case Success(t) => JTypeSignature.arraySig(t, declaratorAST.dim)
+      case Failure(e) => state.errorAndReturn("invalid type of field : " + name, e, JTypeSignature.objectTypeSig)
+    }
   }
 }
 
@@ -422,14 +426,16 @@ trait IRProcedure extends JMethodDef with IRMember {
 
   lazy val mod = IRModifiers.mod(modifiersAST) | implicitModifiers
 
-  lazy val annotations = declaringClass.file.annotationReader.methodAnnotations(modifiersAST.collect { case ann: Annotation => ann })
+  lazy val annotations = annReader.read(modifiersAST.collect { case ann: Annotation => ann })
 
-  lazy val (signature: JMethodSignature, paramInitializers: List[IRParameterInitializer], resolver: NameResolver) = annotations.signature match {
+  lazy val (signature: JMethodSignature, paramInitializers: List[IRParameterInitializer], resolver: NameResolver) = annReader.methodSignature(annotations) match {
     case Some(sig) => (sig, Nil, sig.metaParams.foldLeft(declaringClass.resolver){ _.withMetaParameter(_) })
     case None      => constructResolver(metaParametersAST, Nil, declaringClass.resolver)
   }
 
-  def syntax = annotations.operator
+  lazy val syntax = annReader.operator(annotations)
+
+  private def annReader = declaringClass.file.annotationReader
 
   private def constructResolver (metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JMethodSignature, List[IRParameterInitializer], NameResolver) = metaParametersAST match {
     case param :: rest => resolver.metaParameter(param) match {

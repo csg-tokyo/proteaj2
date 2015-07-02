@@ -15,31 +15,31 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   def methodAnnotations (attribute: Option[RuntimeVisibleAnnotationsAttribute]): JMethodAnnotations = attributeReader.map(methodAnnotations(_, defaultMethodAnnotations)) =<< attribute | defaultMethodAnnotations
   def fieldAnnotations (attribute: Option[RuntimeVisibleAnnotationsAttribute]): JFieldAnnotations = attributeReader.map(fieldAnnotations(_, defaultFieldAnnotations)) =<< attribute | defaultFieldAnnotations
 
-  private lazy val defaultClassAnnotations = JClassAnnotations(None, None, false, false, Nil)
-  private lazy val defaultMethodAnnotations = JMethodAnnotations(None, None, false, false, Nil)
-  private lazy val defaultFieldAnnotations = JFieldAnnotations(None, false, Nil)
+  private lazy val defaultClassAnnotations = JClassAnnotations(None, None, false, false)
+  private lazy val defaultMethodAnnotations = JMethodAnnotations(None, None, false, false)
+  private lazy val defaultFieldAnnotations = JFieldAnnotations(None, false)
 
   private def classAnnotations (as: List[(String, BAnnotation)], result: JClassAnnotations): JClassAnnotations = as match {
-    case ("Lproteaj/lang/ClassSig;", ann) :: rest => classAnnotations(rest, JClassAnnotations(classSignature(ann), result.dsl, result.isPure, result.isContext, Nil))
-    case ("Lproteaj/lang/DSL;", ann) :: rest      => classAnnotations(rest, JClassAnnotations(result.signature, dsl(ann), result.isPure, result.isContext, Nil))
-    case ("Lproteaj/lang/Pure;", _) :: rest       => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, true, result.isContext, Nil))
-    case ("Lproteaj/lang/Context;", _) :: rest    => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, result.isPure, true, Nil))
+    case ("Lproteaj/lang/ClassSig;", ann) :: rest => classAnnotations(rest, JClassAnnotations(classSignature(ann), result.dsl, result.isPure, result.isContext))
+    case ("Lproteaj/lang/DSL;", ann) :: rest      => classAnnotations(rest, JClassAnnotations(result.signature, dsl(ann), result.isPure, result.isContext))
+    case ("Lproteaj/lang/Pure;", _) :: rest       => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, true, result.isContext))
+    case ("Lproteaj/lang/Context;", _) :: rest    => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, result.isPure, true))
     case (_, ann) :: rest                         => classAnnotations(rest, result)
     case Nil => result
   }
 
   private def methodAnnotations (as: List[(String, BAnnotation)], result: JMethodAnnotations): JMethodAnnotations = as match {
-    case ("Lproteaj/lang/MethodSig;", ann) :: rest => methodAnnotations(rest, JMethodAnnotations(methodSignature(ann), result.operator, result.isPure, result.isFinalizer, Nil))
-    case ("Lproteaj/lang/Operator;", ann) :: rest  => methodAnnotations(rest, JMethodAnnotations(result.signature, operator(ann), result.isPure, result.isFinalizer, Nil))
-    case ("Lproteaj/lang/Pure;", _) :: rest        => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, true, result.isFinalizer, Nil))
-    case ("Lproteaj/lang/Finalizer;", _) :: rest   => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, result.isPure, true, Nil))
+    case ("Lproteaj/lang/MethodSig;", ann) :: rest => methodAnnotations(rest, JMethodAnnotations(methodSignature(ann), result.operator, result.isPure, result.isFinalizer))
+    case ("Lproteaj/lang/Operator;", ann) :: rest  => methodAnnotations(rest, JMethodAnnotations(result.signature, operator(ann), result.isPure, result.isFinalizer))
+    case ("Lproteaj/lang/Pure;", _) :: rest        => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, true, result.isFinalizer))
+    case ("Lproteaj/lang/Finalizer;", _) :: rest   => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, result.isPure, true))
     case (_, ann) :: rest                        => methodAnnotations(rest, result)
     case Nil => result
   }
 
   private def fieldAnnotations (as: List[(String, BAnnotation)], result: JFieldAnnotations): JFieldAnnotations = as match {
-    case ("Lproteaj/lang/FieldSig;", ann) :: rest => fieldAnnotations(rest, JFieldAnnotations(fieldSignature(ann), result.isPure, Nil))
-    case ("Lproteaj/lang/Pure;", _) :: rest       => fieldAnnotations(rest, JFieldAnnotations(result.signature, true, Nil))
+    case ("Lproteaj/lang/FieldSig;", ann) :: rest => fieldAnnotations(rest, JFieldAnnotations(fieldSignature(ann), result.isPure))
+    case ("Lproteaj/lang/Pure;", _) :: rest       => fieldAnnotations(rest, JFieldAnnotations(result.signature, true))
     case (_, ann) :: rest                       => fieldAnnotations(rest, result)
     case Nil => result
   }
