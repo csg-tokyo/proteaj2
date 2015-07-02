@@ -211,9 +211,11 @@ object DeclarationParsers extends TwoLevelParsers {
     case ct ~ pt => ContextualType(ct, pt)
   }
 
-  lazy val typeName: HParser[TypeName] = qualifiedName ~ typeArguments ~ emptyBrackets ^^ {
+  lazy val typeName: HParser[TypeName] = className ~ typeArguments ~ emptyBrackets ^^ {
     case name ~ args ~ dim => TypeName(name, args, dim)
   }
+
+  lazy val className: HParser[QualifiedName] = ( "class".! ~> identifier ).+('.') ^^ QualifiedName
 
   lazy val metaParameters = ( '<' ~> metaParameter.+(',') <~ '>' ).? ^^ { _.getOrElse(Nil) }
 
@@ -268,7 +270,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val annotationName = '@' ~> "interface".! ~> qualifiedName
 
-  lazy val annotationElement: HParser[AnnotationElement] = annotation | arrayOfAnnotationElement | expression
+  lazy val annotationElement: HParser[AnnotationElement] = annotation | arrayOfAnnotationElement | annotationExpression
 
   lazy val arrayOfAnnotationElement = '{' ~> annotationElement.*(',') <~ ','.? <~ '}' ^^ ArrayOfAnnotationElement
 
@@ -293,6 +295,15 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val blockStatementCode = blockCode | without('{', '}').+
 
+  /* annotation expression */
+
+  lazy val annotationExpression = stringLiteral | classLiteral | enumConstant
+
+  lazy val stringLiteral = elem[StrLiteral].^ ^^ { s => StringLiteralExpression(s.value) }
+
+  lazy val classLiteral = typeName ^^ ClassLiteralExpression
+
+  lazy val enumConstant = qualifiedName ^^ { name => EnumConstantExpression(name.names) }
 
   /* primary */
 

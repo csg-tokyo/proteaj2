@@ -663,4 +663,16 @@ object IRModifiers {
   }
 }
 
-case class IRUnknownAnnotation (annotationType: JObjectType, args: Map[JMethod, MetaValue]) extends UnknownAnnotation
+// case class IRUnknownAnnotation (annotationType: JObjectType, args: Map[JMethod, MetaValue]) extends UnknownAnnotation
+
+sealed trait IRAnnotationElement
+
+case class IRAnnotation (annotationClass: JClass, args: Map[String, IRAnnotationElement]) extends IRAnnotationElement
+
+case class IRAnnotationElementArray (array: List[IRAnnotationElement]) extends IRAnnotationElement
+
+case class IRAnnotationElementString (str: String) extends IRAnnotationElement
+
+case class IRAnnotationElementClass (signature: JTypeSignature) extends IRAnnotationElement
+
+case class IRAnnotationElementEnumConstant (clazz: Option[JClass], name: String) extends IRAnnotationElement

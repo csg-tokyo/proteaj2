@@ -59,6 +59,9 @@ case class RequiresClause (contexts: List[TypeName]) extends MethodClause
 
 case class EnumConstant (annotations: List[Annotation], name: String, arguments: List[ExpressionSnippet], members: List[ClassMember])
 
+case class ExpressionSnippet (snippet: String) extends Positional
+case class BlockSnippet (snippet: String) extends Positional
+
 sealed trait SyntaxElement
 
 case class OperatorName (name: String) extends SyntaxElement
@@ -97,9 +100,56 @@ case class MarkerAnnotation (name: QualifiedName) extends Annotation
 
 case class ArrayOfAnnotationElement (array: List[AnnotationElement]) extends AnnotationElement
 
-case class ExpressionSnippet (snippet: String) extends AnnotationElement with Positional
+sealed trait AnnotationExpression extends AnnotationElement
 
-case class BlockSnippet (snippet: String) extends Positional
+/*
+case class ConditionalExpression    (cond: AnnotationExpression, thenExpr: AnnotationExpression, elseExpr: AnnotationExpression) extends AnnotationExpression
+case class ConditionalOrExpression  (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class ConditionalAndExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class InclusiveOrExpression    (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class ExclusiveOrExpression    (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class AndExpression            (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+
+case class EqualsExpression    (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class NotEqualsExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+
+case class LTRelationalExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class RTRelationalExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class LERelationalExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class RERelationalExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+
+case class LeftShiftExpression         (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class RightShiftExpression        (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class LogicalRightShiftExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+
+case class AddExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class SubExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class MulExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class DivExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+case class ModExpression (left: AnnotationExpression, right: AnnotationExpression) extends AnnotationExpression
+
+case class PreIncrementExpression (operand: AnnotationExpression) extends AnnotationExpression
+case class PreDecrementExpression (operand: AnnotationExpression) extends AnnotationExpression
+case class UnaryPlusExpression    (operand: AnnotationExpression) extends AnnotationExpression
+case class UnaryMinusExpression   (operand: AnnotationExpression) extends AnnotationExpression
+case class BitInversionExpression (operand: AnnotationExpression) extends AnnotationExpression
+case class LogicalNotExpression   (operand: AnnotationExpression) extends AnnotationExpression
+
+case class CastExpression (targetType: TypeName, operand: AnnotationExpression) extends AnnotationExpression
+
+case class PostIncrementExpression (operand: AnnotationExpression) extends AnnotationExpression
+case class PostDecrementExpression (operand: AnnotationExpression) extends AnnotationExpression
+
+case class CharLiteralExpression (value: Char) extends AnnotationExpression
+case class IntLiteralExpression (value: Int) extends AnnotationExpression
+case class LongLiteralExpression (value: Long) extends AnnotationExpression
+case class FloatLiteralExpression (value: Float) extends AnnotationExpression
+case class DoubleLiteralExpression (value: Double) extends AnnotationExpression
+*/
+
+case class StringLiteralExpression (value: String) extends AnnotationExpression
+case class ClassLiteralExpression (name: TypeName) extends AnnotationExpression
+case class EnumConstantExpression (name: List[String]) extends AnnotationExpression
 
 sealed trait MetaParameter {
   def name: String

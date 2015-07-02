@@ -56,7 +56,9 @@ trait NameResolver {
 
   def classTypeSignature (name: String): Try[JClassTypeSignature] = resolve(name).map(clazz => SimpleClassTypeSignature(clazz.internalName, Nil))
 
-  def classTypeSignature (name: QualifiedName): Try[JClassTypeSignature] = resolve(name.names).map(clazz => SimpleClassTypeSignature(clazz.internalName, Nil))
+  def classTypeSignature (name: QualifiedName): Try[JClassTypeSignature] = classTypeSignature(name.names)
+
+  def classTypeSignature (names: List[String]): Try[JClassTypeSignature] = resolve(names).map(clazz => SimpleClassTypeSignature(clazz.internalName, Nil))
 
   def classTypeSignature (name: QualifiedName, args: List[TypeArgument]): Try[JClassTypeSignature] = for {
     clazz <- resolve(name.names)
