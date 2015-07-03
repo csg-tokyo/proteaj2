@@ -1,5 +1,7 @@
 package phenan.prj
 
+import phenan.prj.ir.IRExpression
+
 sealed trait MetaArgument {
   def matches (v: MetaArgument): Boolean
 }
@@ -12,8 +14,8 @@ case class MetaVariableRef (name: String, valueType: JType) extends PureValue {
   def matches (v: MetaArgument): Boolean = this == v
 }
 
-case class ConcretePureValue (value: Any, parameter: JParameter) extends PureValue {
-  def valueType: JType = ???
+case class ConcretePureValue (ast: IRExpression, parameter: JParameter) extends PureValue {
+  def valueType: JType = parameter.compiler.state.someOrError(ast.staticType, "invalid meta value type", parameter.compiler.typeLoader.void)
   override def matches(v: MetaArgument): Boolean = this == v
 }
 

@@ -5,7 +5,6 @@ import phenan.prj._
 import scala.util._
 
 sealed trait IRExpression {
-  def eval: Try[MetaArgument] = ???
   def staticType: Option[JType] = ???
   def activates: List[IRContextRef] = ???
   def deactivates: List[IRContextRef] = ???
