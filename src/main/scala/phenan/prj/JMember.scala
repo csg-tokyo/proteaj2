@@ -22,6 +22,10 @@ trait JProcedure extends JMember {
   lazy val parameterTypes: List[JParameter] = methodDef.signature.parameters.map(sig => JParameter(sig, env, compiler))
   lazy val exceptionTypes: List[JGenericType] = methodDef.signature.throwTypes.map(sig => JGenericType(sig, env, compiler))
 
+  lazy val activates: List[JGenericType] = methodDef.signature.activates.map(sig => JGenericType(sig, env, compiler))
+  lazy val deactivates: List[JGenericType] = methodDef.signature.deactivates.map(sig => JGenericType(sig, env, compiler))
+  lazy val requires: List[JGenericType] = methodDef.signature.requires.map(sig => JGenericType(sig, env, compiler))
+
   def compiler = declaring.compiler
 }
 

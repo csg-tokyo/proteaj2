@@ -10,9 +10,9 @@ sealed trait IRExpression {
   def deactivates: List[IRContextRef] = ???
 }
 
-case class IRDSLOperation (method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression]) extends IRExpression
+case class IRDSLOperation (method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExpression
 
-case class IRContextOperation (context: IRContextRef, method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression]) extends IRExpression
+case class IRContextOperation (context: IRContextRef, method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExpression
 
 case class IRVariableArguments (args: List[IRExpression]) extends IRExpression
 

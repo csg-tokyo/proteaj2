@@ -7,6 +7,7 @@ class Unifier (compiler: JCompiler) {
 
   def unify (t: JType, gt: JGenericType): Option[MetaArgs] = TypeUnifier.check(t, gt.signature, gt.env)
   def infer (t: JType, gt: JGenericType): Option[MetaArgs] = TypeInferencer.check(t, gt.signature, gt.env)
+  def infer (t: JType, gt: JGenericType, e: MetaArgs): Option[MetaArgs] = TypeInferencer.check(t, gt.signature, gt.env ++ e)
 
   object TypeUnifier extends TypeChecker[Option[MetaArgs]] {
 
