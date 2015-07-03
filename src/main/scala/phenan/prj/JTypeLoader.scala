@@ -55,7 +55,7 @@ class JTypeLoader (compiler: JCompiler) {
   def fromTypeVariableSignature (sig: JTypeVariableSignature, env: Map[String, MetaArgument]): Option[JRefType] = env.get(sig.name).flatMap {
     case t: JRefType  => Some(t)
     case w: JWildcard => w.upperBound.orElse(objectType).map(ub => JCapturedWildcardType(ub, w.lowerBound))
-    case p: PureValue =>
+    case p: MetaValue =>
       state.error("invalid type variable : " + sig.name)
       None
   }
@@ -85,7 +85,7 @@ class JTypeLoader (compiler: JCompiler) {
 
   private def validTypeArg (param: FormalMetaParameter, arg: MetaArgument, env: Map[String, MetaArgument]): Boolean = arg match {
     case arg: JRefType => param.bounds.forall(withinBound(_, arg, env))
-    case pv: PureValue => fromTypeSignature(param.metaType, env).exists(pv.valueType <:< _)
+    case pv: MetaValue => fromTypeSignature(param.metaType, env).exists(pv.valueType <:< _)
     case wc: JWildcard => param.bounds.forall(bound => wc.upperBound.orElse(objectType).exists(upper => withinBound(bound, upper, env)))
   }
 

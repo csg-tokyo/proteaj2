@@ -669,8 +669,6 @@ object IRModifiers {
   }
 }
 
-// case class IRUnknownAnnotation (annotationType: JObjectType, args: Map[JMethod, MetaValue]) extends UnknownAnnotation
-
 sealed trait IRAnnotationElement
 
 case class IRAnnotation (annotationClass: JClass, args: Map[String, IRAnnotationElement]) extends IRAnnotationElement

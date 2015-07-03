@@ -152,7 +152,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
         case (bnd, e, arg) => constructParser(rest, bnd, e, arg :: operands)
       }
       case JMetaOperand(name, param) :: rest => parameter(param, binding, environment) >> {
-        ast => constructParser(rest, binding + (name -> ConcretePureValue(ast, param)), environment, operands)
+        ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), environment, operands)
       }
       case JMetaName(value) :: rest          => metaValue(value, binding, environment) ~> constructParser(rest, binding, environment, operands)
       case JOperatorName(name) :: rest       => word(name).^ ~> constructParser(rest, binding, environment, operands)
@@ -177,7 +177,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case t: JRefType  => TypeParsers(env.resolver).refType ^? { case v if t == v => t }
       case w: JWildcard => TypeParsers(env.resolver).wildcard ^? { case v if w == v => w }
       case r: MetaVariableRef   => TypeParsers(env.resolver).metaVariable ^? { case v if r == v => r }
-      case c: ConcretePureValue => parameter(c.parameter, binding, environment) ^? { case v if c.ast == v => c }
+      case c: ConcreteMetaValue => parameter(c.parameter, binding, environment) ^? { case v if c.ast == v => c }
     }
 
     private def optional (param: JParameter, binding: Map[String, MetaArgument], environment: Environment) = parameter(param, binding, environment).? ^^ { _.orElse(defaultExpression(param)) }
@@ -215,7 +215,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
         case (bnd, e, arg) => constructParser(rest, bnd, e, arg :: operands)
       }
       case JMetaOperand(name, param) :: rest => parameter(param, binding, environment) >> {
-        ast => constructParser(rest, binding + (name -> ConcretePureValue(ast, param)), environment, operands)
+        ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), environment, operands)
       }
       case JMetaName(value) :: rest          => metaValue(value, binding, environment) ~> constructParser(rest, binding, environment, operands)
       case JOperatorName(name) :: rest       => word(name) ~> constructParser(rest, binding, environment, operands)
@@ -237,7 +237,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
 
     private def metaValue (mv: MetaArgument, binding: Map[String, MetaArgument], environment: Environment): LParser[MetaArgument] = mv match {
-      case c: ConcretePureValue => parameter(c.parameter, binding, environment) ^? { case v if c.ast == v => c }
+      case c: ConcreteMetaValue => parameter(c.parameter, binding, environment) ^? { case v if c.ast == v => c }
       case _: JRefType | _: JWildcard | _: MetaVariableRef => failure("type name cannot be used in a literal")
     }
 

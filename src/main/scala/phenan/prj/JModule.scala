@@ -6,15 +6,15 @@ sealed trait MetaArgument {
   def matches (v: MetaArgument): Boolean
 }
 
-sealed trait PureValue extends MetaArgument {
+sealed trait MetaValue extends MetaArgument {
   def valueType: JType
 }
 
-case class MetaVariableRef (name: String, valueType: JType) extends PureValue {
+case class MetaVariableRef (name: String, valueType: JType) extends MetaValue {
   def matches (v: MetaArgument): Boolean = this == v
 }
 
-case class ConcretePureValue (ast: IRExpression, parameter: JParameter) extends PureValue {
+case class ConcreteMetaValue (ast: IRExpression, parameter: JParameter) extends MetaValue {
   def valueType: JType = parameter.compiler.state.someOrError(ast.staticType, "invalid meta value type", parameter.compiler.typeLoader.void)
   override def matches(v: MetaArgument): Boolean = this == v
 }
@@ -25,7 +25,7 @@ case class JWildcard (upperBound: Option[JRefType], lowerBound: Option[JRefType]
   def matches (that: MetaArgument): Boolean = that match {
     case that: JRefType  => upperBound.forall(that <:< _) && lowerBound.forall(_ <:< that)
     case that: JWildcard => upperBound.forall(ub => that.upperBound.exists(_ <:< ub)) && lowerBound.forall(lb => that.lowerBound.exists(lb <:< _))
-    case _: PureValue => false
+    case _: MetaValue => false
   }
 }
 
@@ -299,7 +299,7 @@ case class JUnboundTypeVariable (name: String, bounds: List[JRefType], compiler:
   def matches (v: MetaArgument): Boolean = v match {
     case that: JRefType  => bounds.forall(that <:< _)
     case that: JWildcard => bounds.forall(ub => that.upperBound.exists(_ <:< ub))
-    case _: PureValue => false
+    case _: MetaValue => false
   }
 
   def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
