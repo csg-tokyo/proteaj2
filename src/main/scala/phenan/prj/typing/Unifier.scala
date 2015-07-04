@@ -172,7 +172,7 @@ class Unifier (compiler: JCompiler) {
 
     def check (pv: MetaValue, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = {
       if (args.contains(pvs.name)) {
-        if (pv == args(pvs.name)) Some(args)
+        if (pv.matches(args(pvs.name))) Some(args)
         else None
       }
       else Some(args + (pvs.name -> pv))
@@ -429,7 +429,7 @@ class Unifier (compiler: JCompiler) {
 
     def check (pv: MetaValue, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = {
       if (args.contains(pvs.name)) {
-        if (pv == args(pvs.name)) Some(args)
+        if (args(pvs.name).matches(pv)) Some(args)
         else None
       }
       else Some(args + (pvs.name -> pv))

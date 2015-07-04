@@ -164,7 +164,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     private def parameter (param: JParameter, binding: Map[String, MetaArgument], environment: Environment): HParser[IRExpression] = {
       val expected = param.genericType.bind(binding ++ param.genericType.unbound(binding).flatMap(name => eop.method.metaParameters.get(name).map(name -> _)).toMap.mapValues {
         case FormalMetaParameter(name, JTypeSignature.typeTypeSig, _, bounds) => JUnboundTypeVariable(name, bounds.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, binding)), compiler)
-        case FormalMetaParameter(name, metaType, _, _) => ???
+        case FormalMetaParameter(name, metaType, _, _) => MetaValueWildcard(compiler.typeLoader.fromTypeSignature_RefType(metaType, binding).getOrElse {
+          compiler.state.errorAndReturn("invalid meta type", compiler.typeLoader.void)
+        })
       }).getOrElse {
         compiler.state.error("expected type cannot be known")
         compiler.typeLoader.void
@@ -178,6 +180,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case w: JWildcard => TypeParsers(env.resolver).wildcard ^? { case v if w == v => w }
       case r: MetaVariableRef   => TypeParsers(env.resolver).metaVariable ^? { case v if r == v => r }
       case c: ConcreteMetaValue => parameter(c.parameter, binding, environment) ^? { case v if c.ast == v => c }
+      case _: MetaValueWildcard => failure("meta value wildcard cannot be placed in operator pattern").^
     }
 
     private def optional (param: JParameter, binding: Map[String, MetaArgument], environment: Environment) = parameter(param, binding, environment).? ^^ { _.orElse(defaultExpression(param)) }
@@ -227,7 +230,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     private def parameter (param: JParameter, binding: Map[String, MetaArgument], environment: Environment): LParser[IRExpression] = {
       val expected = param.genericType.bind(binding ++ param.genericType.unbound(binding).flatMap(name => lop.method.metaParameters.get(name).map(name -> _)).toMap.mapValues {
         case FormalMetaParameter(name, JTypeSignature.typeTypeSig, _, bounds) => JUnboundTypeVariable(name, bounds.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, binding)), compiler)
-        case FormalMetaParameter(name, metaType, _, _) => ???
+        case FormalMetaParameter(name, metaType, _, _) => MetaValueWildcard(compiler.typeLoader.fromTypeSignature_RefType(metaType, binding).getOrElse {
+          compiler.state.errorAndReturn("invalid meta type", compiler.typeLoader.void)
+        })
       }).getOrElse {
         compiler.state.error("expected type cannot be known")
         compiler.typeLoader.void
@@ -239,6 +244,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     private def metaValue (mv: MetaArgument, binding: Map[String, MetaArgument], environment: Environment): LParser[MetaArgument] = mv match {
       case c: ConcreteMetaValue => parameter(c.parameter, binding, environment) ^? { case v if c.ast == v => c }
       case _: JRefType | _: JWildcard | _: MetaVariableRef => failure("type name cannot be used in a literal")
+      case _: MetaValueWildcard => failure("meta value wildcard cannot be placed in operator pattern")
     }
 
     private def optional (param: JParameter, binding: Map[String, MetaArgument], environment: Environment) = parameter(param, binding, environment).? ^^ { _.orElse(defaultExpression(param)) }

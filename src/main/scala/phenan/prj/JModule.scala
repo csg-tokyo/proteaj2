@@ -19,6 +19,13 @@ case class ConcreteMetaValue (ast: IRExpression, parameter: JParameter) extends 
   override def matches(v: MetaArgument): Boolean = this == v
 }
 
+case class MetaValueWildcard (valueType: JType) extends MetaValue {
+  def matches(v: MetaArgument): Boolean = v match {
+    case m: MetaValue => m.valueType <:< valueType
+    case _: JWildcard | _: JRefType => false
+  }
+}
+
 case class JWildcard (upperBound: Option[JRefType], lowerBound: Option[JRefType]) extends MetaArgument {
   def name = upperBound.map(ub => "? extends " + ub.name).orElse(lowerBound.map(lb => "? super " + lb.name)).getOrElse("?")
 
