@@ -37,11 +37,15 @@ sealed trait IRFieldAccess extends IRLeftHandSide
 
 case class IRInstanceFieldAccess (instance: IRExpression, field: JField) extends IRFieldAccess
 
+case class IRSuperFieldAccess (superType: JObjectType, field: JField) extends IRFieldAccess
+
+case class IRStaticFieldAccess (field: JField) extends IRFieldAccess
+
 case class IRStaticMethodCall (method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression]) extends IRExpression
 
 case class IRVariableArguments (args: List[IRExpression]) extends IRExpression
 
-case class IRThisRef (thisType: JType) extends IRExpression
+case class IRThisRef (thisType: JObjectType) extends IRExpression
 
 case class IRLocalVariableRef (localType: JType, name: String) extends IRLeftHandSide
 

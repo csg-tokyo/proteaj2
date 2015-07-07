@@ -166,11 +166,18 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val fieldAccess: HParser[IRFieldAccess] = ???
 
-    lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primary >> { instance =>
-      instance.staticType match {
-        case Some(t) => ???
-        case None    => failure("type error").^
-      }
+    lazy val abbreviatedFieldAccess: HParser[IRFieldAccess] = ???
+
+    lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primary ~ ( '.' ~> identifier ) ^^? {
+      case instance ~ name => instance.staticType.flatMap { t => t.findField(name, env.clazz, isThisRef(instance)).map(IRInstanceFieldAccess(instance, _)) }
+    }
+
+    lazy val superFieldAccess: HParser[IRSuperFieldAccess] = "super" ~> '.' ~> identifier ^^? { name =>
+      env.thisType.flatMap(_.superType).flatMap { t => t.findField(name, env.clazz, true).map(IRSuperFieldAccess(t, _)) }
+    }
+
+    lazy val staticFieldAccess: HParser[IRStaticFieldAccess] = typeParsers.className ~ ( '.' ~> identifier ) ^^? {
+      case clazz ~ name => clazz.classModule.findField(name, env.clazz).map(IRStaticFieldAccess)
     }
 
     lazy val cast: HParser[IRCastExpression] = ( '(' ~> typeParsers.typeName <~ ')' ) ~ primary ^^ {
@@ -179,7 +186,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val parenthesized: HParser[IRExpression] = '(' ~> expression <~ ')'
 
-    lazy val thisRef: HParser[IRThisRef] = "this" ^^? { _ => env.thisRef }
+    lazy val thisRef: HParser[IRThisRef] = "this" ^^? { _ => thisObject }
 
     lazy val variableRef: HParser[IRLocalVariableRef] = identifier ^^? { env.localVariable }
 
@@ -190,6 +197,10 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     lazy val dimension1 = ( '[' ~> ']' ).+ ^^ { _.length }
 
     private val typeParsers = TypeParsers(env.resolver)
+
+    private val thisObject = env.thisType.map(IRThisRef)
+
+    private def isThisRef (e: IRExpression) = thisObject.contains(e)
   }
 
   object JavaLiteralParsers {

@@ -6,7 +6,7 @@ import scalaz.Memo._
 
 trait Environment {
   def clazz: JClass
-  def thisRef: Option[IRThisRef]
+  def thisType: Option[JObjectType]
   def contexts: List[IRContextRef]
   def locals: Map[String, IRLocalVariableRef]
   def fileEnvironment: FileEnvironment
@@ -33,7 +33,7 @@ trait Environment {
 
 class Environment_Local (localType: JType, name: String, parent: Environment) extends Environment {
   def clazz = parent.clazz
-  def thisRef = parent.thisRef
+  def thisType = parent.thisType
   def contexts = parent.contexts
   val locals: Map[String, IRLocalVariableRef] = parent.locals + (name -> IRLocalVariableRef(localType, name))
   def fileEnvironment = parent.fileEnvironment
@@ -43,7 +43,7 @@ class Environment_Local (localType: JType, name: String, parent: Environment) ex
 
 class Environment_Context (activates: List[IRContextRef], deactivates: List[IRContextRef], parent: Environment) extends Environment {
   def clazz = parent.clazz
-  def thisRef = parent.thisRef
+  def thisType = parent.thisType
   def locals = parent.locals
   val contexts: List[IRContextRef] = activates ++ parent.contexts.diff(deactivates)
   def fileEnvironment = parent.fileEnvironment
