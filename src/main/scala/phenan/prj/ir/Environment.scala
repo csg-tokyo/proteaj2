@@ -7,6 +7,7 @@ import scala.util._
 import scalaz.Memo._
 
 trait Environment {
+  def thisRef: Option[IRThisRef]
   def contexts: List[IRContextRef]
   def locals: Map[String, IRLocalVariableRef]
   def fileEnvironment: FileEnvironment
@@ -56,6 +57,7 @@ case class FileEnvironment (file: IRFile) extends Environment {
   lazy val userConstraints: List[List[JPriority]] = file.userConstraints.map(resolver.constraint)
   lazy val priorities: List[JPriority] = sortPriorities(collectPriorities(dsls, Set.empty), dsls.flatMap(_.constraints) ++ userConstraints)
 
+  def thisRef = None
   def locals = Map.empty
   def contexts = Nil
   def fileEnvironment = this
@@ -124,6 +126,7 @@ case class FileEnvironment (file: IRFile) extends Environment {
 
 class Environment_Local (localType: JType, name: String, parent: Environment) extends Environment {
   val locals: Map[String, IRLocalVariableRef] = parent.locals + (name -> IRLocalVariableRef(localType, name))
+  def thisRef = parent.thisRef
   def contexts = parent.contexts
   def fileEnvironment = parent.fileEnvironment
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = parent.expressionOperators(expected, priority)
@@ -131,6 +134,7 @@ class Environment_Local (localType: JType, name: String, parent: Environment) ex
 }
 
 class Environment_Context (activates: List[IRContextRef], deactivates: List[IRContextRef], parent: Environment) extends Environment {
+  def thisRef = parent.thisRef
   def locals = parent.locals
   val contexts: List[IRContextRef] = activates ++ parent.contexts.diff(deactivates)
   def fileEnvironment = parent.fileEnvironment

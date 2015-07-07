@@ -19,8 +19,15 @@ class JTypeLoader (compiler: JCompiler) {
   lazy val stringType = compiler.classLoader.stringClass.flatMap(_.objectType(Nil))
   lazy val anyClassType = compiler.classLoader.classClass.flatMap(_.objectType(List(JWildcard(None, None))))
 
+  lazy val byte    = compiler.classLoader.byte.primitiveType
+  lazy val char    = compiler.classLoader.char.primitiveType
+  lazy val double  = compiler.classLoader.double.primitiveType
+  lazy val float   = compiler.classLoader.float.primitiveType
+  lazy val int     = compiler.classLoader.int.primitiveType
+  lazy val long    = compiler.classLoader.long.primitiveType
+  lazy val short   = compiler.classLoader.short.primitiveType
   lazy val boolean = compiler.classLoader.boolean.primitiveType
-  lazy val void = compiler.classLoader.void.primitiveType
+  lazy val void    = compiler.classLoader.void.primitiveType
 
   lazy val superTypesOfArray: List[JObjectType] = CommonNames.superClassesOfArray.flatMap { name =>
     compiler.classLoader.loadClass_PE(name).flatMap(_.objectType(Nil))

@@ -117,9 +117,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val parenthesized: HParser[IRExpression] = '(' ~> expression <~ ')'
 
-    lazy val hostExpression: HParser[IRExpression] = ???
+    lazy val hostExpression: HParser[IRExpression] = JavaExpressionParsers(env).expression | parenthesized | hostLiteral.^
 
-    lazy val hostLiteral: LParser[IRExpression] = ???
+    lazy val hostLiteral: LParser[IRExpression] = JavaLiteralParsers.literal
 
     private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
       env.expressionOperators(expected, p).map(ExpressionOperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
@@ -130,8 +130,61 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
   }
 
-  object JavaExpressionParsers {
+  class JavaExpressionParsers private (env: Environment) {
+    lazy val expression: HParser[IRExpression] = assignment | primary | cast
 
+    lazy val assignment: HParser[IRAssignmentExpression] = simpleAssignment   // | += | -= | ...
+
+    lazy val simpleAssignment: HParser[IRSimpleAssignmentExpression] = leftHandSide >> { left =>
+      left.staticType match {
+        case Some(t) => '=' ~> ExpressionParsers(t, env).expression ^^ { right => IRSimpleAssignmentExpression(left, right) }
+        case None    => failure("type of the left hand side expression cannot be known").^
+      }
+    }
+
+    lazy val leftHandSide: HParser[IRLeftHandSide] = ???
+
+    lazy val primary: HParser[IRExpression] = arrayCreation | primaryNoNewArray
+
+    lazy val arrayCreation: HParser[IRArrayCreation] = newArray | arrayInitializer
+
+    lazy val newArray: HParser[IRNewArray] = ( "new" ~> typeParsers.componentType ) ~ ( '[' ~> intExpression <~ ']' ).+ ~ dimension ^^ {
+      case componentType ~ length ~ dim => IRNewArray(componentType, length, dim)
+    }
+
+    lazy val arrayInitializer: HParser[IRArrayInitializer] = ( "new" ~> typeParsers.componentType ) ~ dimension1 >> {
+      case componentType ~ dim => '{' ~> ExpressionParsers(componentType.array(dim - 1), env).expression.*(',') <~ ','.? <~ '}' ^^ {
+        case components => IRArrayInitializer(componentType, dim, components)
+      }
+    }
+
+    lazy val primaryNoNewArray: HParser[IRExpression] = ???
+
+    lazy val arrayAccess: HParser[IRArrayAccess] = primaryNoNewArray ~ ( '[' ~> intExpression <~ ']' ) ^^ {
+      case array ~ index => IRArrayAccess(array, index)
+    }
+
+    lazy val cast: HParser[IRCastExpression] = ( '(' ~> typeParsers.typeName <~ ')' ) ~ primary ^^ {
+      case dest ~ expr => IRCastExpression(dest, expr)
+    }
+
+    lazy val parenthesized: HParser[IRExpression] = '(' ~> expression <~ ')'
+
+    lazy val thisRef: HParser[IRThisRef] = "this" ^^? { _ => env.thisRef }
+
+    lazy val variableRef: HParser[IRLocalVariableRef] = identifier ^^? { env.localVariable }
+
+    lazy val intExpression = ExpressionParsers(compiler.typeLoader.int, env).expression
+
+    lazy val dimension = ( '[' ~> ']' ).* ^^ { _.length }
+
+    lazy val dimension1 = ( '[' ~> ']' ).+ ^^ { _.length }
+
+    private val typeParsers = TypeParsers(env.resolver)
+  }
+
+  object JavaLiteralParsers {
+    lazy val literal: LParser[IRExpression] = ???
   }
 
   class ExpressionOperatorParsers private (eop: ExpressionOperator, env: Environment) {
@@ -267,6 +320,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   class TypeParsers private (resolver: NameResolver) {
     lazy val metaValue: HParser[MetaArgument] = wildcard | metaVariable | refType
     lazy val typeName: HParser[JType] = primitiveTypeName | refType
+    lazy val componentType: HParser[JType] = primitiveTypeName | objectType
     lazy val refType: HParser[JRefType] = arrayType | typeVariable | objectType
     lazy val objectType: HParser[JObjectType] = className ~ ( '<' ~> metaValue.+(',') <~ '>' ).? ^^? {
       case clazz ~ args => clazz.objectType(args.getOrElse(Nil))
@@ -285,15 +339,15 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     lazy val metaVariable: HParser[MetaVariableRef] = identifier ^^? resolver.metaVariable
     lazy val arrayType: HParser[JArrayType] = typeName <~ emptyBracket ^^ { _.array }
     lazy val primitiveTypeName: HParser[JPrimitiveType] = identifier ^? {
-      case "byte"    => compiler.classLoader.byte.primitiveType
-      case "char"    => compiler.classLoader.char.primitiveType
-      case "double"  => compiler.classLoader.double.primitiveType
-      case "float"   => compiler.classLoader.float.primitiveType
-      case "int"     => compiler.classLoader.int.primitiveType
-      case "long"    => compiler.classLoader.long.primitiveType
-      case "short"   => compiler.classLoader.short.primitiveType
-      case "boolean" => compiler.classLoader.boolean.primitiveType
-      case "void"    => compiler.classLoader.void.primitiveType
+      case "byte"    => compiler.typeLoader.byte
+      case "char"    => compiler.typeLoader.char
+      case "double"  => compiler.typeLoader.double
+      case "float"   => compiler.typeLoader.float
+      case "int"     => compiler.typeLoader.int
+      case "long"    => compiler.typeLoader.long
+      case "short"   => compiler.typeLoader.short
+      case "boolean" => compiler.typeLoader.boolean
+      case "void"    => compiler.typeLoader.void
     }
     lazy val wildcard: HParser[JWildcard] = '?' ~> ( "extends" ~> refType ).? ~ ( "super" ~> refType ).? ^^ {
       case ub ~ lb => JWildcard(ub, lb)
@@ -308,6 +362,11 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   object ExpressionParsers {
     def apply (expected: JType, env: Environment): ExpressionParsers = cached((expected, env))
     private val cached : ((JType, Environment)) => ExpressionParsers = mutableHashMapMemo { pair => new ExpressionParsers(pair._1, pair._2) }
+  }
+
+  object JavaExpressionParsers {
+    def apply (env: Environment): JavaExpressionParsers = cached(env)
+    private val cached : Environment => JavaExpressionParsers = mutableHashMapMemo { e => new JavaExpressionParsers(e) }
   }
 
   object ExpressionOperatorParsers {
