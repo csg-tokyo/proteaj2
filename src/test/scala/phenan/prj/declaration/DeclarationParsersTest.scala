@@ -32,7 +32,7 @@ class DeclarationParsersTest extends FunSuite with Matchers with ASTUtil {
   test ("import static star") {
     val r = parse(importStaticStar, "import static org.junit.Assert.*;")
     assert(r.successful)
-    r.get shouldBe ImportStaticStarDeclaration(qName("org", "junit", "Assert"))
+    r.get shouldBe ImportStaticOnDemandDeclaration(qName("org", "junit", "Assert"))
   }
 
   test ("import dsl") {

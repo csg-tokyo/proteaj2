@@ -40,7 +40,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val importStaticMember = "import" ~> "static" ~> qualifiedName <~ ';' ^^ ImportStaticMemberDeclaration
 
-  lazy val importStaticStar = "import" ~> "static" ~> qualifiedName <~ '.' <~ '*' <~ ';' ^^ ImportStaticStarDeclaration
+  lazy val importStaticStar = "import" ~> "static" ~> qualifiedName <~ '.' <~ '*' <~ ';' ^^ ImportStaticOnDemandDeclaration
 
   lazy val importDSLs = importDSLs_Simple | importDSLs_Constraints
 

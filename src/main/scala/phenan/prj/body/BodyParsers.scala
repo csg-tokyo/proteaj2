@@ -142,7 +142,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       }
     }
 
-    lazy val leftHandSide: HParser[IRLeftHandSide] = ???
+    lazy val leftHandSide: HParser[IRLeftHandSide] = fieldAccess | arrayAccess | abbreviatedFieldAccess | variableRef
 
     lazy val primary: HParser[IRExpression] = arrayCreation | primaryNoNewArray
 
@@ -164,9 +164,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case array ~ index => IRArrayAccess(array, index)
     }
 
-    lazy val fieldAccess: HParser[IRFieldAccess] = ???
+    lazy val fieldAccess: HParser[IRFieldAccess] = staticFieldAccess | superFieldAccess | instanceFieldAccess
 
-    lazy val abbreviatedFieldAccess: HParser[IRFieldAccess] = ???
+    lazy val abbreviatedFieldAccess: HParser[IRFieldAccess] =  thisClassFieldAccess | thisFieldAccess  // | staticImported
 
     lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primary ~ ( '.' ~> identifier ) ^^? {
       case instance ~ name => instance.staticType.flatMap { t => t.findField(name, env.clazz, isThisRef(instance)).map(IRInstanceFieldAccess(instance, _)) }
@@ -180,11 +180,29 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case clazz ~ name => clazz.classModule.findField(name, env.clazz).map(IRStaticFieldAccess)
     }
 
+    lazy val thisFieldAccess: HParser[IRInstanceFieldAccess] = identifier ^^? { name =>
+      env.thisType.flatMap { self => self.findField(name, env.clazz, true).map(IRInstanceFieldAccess(IRThisRef(self), _)) }
+    }
+
+    lazy val thisClassFieldAccess: HParser[IRStaticFieldAccess] = identifier ^^? { name =>
+      env.clazz.classModule.findField(name, env.clazz).map(IRStaticFieldAccess)
+    }
+
     lazy val cast: HParser[IRCastExpression] = ( '(' ~> typeParsers.typeName <~ ')' ) ~ primary ^^ {
       case dest ~ expr => IRCastExpression(dest, expr)
     }
 
     lazy val parenthesized: HParser[IRExpression] = '(' ~> expression <~ ')'
+
+    lazy val classLiteral: HParser[IRClassLiteral] = objectClassLiteral | primitiveClassLiteral
+
+    lazy val objectClassLiteral: HParser[IRObjectClassLiteral] = typeParsers.className ~ dimension <~ '.' <~ "class" ^^ {
+      case clazz ~ dim => IRObjectClassLiteral(clazz, dim)
+    }
+
+    lazy val primitiveClassLiteral: HParser[IRPrimitiveClassLiteral] = typeParsers.primitiveTypeName ~ dimension <~ '.' <~ "class" ^^ {
+      case prm ~ dim => IRPrimitiveClassLiteral(prm, dim)
+    }
 
     lazy val thisRef: HParser[IRThisRef] = "this" ^^? { _ => thisObject }
 
@@ -198,7 +216,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     private val typeParsers = TypeParsers(env.resolver)
 
-    private val thisObject = env.thisType.map(IRThisRef)
+    private def thisObject = env.thisType.map(IRThisRef)
 
     private def isThisRef (e: IRExpression) = thisObject.contains(e)
   }

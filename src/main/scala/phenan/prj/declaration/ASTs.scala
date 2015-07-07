@@ -18,9 +18,8 @@ sealed trait StaticImportDeclaration extends ImportDeclaration
 
 case class ImportStaticMemberDeclaration (name: QualifiedName) extends StaticImportDeclaration
 
-case class ImportStaticStarDeclaration (name: QualifiedName) extends StaticImportDeclaration
+case class ImportStaticOnDemandDeclaration (name: QualifiedName) extends StaticImportDeclaration
 
-// ascending order
 case class ImportDSLsDeclaration (dsls: List[QualifiedName], constraints: List[List[QualifiedName]]) extends ImportDeclaration
 
 sealed trait ModuleDeclaration extends ClassMember with InterfaceMember with AnnotationMember
