@@ -5,6 +5,8 @@ trait JMember {
   def declaring: JModule
 
   def isPrivate: Boolean = modifier.check(JModifier.accPrivate)
+  def isProtected: Boolean = modifier.check(JModifier.accProtected)
+  def isPublic: Boolean = modifier.check(JModifier.accPublic)
 }
 
 class JField (fieldDef: JFieldDef, val fieldType: JType, val declaring: JModule) extends JMember {

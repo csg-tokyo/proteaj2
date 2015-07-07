@@ -61,13 +61,22 @@ case class JGenericType (signature: JTypeSignature, env: Map[String, MetaArgumen
 }
 
 sealed trait JModule {
-  def fields: Map[String, JField]
-  def methods: Map[String, List[JMethod]]
-
   def compiler: JCompiler
 }
 
 case class JClassModule (clazz: JClass) extends JModule {
+  def findField (name: String, from: JClass): Option[JField] = {
+    if (clazz == from) privateFields.get(name).orElse(fields.get(name))
+    else if (clazz.packageInternalName == from.packageInternalName) fields.get(name)
+    else fields.get(name).filter(_.isPublic)
+  }
+
+  def findMethod (name: String, from: JClass): List[JMethod] = {
+    if (clazz == from) privateMethods.getOrElse(name, Nil) ++ methods.getOrElse(name, Nil)
+    else if (clazz.packageInternalName == from.packageInternalName) methods.getOrElse(name, Nil)
+    else methods.getOrElse(name, Nil).filter(_.isPublic)
+  }
+
   lazy val declaredFields: List[JField] = clazz.fields.filter(_.isStatic).flatMap { fieldDef =>
     compiler.typeLoader.fromTypeSignature(fieldDef.signature, Map.empty).map(fieldType => new JField(fieldDef, fieldType, this))
   }
@@ -81,7 +90,6 @@ case class JClassModule (clazz: JClass) extends JModule {
 
   lazy val methods: Map[String, List[JMethod]] = declaredMethods.filterNot(_.isPrivate).groupBy(_.name)
   lazy val privateMethods: Map[String, List[JMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
-
 
   def priorities = clazz.priorities
   def constraints = clazz.priorityConstraints
@@ -121,7 +129,6 @@ sealed trait JType extends JModule {
   def boxed: Option[JRefType]
 
   def isSubtypeOf (that: JType): Boolean
-  def isAssignableTo (that: JType): Boolean
 
   def unifyG (t: JGenericType): Option[Map[String, MetaArgument]] = compiler.unifier.unify(this, t)
   def unifyL (t: JGenericType): Option[Map[String, MetaArgument]] = compiler.unifier.infer(this, t)
@@ -131,6 +138,9 @@ sealed trait JType extends JModule {
 
   def <=< (t: JGenericType) = unifyG(t)
   def >=> (t: JGenericType) = unifyL(t)
+
+  def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField]
+  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod]
 }
 
 sealed trait JRefType extends JType with MetaArgument {
@@ -172,6 +182,20 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
   lazy val fields: Map[String, JField] = nonPrivateFieldList.map(f => f.name -> f).toMap
   lazy val methods: Map[String, List[JMethod]] = nonPrivateMethodList.groupBy(_.name).mapValues(filterOutOverriddenMethod)
 
+  def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = {
+    if (erase == from) privateFields.get(name).orElse(fields.get(name))
+    else if (erase.packageInternalName == from.packageInternalName) fields.get(name)
+    else if (from.isSubclassOf(erase) && receiverIsThis) fields.get(name).filter(f => f.isProtected || f.isPublic)
+    else fields.get(name).filter(_.isPublic)
+  }
+
+  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = {
+    if (erase == from) privateMethods.getOrElse(name, Nil) ++ methods.getOrElse(name, Nil)
+    else if (erase.packageInternalName == from.packageInternalName) methods.getOrElse(name, Nil)
+    else if (from.isSubclassOf(erase) && receiverIsThis) methods.getOrElse(name, Nil).filter(m => m.isProtected || m.isPublic)
+    else methods.getOrElse(name, Nil).filter(_.isPublic)
+  }
+
   def isSubtypeOf (that: JType): Boolean = that match {
     case _ if this == that   => true
     case that: JObjectType   => isSubtypeOf(that)
@@ -182,8 +206,6 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
   def isSubtypeOf (that: JObjectType): Boolean = {
     (this.erase == that.erase && matchTypeArgs(that.env)) || superTypes.exists(_.isSubtypeOf(that))
   }
-
-  def isAssignableTo(that: JType): Boolean = ???
 
   def matches (that: MetaArgument): Boolean = this == that
 
@@ -231,12 +253,12 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
 case class JPrimitiveType (clazz: JPrimitiveClass) extends JType {
   def name = clazz.name
 
-  def fields: Map[String, JField] = Map.empty
   def methods: Map[String, List[JMethod]] = Map.empty
 
-  def isSubtypeOf (that: JType): Boolean = this == that
+  def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = None
+  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = Nil
 
-  def isAssignableTo(that: JType): Boolean = ???
+  def isSubtypeOf (that: JType): Boolean = this == that
 
   lazy val boxed: Option[JRefType] = clazz.wrapperClass.flatMap(_.objectType(Nil))
 
@@ -248,8 +270,8 @@ case class JArrayType (componentType: JType) extends JRefType {
 
   def superTypes: List[JObjectType] = compiler.typeLoader.superTypesOfArray
 
-  def fields: Map[String, JField] = ???
-  def methods: Map[String, List[JMethod]] = ???
+  def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = None
+  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = Nil
 
   def isSubtypeOf (that: JType): Boolean = that match {
     case _ if this == that => true
@@ -259,8 +281,6 @@ case class JArrayType (componentType: JType) extends JRefType {
     case _: JPrimitiveType | _: JUnboundTypeVariable => false
   }
 
-  def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
-
   def matches (that: MetaArgument): Boolean = this == that
 
   def compiler: JCompiler = componentType.compiler
@@ -268,12 +288,22 @@ case class JArrayType (componentType: JType) extends JRefType {
 
 case class JTypeVariable (name: String, bounds: List[JRefType], compiler: JCompiler) extends JRefType {
   def isSubtypeOf(that: JType): Boolean = bounds.exists(_.isSubtypeOf(that)) | compiler.typeLoader.objectType.contains(that)
-  def isAssignableTo(that: JType): Boolean = isSubtypeOf(that)
 
   override def matches (v: MetaArgument): Boolean = this == v
 
-  def methods = boundHead.map(_.methods).getOrElse(Map.empty)
-  def fields = boundHead.map(_.fields).getOrElse(Map.empty)
+  def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = findField_helper(bounds, name, from, receiverIsThis)
+
+  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = bounds.foldRight(List.empty[JMethod]) { (bound, methods) =>
+    bound.findMethod(name, from, receiverIsThis) ++ methods
+  }
+
+  private def findField_helper (bounds: List[JRefType], name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = bounds match {
+    case bound :: rest => bound.findField(name, from, receiverIsThis) match {
+      case None => findField_helper(rest, name, from, receiverIsThis)
+      case r    => r
+    }
+    case Nil => None
+  }
 
   private lazy val boundHead = bounds.headOption.orElse(compiler.typeLoader.objectType)
 }
@@ -282,13 +312,12 @@ case class JCapturedWildcardType private (upperBound: JRefType, lowerBound: Opti
   override def name: String = "capture#" + id
 
   override def isSubtypeOf(that: JType): Boolean = upperBound.isSubtypeOf(that)
-  override def isAssignableTo(that: JType): Boolean = isSubtypeOf(that)
 
   override def matches(v: MetaArgument): Boolean = this == v
 
-  override def methods: Map[String, List[JMethod]] = upperBound.methods
+  def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = upperBound.findField(name, from, receiverIsThis)
 
-  override def fields: Map[String, JField] = upperBound.fields
+  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = upperBound.findMethod(name, from, receiverIsThis)
 
   def compiler = upperBound.compiler
 }
@@ -309,12 +338,21 @@ case class JUnboundTypeVariable (name: String, bounds: List[JRefType], compiler:
     case _: MetaValue => false
   }
 
-  def isAssignableTo (that: JType): Boolean = isSubtypeOf(that)
-
   def isSubtypeOf (that: JType): Boolean = bounds.exists(_.isSubtypeOf(that)) | compiler.typeLoader.objectType.contains(that)
 
-  def methods = boundHead.map(_.methods).getOrElse(Map.empty)
-  def fields = boundHead.map(_.fields).getOrElse(Map.empty)
+  def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = findField_helper(bounds, name, from, receiverIsThis)
+
+  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = bounds.foldRight(List.empty[JMethod]) { (bound, methods) =>
+    bound.findMethod(name, from, receiverIsThis) ++ methods
+  }
+
+  private def findField_helper (bounds: List[JRefType], name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = bounds match {
+    case bound :: rest => bound.findField(name, from, receiverIsThis) match {
+      case None => findField_helper(rest, name, from, receiverIsThis)
+      case r    => r
+    }
+    case Nil => None
+  }
 
   lazy val boundHead = bounds.headOption.orElse(compiler.typeLoader.objectType)
 }

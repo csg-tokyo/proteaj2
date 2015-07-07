@@ -33,6 +33,10 @@ case class IRCastExpression (destType: JType, expression: IRExpression) extends 
 
 case class IRArrayAccess (array: IRExpression, index: IRExpression) extends IRLeftHandSide
 
+sealed trait IRFieldAccess extends IRLeftHandSide
+
+case class IRInstanceFieldAccess (instance: IRExpression, field: JField) extends IRFieldAccess
+
 case class IRStaticMethodCall (method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression]) extends IRExpression
 
 case class IRVariableArguments (args: List[IRExpression]) extends IRExpression

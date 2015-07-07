@@ -138,7 +138,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     lazy val simpleAssignment: HParser[IRSimpleAssignmentExpression] = leftHandSide >> { left =>
       left.staticType match {
         case Some(t) => '=' ~> ExpressionParsers(t, env).expression ^^ { right => IRSimpleAssignmentExpression(left, right) }
-        case None    => failure("type of the left hand side expression cannot be known").^
+        case None    => failure("type error").^
       }
     }
 
@@ -162,6 +162,15 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val arrayAccess: HParser[IRArrayAccess] = primaryNoNewArray ~ ( '[' ~> intExpression <~ ']' ) ^^ {
       case array ~ index => IRArrayAccess(array, index)
+    }
+
+    lazy val fieldAccess: HParser[IRFieldAccess] = ???
+
+    lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primary >> { instance =>
+      instance.staticType match {
+        case Some(t) => ???
+        case None    => failure("type error").^
+      }
     }
 
     lazy val cast: HParser[IRCastExpression] = ( '(' ~> typeParsers.typeName <~ ')' ) ~ primary ^^ {
@@ -250,7 +259,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
 
-    private def defaultExpression (param: JParameter) = param.defaultArg.flatMap(eop.method.clazz.classModule.methods.get).flatMap(_.find(_.erasedParameterTypes == Nil)).map(IRStaticMethodCall(_, Map.empty, Nil))
+    private def defaultExpression (param: JParameter) = param.defaultArg.flatMap(eop.method.clazz.classModule.findMethod(_, env.clazz).find(_.erasedParameterTypes == Nil)).map(IRStaticMethodCall(_, Map.empty, Nil))
   }
 
   class LiteralOperatorParsers private (lop: LiteralOperator, env: Environment) {
@@ -314,7 +323,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
 
-    private def defaultExpression (param: JParameter) = param.defaultArg.flatMap(lop.method.clazz.classModule.methods.get).flatMap(_.find(_.erasedParameterTypes == Nil)).map(IRStaticMethodCall(_, Map.empty, Nil))
+    private def defaultExpression (param: JParameter) = param.defaultArg.flatMap(lop.method.clazz.classModule.findMethod(_, env.clazz).find(_.erasedParameterTypes == Nil)).map(IRStaticMethodCall(_, Map.empty, Nil))
   }
 
   class TypeParsers private (resolver: NameResolver) {

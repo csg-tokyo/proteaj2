@@ -37,10 +37,9 @@ class UnificationTest extends FunSuite with Matchers {
   test ("Map<String, String> m; Set<Map.Entry<String, String>> set = m.entrySet();") {
     val stringType = compiler.classLoader.loadClass("java/lang/String").get.objectType(Nil).get
     val ssMap = compiler.classLoader.loadClass("java/util/Map").get.objectType(List(stringType, stringType)).get
-    ssMap.methods.get("entrySet") shouldBe a [Some[_]]
-    ssMap.methods.get("entrySet").get should have size 1
+    ssMap.findMethod("entrySet", ssMap.erase, true) should have size 1
 
-    val entrySetMethod = ssMap.methods.get("entrySet").get.head
+    val entrySetMethod = ssMap.findMethod("entrySet", ssMap.erase, true).head
 
     val ssMapEntryType = compiler.classLoader.loadClass("java/util/Map$Entry").get.objectType(List(stringType, stringType)).get
     val setOfssMapEntryType = compiler.classLoader.loadClass("java/util/Set").get.objectType(List(ssMapEntryType)).get
@@ -53,10 +52,9 @@ class UnificationTest extends FunSuite with Matchers {
   test ("Stream<String> s; Stream<List<String>> list = s.map(...);") {
     val stringType = compiler.classLoader.loadClass("java/lang/String").get.objectType(Nil).get
     val sStream = compiler.classLoader.loadClass("java/util/stream/Stream").get.objectType(List(stringType)).get
-    sStream.methods.get("map") shouldBe a [Some[_]]
-    sStream.methods.get("map").get should have size 1
+    sStream.findMethod("map", sStream.erase, true) should have size 1
 
-    val mapMethod = sStream.methods.get("map").get.head
+    val mapMethod = sStream.findMethod("map", sStream.erase, true).head
 
     val stringListType = compiler.classLoader.loadClass("java/util/List").get.objectType(List(stringType)).get
     val sListStream = compiler.classLoader.loadClass("java/util/stream/Stream").get.objectType(List(stringListType)).get

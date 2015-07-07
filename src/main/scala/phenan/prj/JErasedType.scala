@@ -26,6 +26,8 @@ trait JClass extends JErasedType {
   def priorityConstraints: List[List[JPriority]]
   def withDSLs: List[JClassTypeSignature]
 
+  lazy val packageInternalName: String = internalName.substring(0, internalName.lastIndexOf('/'))
+
   lazy val priorities: Set[JPriority] = declaredPriorities ++ memberPriorities
 
   lazy val superClass: Option[JClass] = compiler.classLoader.erase_PE(signature.superClass)
