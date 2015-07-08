@@ -361,7 +361,7 @@ object DeclarationScanners extends Scanners {
 
   override def errorToken(msg: String): DToken = ErrorToken(msg)
 
-  def except(cs: Char*) = elem("", c => cs.forall(c != _) && c != EofCh)
+  def except(cs: Char*) = elem("", c => ! cs.contains(c) && c != EofCh)
 }
 
 object DeclarationPreprocessor extends Scanners {

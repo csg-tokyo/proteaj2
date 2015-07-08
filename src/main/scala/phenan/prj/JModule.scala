@@ -85,7 +85,7 @@ case class JClassModule (clazz: JClass) extends JModule {
   lazy val privateFields: Map[String, JField] = declaredFields.filter(_.isPrivate).map(f => f.name -> f).toMap
 
   lazy val declaredMethods: List[JMethod] = clazz.methods.filter(_.isStaticMethod).map { methodDef =>
-    new JMethod(methodDef, Map.empty, this, clazz)
+    new JMethod(methodDef, Map.empty, this)
   }
 
   lazy val methods: Map[String, List[JMethod]] = declaredMethods.filterNot(_.isPrivate).groupBy(_.name)
@@ -173,7 +173,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
   }
 
   lazy val declaredMethods: List[JMethod] = {
-    erase.methods.filter(_.isInstanceMethod).map { methodDef => new JMethod(methodDef, env, this, erase) }
+    erase.methods.filter(_.isInstanceMethod).map { methodDef => new JMethod(methodDef, env, this) }
   }
 
   lazy val privateFields: Map[String, JField] = declaredFields.filter(_.isPrivate).map(f => f.name -> f).toMap
