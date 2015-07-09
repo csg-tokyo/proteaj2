@@ -43,7 +43,13 @@ case class IRSuperFieldAccess (superType: JObjectType, field: JField) extends IR
 
 case class IRStaticFieldAccess (field: JField) extends IRFieldAccess
 
-case class IRStaticMethodCall (method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression]) extends IRExpression
+sealed trait IRMethodCall extends IRExpression
+
+case class IRInstanceMethodCall (instance: IRExpression, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
+
+case class IRSuperMethodCall (superType: JObjectType, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
+
+case class IRStaticMethodCall (metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 
 case class IRVariableArguments (args: List[IRExpression]) extends IRExpression
 

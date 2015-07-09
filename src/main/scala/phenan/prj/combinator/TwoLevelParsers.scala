@@ -88,6 +88,7 @@ trait TwoLevelParsers {
     def ^^? [R] (f: T => Option[R]): HParser[R] = mapOption(f)
     def ^^^ [R] (f: => R): HParser[R]
     def >> [R] (f: T => HParser[R]): HParser[R] = flatMap(f)
+    def >>? [R] (f: T => Option[HParser[R]]): HParser[R] = flatMap(f(_).getOrElse(HParser.failure("")))
 
     def log (s: String): HParser[T]
 

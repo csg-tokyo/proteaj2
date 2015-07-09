@@ -122,11 +122,17 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     lazy val hostLiteral: LParser[IRExpression] = JavaLiteralParsers.literal
 
     private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
-      env.expressionOperators(expected, p).map(ExpressionOperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
+      env.expressionOperators(expected, p).map(ExpressionOperatorParsers(_, env).operator).reduceOption(_ ||| _) match {
+        case Some(parser) => parser | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
+        case None         => env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
+      }
     }
 
     private val literal_cached: JPriority => LParser[IRExpression] = mutableHashMapMemo { p =>
-      env.literalOperators(expected, p).map(LiteralOperatorParsers(_, env).operator).reduce(_ ||| _) | env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
+      env.literalOperators(expected, p).map(LiteralOperatorParsers(_, env).operator).reduceOption(_ ||| _) match {
+        case Some(parser) => parser | env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
+        case None         => env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
+      }
     }
   }
 
@@ -158,19 +164,34 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       }
     }
 
-    lazy val primaryNoNewArray: HParser[IRExpression] = ???
+    lazy val primaryNoNewArray: HParser[IRExpression] = newExpression | methodCall | fieldAccess | arrayAccess | abbreviatedMethodCall | abbreviatedFieldAccess | classLiteral | variableRef | thisRef | parenthesized
 
-    lazy val newExpression: HParser[IRNewExpression] = ( "new" ~> typeParsers.metaArguments ) ~ typeParsers.objectType >> {
-      case metaArgs ~ constructType => constructType.findConstructor(env.clazz).flatMap(constructorCall(metaArgs, _)).reduce(_ | _)
+    lazy val newExpression: HParser[IRNewExpression] = ( "new" ~> typeParsers.metaArguments ) ~ typeParsers.objectType >>? {
+      case metaArgs ~ constructType => constructType.findConstructor(env.clazz).flatMap(constructorCall(metaArgs, _)).reduceOption(_ | _)
     }
 
-    def constructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRNewExpression]] = for {
-      bind     <- binding(constructor, metaArgs)
-      contexts <- env.inferContexts(constructor, bind)
-    } yield ArgumentParsers.arguments(constructor, bind, env) ^^ { IRNewExpression(bind, constructor, _, contexts) }
+    lazy val methodCall: HParser[IRMethodCall] = staticMethodCall | superMethodCall | instanceMethodCall
 
-    lazy val arrayAccess: HParser[IRArrayAccess] = primaryNoNewArray ~ ( '[' ~> intExpression <~ ']' ) ^^ {
-      case array ~ index => IRArrayAccess(array, index)
+    lazy val abbreviatedMethodCall: HParser[IRMethodCall] = thisClassMethodCall | thisMethodCall
+
+    lazy val instanceMethodCall: HParser[IRInstanceMethodCall] = primary ~ ( '.' ~> typeParsers.metaArguments ) ~ identifier >>? {
+      case instance ~ metaArgs ~ name => instance.staticType.flatMap { _.findMethod(name, env.clazz, isThisRef(instance)).flatMap(invokeVirtual(instance, metaArgs, _)).reduceOption(_ | _) }
+    }
+
+    lazy val superMethodCall: HParser[IRSuperMethodCall] = ( "super" ~> '.' ~> typeParsers.metaArguments ) ~ identifier >>? {
+      case metaArgs ~ name => env.thisType.flatMap(_.superType).flatMap { t => t.findMethod(name, env.clazz, true).flatMap(invokeSpecial(t, metaArgs, _)).reduceOption(_ | _) }
+    }
+
+    lazy val staticMethodCall: HParser[IRStaticMethodCall] = typeParsers.className ~ ( '.' ~> typeParsers.metaArguments ) ~ identifier >>? {
+      case clazz ~ metaArgs ~ name => clazz.classModule.findMethod(name, env.clazz).flatMap(invokeStatic(metaArgs, _)).reduceOption(_ | _)
+    }
+
+    lazy val thisMethodCall: HParser[IRInstanceMethodCall] = identifier >>? { name =>
+      env.thisType.flatMap { self => self.findMethod(name, env.clazz, true).map(invokeVirtual(IRThisRef(self), _)).reduceOption(_ | _) }
+    }
+
+    lazy val thisClassMethodCall: HParser[IRStaticMethodCall] = identifier >>? { name =>
+      env.clazz.classModule.findMethod(name, env.clazz).map(invokeStatic).reduceOption(_ | _)
     }
 
     lazy val fieldAccess: HParser[IRFieldAccess] = staticFieldAccess | superFieldAccess | instanceFieldAccess
@@ -178,7 +199,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     lazy val abbreviatedFieldAccess: HParser[IRFieldAccess] =  thisClassFieldAccess | thisFieldAccess  // | staticImported
 
     lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primary ~ ( '.' ~> identifier ) ^^? {
-      case instance ~ name => instance.staticType.flatMap { t => t.findField(name, env.clazz, isThisRef(instance)).map(IRInstanceFieldAccess(instance, _)) }
+      case instance ~ name => instance.staticType.flatMap { _.findField(name, env.clazz, isThisRef(instance)).map(IRInstanceFieldAccess(instance, _)) }
     }
 
     lazy val superFieldAccess: HParser[IRSuperFieldAccess] = "super" ~> '.' ~> identifier ^^? { name =>
@@ -195,6 +216,10 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val thisClassFieldAccess: HParser[IRStaticFieldAccess] = identifier ^^? { name =>
       env.clazz.classModule.findField(name, env.clazz).map(IRStaticFieldAccess)
+    }
+
+    lazy val arrayAccess: HParser[IRArrayAccess] = primaryNoNewArray ~ ( '[' ~> intExpression <~ ']' ) ^^ {
+      case array ~ index => IRArrayAccess(array, index)
     }
 
     lazy val cast: HParser[IRCastExpression] = ( '(' ~> typeParsers.typeName <~ ')' ) ~ primary ^^ {
@@ -222,6 +247,34 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     lazy val dimension = ( '[' ~> ']' ).* ^^ { _.length }
 
     lazy val dimension1 = ( '[' ~> ']' ).+ ^^ { _.length }
+
+    private def constructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRNewExpression]] = for {
+      bind     <- binding(constructor, metaArgs)
+      contexts <- env.inferContexts(constructor, bind)
+    } yield ArgumentParsers.arguments(constructor, bind, env) ^^ { IRNewExpression(bind, constructor, _, contexts) }
+
+    private def invokeVirtual (instance: IRExpression, method: JMethod): HParser[IRInstanceMethodCall] = ArgumentParsers.arguments(method, env) ^^? {
+      case (bind, args) => env.inferContexts(method, bind).map(IRInstanceMethodCall(instance, bind, method, args, _))
+    }
+
+    private def invokeVirtual (instance: IRExpression, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRInstanceMethodCall]] = for {
+      bind     <- binding(method, metaArgs)
+      contexts <- env.inferContexts(method, bind)
+    } yield ArgumentParsers.arguments(method, bind, env) ^^ { IRInstanceMethodCall(instance, bind, method, _, contexts) }
+
+    private def invokeSpecial (superType: JObjectType, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRSuperMethodCall]] = for {
+      bind     <- binding(method, metaArgs)
+      contexts <- env.inferContexts(method, bind)
+    } yield ArgumentParsers.arguments(method, bind, env) ^^ { IRSuperMethodCall(superType, bind, method, _, contexts) }
+
+    private def invokeStatic (method: JMethod): HParser[IRStaticMethodCall] = ArgumentParsers.arguments(method, env) ^^? {
+      case (bind, args) => env.inferContexts(method, bind).map(IRStaticMethodCall(bind, method, args, _))
+    }
+
+    private def invokeStatic (metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRStaticMethodCall]] = for {
+      bind     <- binding(method, metaArgs)
+      contexts <- env.inferContexts(method, bind)
+    } yield ArgumentParsers.arguments(method, bind, env) ^^ { IRStaticMethodCall(bind, method, _, contexts) }
 
     private val typeParsers = TypeParsers(env.resolver)
 
@@ -338,6 +391,17 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
   object ArgumentParsers {
 
+    def arguments (procedure: JProcedure, environment: Environment): HParser[(Map[String, MetaArgument], List[IRExpression])] = {
+      '(' ~> arguments_helper(procedure.parameterTypes, Map.empty, procedure, environment, Nil) <~ ')'
+    }
+
+    private def arguments_helper (parameters: List[JParameter], binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment, args: List[IRExpression]): HParser[(Map[String, MetaArgument], List[IRExpression])] = parameters match {
+      case Nil           => HParser.success((binding, args))
+      case param :: Nil  => expected(param, binding, procedure).map(ExpressionParsers(_, environment).expression.map(arg => (bind(param, arg, binding), args :+ arg))).getOrElse(HParser.failure("fail to parse argument"))
+      case param :: rest => expected(param, binding, procedure).map(ExpressionParsers(_, environment).expression >> { arg => ',' ~> arguments_helper(rest, bind(param, arg, binding), procedure, environment, args :+ arg) }).getOrElse(HParser.failure("fail to parse argument"))
+
+    }
+
     def arguments (procedure: JProcedure, binding: Map[String, MetaArgument], environment: Environment): HParser[List[IRExpression]] = {
       '(' ~> HParser.sequence(procedure.parameterTypes.map(argument(_, binding, environment)), ',') <~ ')'
     }
@@ -366,7 +430,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     def defaultArgument (param: JParameter, procedure: JProcedure, environment: Environment) = for {
       name   <- param.defaultArg
       method <- procedure.declaringClass.classModule.findMethod(name, environment.clazz).find(_.erasedParameterTypes == Nil)
-    } yield IRStaticMethodCall(method, Map.empty, Nil)
+    } yield IRStaticMethodCall(Map.empty, method, Nil, Nil)
 
     private def expected (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure): Option[JType] = {
       unbound(param.genericType.unbound(binding).toList, binding, procedure).flatMap(param.genericType.bind)
