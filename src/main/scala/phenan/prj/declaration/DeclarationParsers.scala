@@ -353,8 +353,8 @@ object DeclarationScanners extends Scanners {
   lazy val octalEscape2 = '\\' ~> ( octalDigit ~ octalDigit ) ^^ { case a ~ b => ((a << 3) + b).toChar }
   lazy val octalEscape3 = '\\' ~> ( quaternaryDigit ~ octalDigit ~ octalDigit ) ^^ { case a ~ b ~ c => ((a << 6) + (b << 3) + c).toChar }
 
-  lazy val quaternaryDigit = elem("hex digit", { ch => '0' <= ch && ch <= '3' }) ^^ { Character.digit(_, 4) }
-  lazy val octalDigit = elem("hex digit", { ch => '0' <= ch && ch <= '7' }) ^^ { Character.digit(_, 8) }
+  lazy val quaternaryDigit = elem("quaternary digit", { ch => '0' <= ch && ch <= '3' }) ^^ { Character.digit(_, 4) }
+  lazy val octalDigit = elem("octal digit", { ch => '0' <= ch && ch <= '7' }) ^^ { Character.digit(_, 8) }
 
   lazy val lineComment = '/' ~> '/' ~> except('\n').*
   lazy val blockComment = '/' ~> '*' ~> ( except('*') | '*' <~ not('/') ).* <~ '*' <~ '/'

@@ -59,6 +59,16 @@ case class IRObjectClassLiteral (clazz: JClass, dim: Int) extends IRClassLiteral
 
 case class IRPrimitiveClassLiteral (primitiveClass: JPrimitiveType, dim: Int) extends IRClassLiteral
 
+case class IRCharLiteral (value: Char) extends IRExpression
+
+case class IRIntLiteral (value: Int) extends IRExpression
+
+case class IRLongLiteral (value: Long) extends IRExpression
+
+case class IRBooleanLiteral (value: Boolean) extends IRExpression
+
+case class IRStringLiteral (value: String) extends IRExpression
+
 case class IRThisRef (thisType: JObjectType) extends IRExpression
 
 case class IRLocalVariableRef (localType: JType, name: String) extends IRLeftHandSide

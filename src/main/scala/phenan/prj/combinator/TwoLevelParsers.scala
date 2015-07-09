@@ -123,6 +123,7 @@ trait TwoLevelParsers {
     def ^? [R] (f: PartialFunction[T, R]): LParser[R]
     def ^^ [R] (f: T => R): LParser[R] = map(f)
     def ^^? [R] (f: T => Option[R]): LParser[R] = mapOption(f)
+    def ^^^ [R] (f: => R): LParser[R]
     def >> [R] (f: T => LParser[R]): LParser[R] = flatMap(f)
 
     def log (s: String): LParser[T]
@@ -202,6 +203,7 @@ trait TwoLevelParsers {
       def flatMap [R] (f: T => LParser[R]): LParser[R] = LParserImpl(parser.flatMap(f(_).parser))
 
       def ^? [R] (f: PartialFunction[T, R]): LParser[R] = LParserImpl(parser ^? f)
+      def ^^^ [R] (f: => R): LParser[R] = LParserImpl(parser ^^^ f)
 
       def log (s: String): LParser[T] = LParserImpl(Impl.log(parser)(s))
     }
