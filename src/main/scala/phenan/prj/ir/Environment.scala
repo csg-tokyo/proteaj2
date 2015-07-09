@@ -24,6 +24,8 @@ trait Environment {
   def localVariable (name: String): Option[IRLocalVariableRef] = locals.get(name)
 
   def defineLocal (localType: JType, name: String): Environment = new Environment_Local(localType, name, this)
+
+  def modifyContext (statement: IRStatement): Environment = new Environment_Context(statement.activates, statement.deactivates, this)
   def modifyContext (expression: IRExpression): Environment = new Environment_Context(expression.activates, expression.deactivates, this)
 
   def defineLocals (locals: IRLocalDeclaration): Environment = locals.declarators.foldLeft(this) { (e, d) =>

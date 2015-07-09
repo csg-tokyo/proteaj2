@@ -2,7 +2,10 @@ package phenan.prj.ir
 
 import phenan.prj.JType
 
-sealed trait IRStatement
+sealed trait IRStatement {
+  def activates: List[IRContextRef] = ???
+  def deactivates: List[IRContextRef] = ???
+}
 
 case class IRBlock (statements: List[IRStatement]) extends IRStatement
 

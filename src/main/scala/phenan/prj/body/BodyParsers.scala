@@ -23,19 +23,16 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   class StatementParsers private (returnType: JType, env: Environment) {
     lazy val block = '{' ~> blockStatements <~ '}' ^^ IRBlock
 
-    lazy val blockStatements: HParser[List[IRStatement]] = statement_BlockStatements | local_BlockStatements | expression_BlockStatements | HParser.success(Nil)
+    lazy val blockStatements: HParser[List[IRStatement]] = HParser.repeat0((List.empty[IRStatement], env)) {
+      case (statements, environment) => StatementParsers(returnType, environment).blockStatement ^^ {
+        case s @ IRLocalDeclarationStatement(local) => (statements :+ s, environment.defineLocals(local))
+        case s => (statements :+ s, environment.modifyContext(s))
+      }
+    } ^^ { _._1 }
 
-    private lazy val statement_BlockStatements = statement ~ blockStatements ^^ { case s ~ bs => s :: bs }
+    lazy val blockStatement: HParser[IRStatement] = localDeclarationStatement | statement
 
-    private lazy val local_BlockStatements = localDeclarationStatement >> { local =>
-      StatementParsers(returnType, env.defineLocals(local.declaration)).blockStatements ^^ { local :: _ }
-    }
-
-    private lazy val expression_BlockStatements = expressionStatement >> { es =>
-      StatementParsers(returnType, env.modifyContext(es.expression)).blockStatements ^^ { es :: _ }
-    }
-
-    lazy val statement: HParser[IRStatement] = block | controlStatement
+    lazy val statement: HParser[IRStatement] = block | controlStatement | expressionStatement
 
     lazy val controlStatement: HParser[IRStatement] = ifStatement | whileStatement | forStatement | returnStatement
 
