@@ -338,7 +338,16 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
   object ArgumentParsers {
 
-    def arguments (procedure: JProcedure, binding: Map[String, MetaArgument], environment: Environment): HParser[List[IRExpression]] = ???
+    def arguments (procedure: JProcedure, binding: Map[String, MetaArgument], environment: Environment): HParser[List[IRExpression]] = {
+      '(' ~> HParser.sequence(procedure.parameterTypes.map(argument(_, binding, environment)), ',') <~ ')'
+    }
+
+    def argument (param: JParameter, binding: Map[String, MetaArgument], environment: Environment): HParser[IRExpression] = {
+      param.genericType.bind(binding) match {
+        case Some(expected) => ExpressionParsers(expected, environment).expression
+        case None           => HParser.failure("invalid expected type")
+      }
+    }
 
     def expression (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[IRExpression] = {
       expected(param, binding, procedure).map(ExpressionParsers(_, environment).expression(priority(param, procedure, environment))).getOrElse {
