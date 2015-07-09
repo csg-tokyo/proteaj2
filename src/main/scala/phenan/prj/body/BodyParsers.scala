@@ -248,33 +248,35 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val dimension1 = ( '[' ~> ']' ).+ ^^ { _.length }
 
-    private def constructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRNewExpression]] = for {
-      bind     <- binding(constructor, metaArgs)
-      contexts <- env.inferContexts(constructor, bind)
-    } yield ArgumentParsers.arguments(constructor, bind, env) ^^ { IRNewExpression(bind, constructor, _, contexts) }
-
-    private def invokeVirtual (instance: IRExpression, method: JMethod): HParser[IRInstanceMethodCall] = ArgumentParsers.arguments(method, env) ^^? {
-      case (bind, args) => env.inferContexts(method, bind).map(IRInstanceMethodCall(instance, bind, method, args, _))
+    private def procedureCall [T] (procedure: JProcedure)(f: (Map[String, MetaArgument], List[IRExpression], List[IRContextRef]) => T): HParser[T] = {
+      ArgumentParsers.arguments(procedure, env) ^^? { case (bind, args) => env.inferContexts(procedure, bind).map(f(bind, args, _)) }
     }
 
-    private def invokeVirtual (instance: IRExpression, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRInstanceMethodCall]] = for {
-      bind     <- binding(method, metaArgs)
-      contexts <- env.inferContexts(method, bind)
-    } yield ArgumentParsers.arguments(method, bind, env) ^^ { IRInstanceMethodCall(instance, bind, method, _, contexts) }
-
-    private def invokeSpecial (superType: JObjectType, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRSuperMethodCall]] = for {
-      bind     <- binding(method, metaArgs)
-      contexts <- env.inferContexts(method, bind)
-    } yield ArgumentParsers.arguments(method, bind, env) ^^ { IRSuperMethodCall(superType, bind, method, _, contexts) }
-
-    private def invokeStatic (method: JMethod): HParser[IRStaticMethodCall] = ArgumentParsers.arguments(method, env) ^^? {
-      case (bind, args) => env.inferContexts(method, bind).map(IRStaticMethodCall(bind, method, args, _))
+    private def procedureCall [T] (procedure: JProcedure, metaArgs: List[MetaArgument])(f: (Map[String, MetaArgument], List[IRExpression], List[IRContextRef]) => T): Option[HParser[T]] = {
+      if (metaArgs.isEmpty) Some(procedureCall(procedure)(f))
+      else for {
+        bind     <- binding(procedure, metaArgs)
+        contexts <- env.inferContexts(procedure, bind)
+      } yield ArgumentParsers.arguments(procedure, bind, env) ^^ { f(bind, _, contexts) }
     }
 
-    private def invokeStatic (metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRStaticMethodCall]] = for {
-      bind     <- binding(method, metaArgs)
-      contexts <- env.inferContexts(method, bind)
-    } yield ArgumentParsers.arguments(method, bind, env) ^^ { IRStaticMethodCall(bind, method, _, contexts) }
+    private def constructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRNewExpression]] =
+      procedureCall(constructor, metaArgs) { IRNewExpression(_, constructor, _, _) }
+
+    private def invokeVirtual (instance: IRExpression, method: JMethod): HParser[IRInstanceMethodCall] =
+      procedureCall(method) { IRInstanceMethodCall(instance, _, method, _, _) }
+
+    private def invokeVirtual (instance: IRExpression, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRInstanceMethodCall]] =
+      procedureCall(method, metaArgs) { IRInstanceMethodCall(instance, _, method, _, _) }
+
+    private def invokeSpecial (superType: JObjectType, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRSuperMethodCall]] =
+      procedureCall(method, metaArgs) { IRSuperMethodCall(superType, _, method, _, _) }
+
+    private def invokeStatic (method: JMethod): HParser[IRStaticMethodCall] =
+      procedureCall(method) { IRStaticMethodCall(_, method, _, _) }
+
+    private def invokeStatic (metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRStaticMethodCall]] =
+      procedureCall(method, metaArgs) { IRStaticMethodCall(_, method, _, _) }
 
     private val typeParsers = TypeParsers(env.resolver)
 
