@@ -14,6 +14,8 @@ trait Environment {
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator]
   def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator]
 
+  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]]
+
   def resolver: NameResolver = fileEnvironment.file.resolver
 
   def highestPriority: Option[JPriority] = fileEnvironment.priorities.headOption
@@ -39,6 +41,7 @@ class Environment_Local (localType: JType, name: String, parent: Environment) ex
   def fileEnvironment = parent.fileEnvironment
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = parent.expressionOperators(expected, priority)
   def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = parent.literalOperators(expected, priority)
+  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = parent.inferContexts(procedure, bind)
 }
 
 class Environment_Context (activates: List[IRContextRef], deactivates: List[IRContextRef], parent: Environment) extends Environment {
@@ -50,6 +53,8 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
 
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = expressionOperators_cached(expected).getOrElse(priority, Nil)
   def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = literalOperators_cached(expected).getOrElse(priority, Nil)
+
+  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind, contexts).map(_._1)
 
   private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier)
 

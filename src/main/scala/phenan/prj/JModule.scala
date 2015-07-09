@@ -182,6 +182,12 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
   lazy val fields: Map[String, JField] = nonPrivateFieldList.map(f => f.name -> f).toMap
   lazy val methods: Map[String, List[JMethod]] = nonPrivateMethodList.groupBy(_.name).mapValues(filterOutOverriddenMethod)
 
+  def findConstructor (from: JClass): List[JConstructor] = {
+    if (erase == from) constructors
+    else if (erase.packageInternalName == from.packageInternalName) constructors.filter(! _.isPrivate)
+    else constructors.filter(_.isPublic)
+  }
+
   def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = {
     if (erase == from) privateFields.get(name).orElse(fields.get(name))
     else if (erase.packageInternalName == from.packageInternalName) fields.get(name)

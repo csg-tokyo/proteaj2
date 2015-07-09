@@ -160,6 +160,15 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val primaryNoNewArray: HParser[IRExpression] = ???
 
+    lazy val newExpression: HParser[IRNewExpression] = ( "new" ~> typeParsers.metaArguments ) ~ typeParsers.objectType >> {
+      case metaArgs ~ constructType => constructType.findConstructor(env.clazz).flatMap(constructorCall(metaArgs, _)).reduce(_ | _)
+    }
+
+    def constructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRNewExpression]] = for {
+      bind     <- binding(constructor, metaArgs)
+      contexts <- env.inferContexts(constructor, bind)
+    } yield ArgumentParsers.arguments(constructor, bind, env) ^^ { IRNewExpression(bind, constructor, _, contexts) }
+
     lazy val arrayAccess: HParser[IRArrayAccess] = primaryNoNewArray ~ ( '[' ~> intExpression <~ ']' ) ^^ {
       case array ~ index => IRArrayAccess(array, index)
     }
@@ -219,6 +228,12 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     private def thisObject = env.thisType.map(IRThisRef)
 
     private def isThisRef (e: IRExpression) = thisObject.contains(e)
+
+    private def binding (procedure: JProcedure, metaArgs: List[MetaArgument]): Option[Map[String, MetaArgument]] = {
+      val metaParams = procedure.methodDef.signature.metaParams
+      if (compiler.typeLoader.validTypeArgs(metaParams, metaArgs, procedure.env)) Some(metaParams.map(_.name).zip(metaArgs).toMap)
+      else None
+    }
   }
 
   object JavaLiteralParsers {
@@ -322,12 +337,8 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   object ArgumentParsers {
-    def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
 
-    def defaultArgument (param: JParameter, procedure: JProcedure, environment: Environment) = for {
-      name   <- param.defaultArg
-      method <- procedure.declaringClass.classModule.findMethod(name, environment.clazz).find(_.erasedParameterTypes == Nil)
-    } yield IRStaticMethodCall(method, Map.empty, Nil)
+    def arguments (procedure: JProcedure, binding: Map[String, MetaArgument], environment: Environment): HParser[List[IRExpression]] = ???
 
     def expression (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[IRExpression] = {
       expected(param, binding, procedure).map(ExpressionParsers(_, environment).expression(priority(param, procedure, environment))).getOrElse {
@@ -340,6 +351,13 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
         LParser.failure("fail to parse argument literal")
       }
     }
+
+    def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
+
+    def defaultArgument (param: JParameter, procedure: JProcedure, environment: Environment) = for {
+      name   <- param.defaultArg
+      method <- procedure.declaringClass.classModule.findMethod(name, environment.clazz).find(_.erasedParameterTypes == Nil)
+    } yield IRStaticMethodCall(method, Map.empty, Nil)
 
     private def expected (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure): Option[JType] = {
       unbound(param.genericType.unbound(binding).toList, binding, procedure).flatMap(param.genericType.bind)
@@ -365,12 +383,13 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   class TypeParsers private (resolver: NameResolver) {
+    lazy val metaArguments: HParser[List[MetaArgument]] = ( '<' ~> metaValue.+(',') <~ '>' ).? ^^ { _.getOrElse(Nil) }
     lazy val metaValue: HParser[MetaArgument] = wildcard | metaVariable | refType
     lazy val typeName: HParser[JType] = primitiveTypeName | refType
     lazy val componentType: HParser[JType] = primitiveTypeName | objectType
     lazy val refType: HParser[JRefType] = arrayType | typeVariable | objectType
-    lazy val objectType: HParser[JObjectType] = className ~ ( '<' ~> metaValue.+(',') <~ '>' ).? ^^? {
-      case clazz ~ args => clazz.objectType(args.getOrElse(Nil))
+    lazy val objectType: HParser[JObjectType] = className ~ metaArguments ^^? {
+      case clazz ~ args => clazz.objectType(args)
     }
     lazy val packageName: HParser[List[String]] = (identifier <~ '.').*! { names =>
       ! resolver.root.isKnownPackage(names) && resolver.resolve(names).isSuccess

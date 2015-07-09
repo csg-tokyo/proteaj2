@@ -4,7 +4,7 @@ import phenan.prj._
 import phenan.prj.typing._
 
 class MethodContextInferencer (unifier: Unifier) {
-  def inferContexts (method: JMethod, e: Map[String, MetaArgument], contexts: List[IRContextRef]): Option[(List[IRContextRef], Map[String, MetaArgument])] = inferContexts(method.requires, Nil, e, contexts)
+  def inferContexts (procedure: JProcedure, e: Map[String, MetaArgument], contexts: List[IRContextRef]): Option[(List[IRContextRef], Map[String, MetaArgument])] = inferContexts(procedure.requires, Nil, e, contexts)
 
   private def inferContexts (requires: List[JGenericType], cs: List[IRContextRef], e: Map[String, MetaArgument], contexts: List[IRContextRef]): Option[(List[IRContextRef], Map[String, MetaArgument])] = requires match {
     case req :: rest => findRequiredContext(req, contexts, e) match {
