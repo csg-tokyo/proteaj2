@@ -35,6 +35,29 @@ trait Environment {
   private lazy val nextPriorities: Map[JPriority, JPriority] = fileEnvironment.priorities.zip(fileEnvironment.priorities.tail).toMap
 }
 
+class Environment_Instance (val objectType: JObjectType, val fileEnvironment: FileEnvironment) extends Environment {
+  def clazz: JClass = objectType.erase
+  def thisType: Option[JObjectType] = Some(objectType)
+  def contexts: List[IRContextRef] = Nil
+  def locals: Map[String, IRLocalVariableRef] = Map.empty
+  def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = fileEnvironment.expressionOperators(expected, priority)
+  def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = fileEnvironment.literalOperators(expected, priority)
+  def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
+
+  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier, Nil)
+}
+
+class Environment_Static (val clazz: JClass, val fileEnvironment: FileEnvironment) extends Environment {
+  def thisType: Option[JObjectType] = None
+  def contexts: List[IRContextRef] = Nil
+  def locals: Map[String, IRLocalVariableRef] = Map.empty
+  def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = fileEnvironment.expressionOperators(expected, priority)
+  def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = fileEnvironment.literalOperators(expected, priority)
+  def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
+
+  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier, Nil)
+}
+
 class Environment_Local (localType: JType, name: String, parent: Environment) extends Environment {
   def clazz = parent.clazz
   def thisType = parent.thisType
@@ -56,18 +79,18 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = expressionOperators_cached(expected).getOrElse(priority, Nil)
   def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = literalOperators_cached(expected).getOrElse(priority, Nil)
 
-  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind, contexts).map(_._1)
+  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
 
-  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier)
+  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier, contexts)
 
   private val expressionOperators_cached: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
     val fromDSL = fileEnvironment.dslExpressionOperators(t).flatMap {
-      case (s, m, e) => inferencer.inferContexts(m, e, contexts).map {
+      case (s, m, e) => inferencer.inferContexts(m, e).map {
         case (cs, e2) => ExpressionOperator(s, e2, m, { (ma, args) => IRDSLOperation(m, ma, args, cs) })
       }
     }
     val fromContexts = contexts.flatMap(c => collectOperators(c, t, c.contextType.expressionOperators)).flatMap {
-      case (c, s, m, e) => inferencer.inferContexts(m, e, contexts).map {
+      case (c, s, m, e) => inferencer.inferContexts(m, e).map {
         case (cs, e2) => ExpressionOperator(s, e2, m, { (ma, args) => IRContextOperation(c, m, ma, args, cs) })
       }
     }
@@ -76,12 +99,12 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
 
   private val literalOperators_cached: JType => Map[JPriority, List[LiteralOperator]] = mutableHashMapMemo { t =>
     val fromDSL = fileEnvironment.dslLiteralOperators(t).flatMap {
-      case (s, m, e) => inferencer.inferContexts(m, e, contexts).map {
+      case (s, m, e) => inferencer.inferContexts(m, e).map {
         case (cs, e2) => LiteralOperator(s, e2, m, { (ma, args) => IRDSLOperation(m, ma, args, cs) })
       }
     }
     val fromContexts = contexts.flatMap(c => collectOperators(c, t, c.contextType.literalOperators)).flatMap {
-      case (c, s, m, e) => inferencer.inferContexts(m, e, contexts).map {
+      case (c, s, m, e) => inferencer.inferContexts(m, e).map {
         case (cs, e2) => LiteralOperator(s, e2, m, { (ma, args) => IRContextOperation(c, m, ma, args, cs) })
       }
     }

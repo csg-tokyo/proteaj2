@@ -7,6 +7,9 @@ import scala.util._
 import scalaz.Memo._
 
 case class FileEnvironment (file: IRFile) {
+  def instanceEnvironment (objectType: JObjectType): Environment = new Environment_Instance(objectType, this)
+  def staticEnvironment (clazz: JClass): Environment = new Environment_Static(clazz, this)
+
   lazy val dsls: List[JClassModule] = collectDSLs(file.importedDSLNames, Nil)
   lazy val userConstraints: List[List[JPriority]] = file.userConstraints.map(resolver.constraint)
   lazy val priorities: List[JPriority] = sortPriorities(collectPriorities(dsls, Set.empty), dsls.flatMap(_.constraints) ++ userConstraints)
@@ -22,11 +25,11 @@ case class FileEnvironment (file: IRFile) {
   private lazy val allExpressionOperators = dsls.flatMap(_.expressionOperators)
   private lazy val allLiteralOperators = dsls.flatMap(_.literalOperators)
 
-  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier)
+  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier, Nil)
 
   private val expressionOperators_cached: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
     dslExpressionOperators(t).flatMap {
-      case (s, m, e) => inferencer.inferContexts(m, e, Nil).map {
+      case (s, m, e) => inferencer.inferContexts(m, e).map {
         case (cs, e2) => ExpressionOperator(s, e2, m, { (ma, args) => IRDSLOperation(m, ma, args, cs) })
       }
     }.groupBy(_.syntax.priority)
@@ -34,7 +37,7 @@ case class FileEnvironment (file: IRFile) {
 
   private val literalOperators_cached: JType => Map[JPriority, List[LiteralOperator]] = mutableHashMapMemo { t =>
     dslLiteralOperators(t).flatMap {
-      case (s, m, e) => inferencer.inferContexts(m, e, Nil).map {
+      case (s, m, e) => inferencer.inferContexts(m, e).map {
         case (cs, e2) => LiteralOperator(s, e2, m, { (ma, args) => IRDSLOperation(m, ma, args, cs) })
       }
     }.groupBy(_.syntax.priority)
