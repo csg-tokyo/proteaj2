@@ -3,8 +3,8 @@ package phenan.prj.ir
 import phenan.prj.JType
 
 sealed trait IRStatement {
-  def activates: List[IRContextRef] = ???
-  def deactivates: List[IRContextRef] = ???
+  def activates: List[IRContextRef] = Nil
+  def deactivates: List[IRContextRef] = Nil
 }
 
 case class IRBlock (statements: List[IRStatement]) extends IRStatement
@@ -27,4 +27,7 @@ case class IREnhancedForStatement (elementType: JType, name: String, dim: Int, i
 
 case class IRReturnStatement (expression: IRExpression) extends IRStatement
 
-case class IRExpressionStatement (expression: IRExpression) extends IRStatement
+case class IRExpressionStatement (expression: IRExpression) extends IRStatement {
+  override def activates: List[IRContextRef] = expression.activates
+  override def deactivates: List[IRContextRef] = expression.deactivates
+}
