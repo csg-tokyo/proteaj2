@@ -299,9 +299,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case _ => LParser.failure("")
     }
 
-    lazy val intLiteral: LParser[IRIntLiteral] = integerLiteral ^? { case n if Int.MinValue <= n && n <= Int.MaxValue => IRIntLiteral(n.toInt) }
+    lazy val intLiteral: LParser[IRIntLiteral] = integerLiteral ^? { case n if Int.MinValue <= n && n <= Int.MaxValue => IRIntLiteral(n.toInt, compiler) }
 
-    lazy val longLiteral: LParser[IRLongLiteral] = integerLiteral <~ ( elem('l') | elem('L') ) ^^ IRLongLiteral
+    lazy val longLiteral: LParser[IRLongLiteral] = integerLiteral <~ ( elem('l') | elem('L') ) ^^ { value => IRLongLiteral(value, compiler) }
 
     lazy val integerLiteral: LParser[Long] = decimalLiteral | hexLiteral | binaryLiteral | octalLiteral | zeroLiteral
 
@@ -317,11 +317,11 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val zeroLiteral: LParser[Long] = zero ^^^ 0L
 
-    lazy val charLiteral: LParser[IRCharLiteral] = quote ~> (escapeSequence | except('\'')) <~ quote ^^ IRCharLiteral
+    lazy val charLiteral: LParser[IRCharLiteral] = quote ~> (escapeSequence | except('\'')) <~ quote ^^ { value => IRCharLiteral(value, compiler) }
 
-    lazy val booleanLiteral: LParser[IRBooleanLiteral] = word("true") ^^^ IRBooleanLiteral(true) | word("false") ^^^ IRBooleanLiteral(false)
+    lazy val booleanLiteral: LParser[IRBooleanLiteral] = word("true") ^^^ IRBooleanLiteral(true, compiler) | word("false") ^^^ IRBooleanLiteral(false, compiler)
 
-    lazy val stringLiteral: LParser[IRStringLiteral] = dq ~> (escapeSequence | except('\"')).* <~ dq ^^ { cs => IRStringLiteral(cs.mkString) }
+    lazy val stringLiteral: LParser[IRStringLiteral] = dq ~> (escapeSequence | except('\"')).* <~ dq ^^ { cs => IRStringLiteral(cs.mkString, compiler) }
 
     lazy val escapeSequence = octalEscape | escape('b', '\b') | escape('f', '\f') | escape('n', '\n') | escape('r', '\r') | escape('t', '\t') | escape('\'', '\'') | escape('\"', '\"') | escape('\\', '\\')
 
@@ -362,10 +362,10 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
         constructParser(rest, bind(param, arg, binding), environment.modifyContext(arg), arg :: operands)
       }
       case JRepetition0(param) :: rest       => rep0(param, binding, environment) >> {
-        case (bnd, e, args) => constructParser(rest, bnd, e, IRVariableArguments(args) :: operands)
+        case (bnd, e, args) => constructParser(rest, bnd, e, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
       case JRepetition1(param) :: rest       => rep1(param, binding, environment) >> {
-        case (bnd, e, args) => constructParser(rest, bnd, e, IRVariableArguments(args) :: operands)
+        case (bnd, e, args) => constructParser(rest, bnd, e, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
       case JMetaOperand(name, param) :: rest => expression(param, binding, eop.method, environment) >> {
         ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), environment, operands)
@@ -411,10 +411,10 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
         constructParser(rest, bind(param, arg, binding), environment.modifyContext(arg), arg :: operands)
       }
       case JRepetition0(param) :: rest       => rep0(param, binding, environment) >> {
-        case (bnd, e, args) => constructParser(rest, bnd, e, IRVariableArguments(args) :: operands)
+        case (bnd, e, args) => constructParser(rest, bnd, e, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
       case JRepetition1(param) :: rest       => rep1(param, binding, environment) >> {
-        case (bnd, e, args) => constructParser(rest, bnd, e, IRVariableArguments(args) :: operands)
+        case (bnd, e, args) => constructParser(rest, bnd, e, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
       case JMetaOperand(name, param) :: rest => literal(param, binding, lop.method, environment) >> {
         ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), environment, operands)
