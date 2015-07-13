@@ -121,7 +121,17 @@ trait IRModule extends JClass with IRMember {
 
   lazy val dslInfo = file.annotationReader.dsl(annotations)
 
+  lazy val thisType: Option[JObjectType] = metaParametersRef(signature.metaParams, Nil).flatMap(objectType)
+
   def compiler: JCompiler = file.compiler
+
+  private def metaParametersRef (mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
+    case mp :: rest => resolver.environment.get(mp.name) match {
+      case Some(arg) => metaParametersRef(rest, arg :: ref)
+      case None      => None
+    }
+    case Nil => Some(ref.reverse)
+  }
 
   private def constructResolver (metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JClassSignature, NameResolver) = metaParametersAST match {
     case param :: rest => resolver.metaParameter(param) match {
@@ -430,16 +440,41 @@ trait IRProcedure extends JMethodDef with IRMember {
 
   lazy val annotations = annReader.read(modifiersAST.collect { case ann: Annotation => ann })
 
-  lazy val (signature: JMethodSignature, paramInitializers: List[IRParameterInitializer], resolver: NameResolver) = annReader.methodSignature(annotations) match {
-    case Some(sig) => (sig, Nil, sig.metaParams.foldLeft(declaringClass.resolver){ _.withMetaParameter(_) })
+  lazy val (signature: JMethodSignature, parameters: List[IRFormalParameter], resolver: NameResolver) = annReader.methodSignature(annotations) match {
+    case Some(sig) => fromSignature(sig, declaringClass.resolver)
     case None      => constructResolver(metaParametersAST, Nil, declaringClass.resolver)
   }
 
   lazy val syntax = annReader.operator(annotations)
 
+  def paramInitializers = parameters.flatMap(_.initializerMethod)
+
+  def parameterVariables: Option[List[IRLocalVariableRef]] = metaParametersRef(signature.metaParams, Nil).map(args => signature.metaParams.map(_.name).zip(args).toMap).flatMap(bind => parametersRef(parameters, Nil, bind))
+
+  private def parametersRef (params: List[IRFormalParameter], ref: List[IRLocalVariableRef], bind: Map[String, MetaArgument]): Option[List[IRLocalVariableRef]] = params match {
+    case param :: rest => param.actualTypeSignature.flatMap(compiler.typeLoader.fromTypeSignature(_, bind)) match {
+      case Some(t) => parametersRef(rest, IRLocalVariableRef(t, param.name) :: ref, bind)
+      case None    => None
+    }
+    case Nil => Some(ref.reverse)
+  }
+
+  private def metaParametersRef (mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
+    case mp :: rest => resolver.environment.get(mp.name) match {
+      case Some(arg) => metaParametersRef(rest, arg :: ref)
+      case None      => None
+    }
+    case Nil => Some(ref.reverse)
+  }
+
   private def annReader = declaringClass.file.annotationReader
 
-  private def constructResolver (metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JMethodSignature, List[IRParameterInitializer], NameResolver) = metaParametersAST match {
+  private def fromSignature (sig: JMethodSignature, resolver: NameResolver): (JMethodSignature, List[IRFormalParameter], NameResolver) = {
+    val r = sig.metaParams.foldLeft(resolver) { _.withMetaParameter(_) }
+    (sig, formalParametersAST.map(new IRFormalParameter(_, r, this)), r)
+  }
+
+  private def constructResolver (metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JMethodSignature, List[IRFormalParameter], NameResolver) = metaParametersAST match {
     case param :: rest => resolver.metaParameter(param) match {
       case Success(fmp) => constructResolver(rest, fmp :: metaParams, resolver.withMetaParameter(fmp))
       case Failure(e)   =>
@@ -448,7 +483,7 @@ trait IRProcedure extends JMethodDef with IRMember {
     }
     case Nil =>
       val formalParameters = formalParametersAST.map(param => new IRFormalParameter(param, resolver, this))
-      (constructSignature(metaParams.reverse, formalParameters, resolver), formalParameters.flatMap(_.initializerMethod), resolver)
+      (constructSignature(metaParams.reverse, formalParameters, resolver), formalParameters, resolver)
   }
 
   private def constructSignature (metaParams: List[FormalMetaParameter], formalParameters: List[IRFormalParameter], resolver: NameResolver): JMethodSignature = {
@@ -489,7 +524,9 @@ trait IRProcedure extends JMethodDef with IRMember {
 
 class IRFormalParameter (ast: FormalParameter, resolver: NameResolver, method: IRProcedure) {
   private lazy val initializer = ast.initializer.map(snippet => (method.name + "$init$" + method.state.uniqueId, snippet))
+  def name = ast.name
   lazy val signature = resolver.parameterSignature(ast, initializer.map(_._1))
+  def actualTypeSignature = signature.map(_.actualTypeSignature).toOption
   lazy val initializerMethod = for {
     returnType <- signature.map(_.actualTypeSignature).toOption
     (name, snippet) <- initializer

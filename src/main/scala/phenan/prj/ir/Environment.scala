@@ -5,7 +5,7 @@ import phenan.prj._
 import scalaz.Memo._
 
 trait Environment {
-  def clazz: JClass
+  def clazz: IRModule
   def thisType: Option[JObjectType]
   def contexts: List[IRContextRef]
   def locals: Map[String, IRLocalVariableRef]
@@ -16,7 +16,7 @@ trait Environment {
 
   def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]]
 
-  def resolver: NameResolver = fileEnvironment.file.resolver
+  def resolver: NameResolver = clazz.resolver
 
   def highestPriority: Option[JPriority] = fileEnvironment.priorities.headOption
   def nextPriority (priority: JPriority): Option[JPriority] = nextPriorities.get(priority)
@@ -35,27 +35,44 @@ trait Environment {
   private lazy val nextPriorities: Map[JPriority, JPriority] = fileEnvironment.priorities.zip(fileEnvironment.priorities.tail).toMap
 }
 
-class Environment_Instance (val objectType: JObjectType, val fileEnvironment: FileEnvironment) extends Environment {
-  def clazz: JClass = objectType.erase
-  def thisType: Option[JObjectType] = Some(objectType)
+sealed trait InitialEnvironment extends Environment {
   def contexts: List[IRContextRef] = Nil
-  def locals: Map[String, IRLocalVariableRef] = Map.empty
   def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = fileEnvironment.expressionOperators(expected, priority)
   def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = fileEnvironment.literalOperators(expected, priority)
   def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
-
-  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier, Nil)
+  private val inferencer = new MethodContextInferencer(clazz.compiler.unifier, Nil)
 }
 
-class Environment_Static (val clazz: JClass, val fileEnvironment: FileEnvironment) extends Environment {
-  def thisType: Option[JObjectType] = None
-  def contexts: List[IRContextRef] = Nil
+class Environment_InstanceField (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends InitialEnvironment {
+  def thisType: Option[JObjectType] = clazz.thisType
   def locals: Map[String, IRLocalVariableRef] = Map.empty
-  def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = fileEnvironment.expressionOperators(expected, priority)
-  def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = fileEnvironment.literalOperators(expected, priority)
-  def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
+}
 
-  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier, Nil)
+class Environment_StaticField (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends InitialEnvironment {
+  def thisType: Option[JObjectType] = None
+  def locals: Map[String, IRLocalVariableRef] = Map.empty
+}
+
+class Environment_InstanceMethod (val method: IRProcedure, val fileEnvironment: FileEnvironment) extends InitialEnvironment {
+  def clazz: IRModule = method.declaringClass
+  def thisType: Option[JObjectType] = clazz.thisType
+  def locals: Map[String, IRLocalVariableRef] = method.parameterVariables match {
+    case Some(vs) => vs.map(v => v.name -> v).toMap
+    case None     =>
+      clazz.compiler.state.error("invalid local variables")
+      Map.empty
+  }
+}
+
+class Environment_StaticMethod (val method: IRProcedure, val fileEnvironment: FileEnvironment) extends InitialEnvironment {
+  def clazz: IRModule = method.declaringClass
+  def thisType: Option[JObjectType] = None
+  def locals: Map[String, IRLocalVariableRef] = method.parameterVariables match {
+    case Some(vs) => vs.map(v => v.name -> v).toMap
+    case None     =>
+      clazz.compiler.state.error("invalid local variables")
+      Map.empty
+  }
 }
 
 class Environment_Local (localType: JType, name: String, parent: Environment) extends Environment {

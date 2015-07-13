@@ -1,5 +1,7 @@
 package phenan.prj.generator
 
-class CodeGenerator {
+import phenan.prj._
+
+class CodeGenerator (compiler: JCompiler) {
 
 }

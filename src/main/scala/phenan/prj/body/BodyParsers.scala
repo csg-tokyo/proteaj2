@@ -115,7 +115,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val parenthesized: HParser[IRExpression] = '(' ~> expression <~ ')'
 
-    lazy val hostExpression: HParser[IRExpression] = JavaExpressionParsers(env).expression | parenthesized | hostLiteral.^
+    lazy val hostExpression: HParser[IRExpression] = javaExpression | parenthesized | hostLiteral.^
+
+    lazy val javaExpression = JavaExpressionParsers(env).expression ^? { case e if e.staticType.exists(_ <:< expected) => e }
 
     lazy val hostLiteral: LParser[IRExpression] = JavaLiteralParsers.literal(expected)
 
@@ -146,7 +148,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       }
     }
 
-    lazy val leftHandSide: HParser[IRLeftHandSide] = fieldAccess | arrayAccess | abbreviatedFieldAccess | variableRef
+    lazy val leftHandSide: HParser[IRLeftHandSide] = primary ^? { case e: IRLeftHandSide => e }
 
     lazy val primary: HParser[IRExpression] = arrayCreation | primaryNoNewArray
 

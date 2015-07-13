@@ -4,6 +4,7 @@ import java.io._
 
 import phenan.prj.body.BodyCompiler
 import phenan.prj.declaration.DeclarationCompiler
+import phenan.prj.generator.CodeGenerator
 import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state.JState
@@ -13,7 +14,7 @@ class JCompiler (implicit val state: JState) {
 
   def compile (files: List[String]): Unit = {
     generateIR(files)
-    generateClassFile()
+    if (state.errors == 0) generateClassFile()
   }
 
   def generateIR (files: List[String]): Unit = {
@@ -52,6 +53,7 @@ class JCompiler (implicit val state: JState) {
   val typeLoader: JTypeLoader = new JTypeLoader(this)
   val declarationCompiler = new DeclarationCompiler(this)
   val bodyCompiler = new BodyCompiler(this)
+  val generator = new CodeGenerator(this)
 
   private var modules: Map[String, IRModule] = Map.empty
   private var compiled: Map[String, IRModule] = Map.empty

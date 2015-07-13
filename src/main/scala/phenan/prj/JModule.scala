@@ -62,6 +62,16 @@ case class JGenericType (signature: JTypeSignature, env: Map[String, MetaArgumen
 
 sealed trait JModule {
   def compiler: JCompiler
+
+  protected def sortMethods (methods: List[JMethod]): List[JMethod] = methods.sortWith { (m1, m2) =>
+    m1.erasedParameterTypes.size > m2.erasedParameterTypes.size ||
+      ( m1.erasedParameterTypes.size == m2.erasedParameterTypes.size && compareMethodParams(m1.erasedParameterTypes.zip(m2.erasedParameterTypes)) )
+  }
+
+  private def compareMethodParams (params: List[(JErasedType, JErasedType)]): Boolean = params match {
+    case (p1, p2) :: rest => p1.isSubclassOf(p2) || compareMethodParams(rest)
+    case Nil => false
+  }
 }
 
 case class JClassModule (clazz: JClass) extends JModule {
@@ -71,7 +81,7 @@ case class JClassModule (clazz: JClass) extends JModule {
     else fields.get(name).filter(_.isPublic)
   }
 
-  def findMethod (name: String, from: JClass): List[JMethod] = {
+  def findMethod (name: String, from: JClass): List[JMethod] = sortMethods {
     if (clazz == from) privateMethods.getOrElse(name, Nil) ++ methods.getOrElse(name, Nil)
     else if (clazz.packageInternalName == from.packageInternalName) methods.getOrElse(name, Nil)
     else methods.getOrElse(name, Nil).filter(_.isPublic)
@@ -195,7 +205,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
     else fields.get(name).filter(_.isPublic)
   }
 
-  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = {
+  def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = sortMethods {
     if (erase == from) privateMethods.getOrElse(name, Nil) ++ methods.getOrElse(name, Nil)
     else if (erase.packageInternalName == from.packageInternalName) methods.getOrElse(name, Nil)
     else if (from.isSubclassOf(erase) && receiverIsThis) methods.getOrElse(name, Nil).filter(m => m.isProtected || m.isPublic)
