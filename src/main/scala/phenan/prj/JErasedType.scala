@@ -34,7 +34,7 @@ trait JClass extends JErasedType {
   lazy val interfaces: List[JClass] = signature.interfaces.flatMap(compiler.classLoader.erase_PE)
 
   def isSubclassOf (that: JErasedType): Boolean = {
-    this == that || superClass.exists(_.isSubclassOf(that)) || interfaces.exists(_.isSubclassOf(that))
+    this == that || superClass.exists(sup => sup != this && sup.isSubclassOf(that)) || interfaces.exists(_.isSubclassOf(that))
   }
 
   def classModule: JClassModule = JClassModule(this)

@@ -9,7 +9,7 @@ trait JMember {
   def isPublic: Boolean = modifier.check(JModifier.accPublic)
 }
 
-class JField (fieldDef: JFieldDef, val fieldType: JType, val declaring: JModule) extends JMember {
+case class JField (fieldDef: JFieldDef, fieldType: JType, declaring: JModule) extends JMember {
   def modifier: JModifier = fieldDef.mod
   def name: String = fieldDef.name
 }

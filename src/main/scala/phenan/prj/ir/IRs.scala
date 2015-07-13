@@ -31,6 +31,8 @@ case class IRFile (ast: CompilationUnit, root: RootResolver) {
 
   def userConstraints = ast.header.imports.collect { case ImportDSLsDeclaration(_, cs) => cs }.flatten
 
+  lazy val environment = FileEnvironment(this)
+
   lazy val resolver = root.file(this)
   def compiler = root.compiler
   def state = compiler.state
