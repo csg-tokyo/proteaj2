@@ -9,3 +9,5 @@ case class InvalidClassFileException (msg: String) extends Exception(msg)
 case class InvalidTypeException (msg: String) extends Exception(msg)
 
 case class ParseException (msg: String) extends Exception(msg)
+
+case class InvalidASTException (msg: String) extends Exception(msg)

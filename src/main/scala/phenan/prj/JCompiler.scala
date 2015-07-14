@@ -4,7 +4,7 @@ import java.io._
 
 import phenan.prj.body.BodyCompiler
 import phenan.prj.declaration.DeclarationCompiler
-import phenan.prj.generator.CodeGenerator
+import phenan.prj.generator.JavaCodeGenerators
 import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state.JState
@@ -53,7 +53,7 @@ class JCompiler (implicit val state: JState) {
   val typeLoader: JTypeLoader = new JTypeLoader(this)
   val declarationCompiler = new DeclarationCompiler(this)
   val bodyCompiler = new BodyCompiler(this)
-  val generator = new CodeGenerator(this)
+  val generator = new JavaCodeGenerators(this)
 
   private var modules: Map[String, IRModule] = Map.empty
   private var compiled: Map[String, IRModule] = Map.empty

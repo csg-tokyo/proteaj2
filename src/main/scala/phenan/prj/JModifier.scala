@@ -1,7 +1,7 @@
 package phenan.prj
 
 case class JModifier (flags: Int) extends AnyVal {
-  override def toString: String = toFlagList(1, Nil).map(JModifier.toString).mkString(" ")
+  override def toString: String = toFlagList(1, Nil).map(JModifier.toString).filterNot(_ == "").mkString(" ")
 
   def | (flag: Int): JModifier = JModifier(flags | flag)
 
@@ -47,12 +47,8 @@ object JModifier {
     case 0x0040 => "volatile"
     case 0x0080 => "transient"
     case 0x0100 => "native"
-    case 0x0200 => "interface"
     case 0x0400 => "abstract"
     case 0x0800 => "strictfp"
-    case 0x1000 => "synthetic"
-    case 0x2000 => "annotation"
-    case 0x4000 => "enum"
-    case _ => "unknown-modifier"
+    case _ => ""
   }
 }
