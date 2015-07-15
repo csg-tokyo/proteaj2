@@ -27,6 +27,7 @@ trait Environment {
 
   def modifyContext (statement: IRStatement): Environment = new Environment_Context(statement.activates, statement.deactivates, this)
   def modifyContext (expression: IRExpression): Environment = new Environment_Context(expression.activates, expression.deactivates, this)
+  def withContexts (contexts: List[IRContextRef]): Environment = new Environment_Context(contexts, Nil, this)
 
   def defineLocals (locals: IRLocalDeclaration): Environment = locals.declarators.foldLeft(this) { (e, d) =>
     e.defineLocal(locals.localType.array(d.dim), d.name)

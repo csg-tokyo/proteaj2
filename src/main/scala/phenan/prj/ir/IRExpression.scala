@@ -22,11 +22,11 @@ case class IRSimpleAssignmentExpression (left: IRLeftHandSide, right: IRExpressi
 
 case class IRNewExpression (metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExpression {
   def staticType = Some(constructor.declaring)
-  lazy val activates: List[IRContextRef] = constructor.activates.flatMap(_.bind(metaArgs)).collect {
-    case obj: JObjectType => IRContextRef(obj)
+  lazy val activates: List[IRContextRef] = IRContextRef.createRefs(constructor.activates, metaArgs).getOrElse {
+    constructor.compiler.state.errorAndReturn("invalid context type", Nil)
   }
-  lazy val deactivates: List[IRContextRef] = constructor.deactivates.flatMap(_.bind(metaArgs)).collect {
-    case obj: JObjectType => IRContextRef(obj)
+  lazy val deactivates: List[IRContextRef] = IRContextRef.createRefs(constructor.deactivates, metaArgs).getOrElse {
+    constructor.compiler.state.errorAndReturn("invalid context type", Nil)
   }
 }
 
@@ -76,11 +76,11 @@ sealed trait IRMethodCall extends IRExpression {
   def metaArgs: Map[String, MetaArgument]
   def method: JMethod
   lazy val staticType: Option[JType] = method.returnType.bind(metaArgs)
-  lazy val activates: List[IRContextRef] = method.activates.flatMap(_.bind(metaArgs)).collect {
-    case obj: JObjectType => IRContextRef(obj)
+  lazy val activates: List[IRContextRef] = IRContextRef.createRefs(method.activates, metaArgs).getOrElse {
+    method.compiler.state.errorAndReturn("invalid context type", Nil)
   }
-  lazy val deactivates: List[IRContextRef] = method.deactivates.flatMap(_.bind(metaArgs)).collect {
-    case obj: JObjectType => IRContextRef(obj)
+  lazy val deactivates: List[IRContextRef] = IRContextRef.createRefs(method.deactivates, metaArgs).getOrElse {
+    method.compiler.state.errorAndReturn("invalid context type", Nil)
   }
 }
 
@@ -150,6 +150,22 @@ case class IRContextRef (contextType: JObjectType) extends IRExpression {
   def staticType = Some(contextType)
   def activates: List[IRContextRef] = Nil
   def deactivates: List[IRContextRef] = Nil
+}
+
+object IRContextRef {
+  def createRefs (gts: List[JGenericType], bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = createRefs(gts, bind, Nil)
+
+  private def createRefs (gts: List[JGenericType], bind: Map[String, MetaArgument], refs: List[IRContextRef]): Option[List[IRContextRef]] = gts match {
+    case gt :: rest => createRef(gt, bind) match {
+      case Some(ref) => createRefs(rest, bind, ref :: refs)
+      case None      => None
+    }
+    case Nil => Some(refs.reverse)
+  }
+
+  def createRef (gt: JGenericType, bind: Map[String, MetaArgument]): Option[IRContextRef] = {
+    gt.bind(bind).collect { case obj: JObjectType => IRContextRef(obj) }
+  }
 }
 
 
