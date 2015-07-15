@@ -104,7 +104,7 @@ sealed trait IRJavaLiteral extends IRExpression {
   def deactivates: List[IRContextRef] = Nil
 }
 
-sealed trait IRClassLiteral extends IRJavaLiteral
+sealed trait IRClassLiteral extends IRJavaLiteral with IRAnnotationElement
 
 case class IRObjectClassLiteral (clazz: JClass, dim: Int) extends IRClassLiteral {
   def staticType = clazz.objectType(Nil).map(_.array(dim)).flatMap(clazz.compiler.typeLoader.classTypeOf)
@@ -130,7 +130,7 @@ case class IRBooleanLiteral (value: Boolean, compiler: JCompiler) extends IRJava
   def staticType = Some(compiler.typeLoader.boolean)
 }
 
-case class IRStringLiteral (value: String, compiler: JCompiler) extends IRJavaLiteral {
+case class IRStringLiteral (value: String, compiler: JCompiler) extends IRJavaLiteral with IRAnnotationElement {
   def staticType = compiler.typeLoader.stringType
 }
 
@@ -151,3 +151,12 @@ case class IRContextRef (contextType: JObjectType) extends IRExpression {
   def activates: List[IRContextRef] = Nil
   def deactivates: List[IRContextRef] = Nil
 }
+
+
+sealed trait IRAnnotationElement
+
+case class IRAnnotation (annotationClass: JClass, args: Map[String, IRAnnotationElement]) extends IRAnnotationElement
+
+case class IRAnnotationElementArray (array: List[IRAnnotationElement]) extends IRAnnotationElement
+
+case class IRAnnotationElementEnumConstant (clazz: Option[JClass], name: String) extends IRAnnotationElement

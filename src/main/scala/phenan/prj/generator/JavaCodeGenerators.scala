@@ -17,16 +17,16 @@ class JavaCodeGenerators (compiler: JCompiler) extends Generators {
   lazy val annotationElement: Generator[IRAnnotationElement] = ( annotation | annotationElementArray | annotationElementString | annotationElementClass | annotationElementEnumConst ) ^^ {
     case ann: IRAnnotation                    => ann.l.l.l.l
     case arr: IRAnnotationElementArray        => arr.r.l.l.l
-    case str: IRAnnotationElementString       => str.r.l.l
-    case cls: IRAnnotationElementClass        => cls.r.l
+    case str: IRStringLiteral                 => str.r.l.l
+    case cls: IRClassLiteral                  => cls.r.l
     case enm: IRAnnotationElementEnumConstant => enm.r
   }
 
   lazy val annotationElementArray: Generator[IRAnnotationElementArray] = '{' ~> annotationElement.*(',') <~ '}' ^^ { _.array }
 
-  lazy val annotationElementString: Generator[IRAnnotationElementString] = stringLiteral ^^ { _.str }
+  lazy val annotationElementString: Generator[IRStringLiteral] = stringLiteral ^^ { _.value }
 
-  lazy val annotationElementClass: Generator[IRAnnotationElementClass] = ???
+  lazy val annotationElementClass: Generator[IRClassLiteral] = ???
 
   lazy val annotationElementEnumConst: Generator[IRAnnotationElementEnumConstant] = ???
 

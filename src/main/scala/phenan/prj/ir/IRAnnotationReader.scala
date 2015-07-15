@@ -120,8 +120,8 @@ class IRAnnotationReader (file: IRFile) {
   private lazy val classTypeSignature: IRAnnotationElement =?> JClassTypeSignature = string >==> SignatureParsers.parseClassTypeSignature
   private lazy val parameterSignature: IRAnnotationElement =?> JParameterSignature = string >==> SignatureParsers.parseParameterSignature
 
-  private lazy val string: IRAnnotationElement =?> String = collect { case IRAnnotationElementString(s) => s }
-  private lazy val descriptor: IRAnnotationElement =?> JClassTypeSignature = collect { case IRAnnotationElementClass(sig: JClassTypeSignature) => sig }
+  private lazy val string: IRAnnotationElement =?> String = collect { case IRStringLiteral(s, _) => s }
+  private lazy val descriptor: IRAnnotationElement =?> JClassTypeSignature = collect { case IRObjectClassLiteral(clazz, 0) => SimpleClassTypeSignature(clazz.internalName, Nil) }
 
 
   /* Annotation => IRAnnotation */
@@ -148,8 +148,12 @@ class IRAnnotationReader (file: IRFile) {
   }
 
   private lazy val evaluate: AnnotationExpression =?> IRAnnotationElement = read {
-    case StringLiteralExpression(s)   => Some(IRAnnotationElementString(s))
-    case ClassLiteralExpression(name) => resolver.typeSignature(name).toOption.map(IRAnnotationElementClass)
+    case StringLiteralExpression(s)   => Some(IRStringLiteral(s, compiler))
+    case ClassLiteralExpression(name) =>
+      if (name.name.names.size == 1 && compiler.classLoader.primitives.contains(name.name.names.head))
+        Some(IRPrimitiveClassLiteral(compiler.classLoader.primitives(name.name.names.head).primitiveType, name.dim))
+      else
+        resolver.resolve(name.name.names).toOption.map(IRObjectClassLiteral(_, name.dim))
     case EnumConstantExpression(name) =>
       if (name.size == 1) Some(IRAnnotationElementEnumConstant(None, name.head))
       else resolver.resolve(name.init).toOption.map(clazz => IRAnnotationElementEnumConstant(Some(clazz), name.last))
