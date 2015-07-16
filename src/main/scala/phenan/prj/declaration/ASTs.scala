@@ -98,6 +98,7 @@ case class SingleElementAnnotation (name: QualifiedName, arg: AnnotationElement)
 case class MarkerAnnotation (name: QualifiedName) extends Annotation
 
 case class ArrayOfAnnotationElement (array: List[AnnotationElement]) extends AnnotationElement
+case class EnumConstantElement (name: List[String]) extends AnnotationElement
 
 sealed trait AnnotationExpression extends AnnotationElement
 
@@ -148,7 +149,6 @@ case class DoubleLiteralExpression (value: Double) extends AnnotationExpression
 
 case class StringLiteralExpression (value: String) extends AnnotationExpression
 case class ClassLiteralExpression (name: TypeName) extends AnnotationExpression
-case class EnumConstantExpression (name: List[String]) extends AnnotationExpression
 
 sealed trait MetaParameter {
   def name: String

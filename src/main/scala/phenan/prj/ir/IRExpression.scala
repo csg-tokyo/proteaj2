@@ -99,12 +99,12 @@ case class IRVariableArguments (args: List[IRExpression], staticType: Option[JTy
   def deactivates: List[IRContextRef] = args.flatMap(_.deactivates)
 }
 
-sealed trait IRJavaLiteral extends IRExpression {
+sealed trait IRJavaLiteral extends IRExpression with IRAnnotationElement {
   def activates: List[IRContextRef] = Nil
   def deactivates: List[IRContextRef] = Nil
 }
 
-sealed trait IRClassLiteral extends IRJavaLiteral with IRAnnotationElement
+sealed trait IRClassLiteral extends IRJavaLiteral
 
 case class IRObjectClassLiteral (clazz: JClass, dim: Int) extends IRClassLiteral {
   def staticType = clazz.objectType(Nil).map(_.array(dim)).flatMap(clazz.compiler.typeLoader.classTypeOf)
@@ -130,7 +130,7 @@ case class IRBooleanLiteral (value: Boolean, compiler: JCompiler) extends IRJava
   def staticType = Some(compiler.typeLoader.boolean)
 }
 
-case class IRStringLiteral (value: String, compiler: JCompiler) extends IRJavaLiteral with IRAnnotationElement {
+case class IRStringLiteral (value: String, compiler: JCompiler) extends IRJavaLiteral {
   def staticType = compiler.typeLoader.stringType
 }
 
@@ -175,4 +175,4 @@ case class IRAnnotation (annotationClass: JClass, args: Map[String, IRAnnotation
 
 case class IRAnnotationElementArray (array: List[IRAnnotationElement]) extends IRAnnotationElement
 
-case class IRAnnotationElementEnumConstant (clazz: Option[JClass], name: String) extends IRAnnotationElement
+case class IRAnnotationElementEnumConstant (field: JFieldDef) extends IRAnnotationElement

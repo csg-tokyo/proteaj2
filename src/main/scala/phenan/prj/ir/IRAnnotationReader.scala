@@ -64,7 +64,7 @@ class IRAnnotationReader (file: IRFile) {
     syntax   <- syntaxDefAnnotation(priority, pattern)
   } yield syntax
 
-  private def syntaxDefAnnotation (priority: JPriority, pattern: List[JSyntaxElementDef]): IRAnnotation =?> JSyntaxDef = enumSwitch("level", "proteaj/lang/OpLevel") {
+  private def syntaxDefAnnotation (priority: JPriority, pattern: List[JSyntaxElementDef]): IRAnnotation =?> JSyntaxDef = enumSwitch("level") {
     case "Statement"  => unit(JStatementSyntaxDef(priority, pattern))
     case "Expression" => unit(JExpressionSyntaxDef(priority, pattern))
     case "Literal"    => unit(JLiteralSyntaxDef(priority, pattern))
@@ -78,7 +78,7 @@ class IRAnnotationReader (file: IRFile) {
     bounds   <- array("bounds")(typeSignature)
   } yield FormalMetaParameter(name, metaType | JTypeSignature.typeTypeSig, priority, bounds)
 
-  private lazy val operatorElementAnnotation: IRAnnotation =?> JSyntaxElementDef = enumSwitch("kind", "proteaj/lang/OpElemType") {
+  private lazy val operatorElementAnnotation: IRAnnotation =?> JSyntaxElementDef = enumSwitch("kind") {
     case "Name"         => required("name")(string).map(JOperatorNameDef)
     case "Hole"         => unit(JOperandDef)
     case "Star"         => unit(JRepetition0Def)
@@ -90,8 +90,8 @@ class IRAnnotationReader (file: IRFile) {
     case _              => state.errorAndReturn("invalid operator element type", unit(JOperandDef))
   }
 
-  private def enumSwitch [T] (name: String, enumTypeName: String)(readers: String => IRAnnotation =?> T): IRAnnotation =?> T = opt(elem(name)) >=> read {
-    case Some(IRAnnotationElementEnumConstant(clazz, const)) if clazz.forall(_.internalName == enumTypeName) => Some(const)
+  private def enumSwitch [T] (name: String)(readers: String => IRAnnotation =?> T): IRAnnotation =?> T = opt(elem(name)) >=> read {
+    case Some(IRAnnotationElementEnumConstant(field)) => Some(field.name)
     case None => Some("")
     case _    => None
   } flatMap readers
@@ -130,37 +130,61 @@ class IRAnnotationReader (file: IRFile) {
 
   private lazy val annotation: Annotation =?> IRAnnotation = for {
     clazz <- annotationClass
-    args  <- annotationArguments
+    args  <- annotationArguments(clazz)
   } yield IRAnnotation(clazz, args)
 
   private lazy val annotationClass: Annotation =?> JClass = read { ann => resolver.resolve(ann.name.names).toOption }
 
-  private lazy val annotationArguments: Annotation =?> Map[String, IRAnnotationElement] = lift {
-    case MarkerAnnotation(_)             => Map.empty
-    case SingleElementAnnotation(_, arg) => annotationElement(arg).map(a => Map("value" -> a)).getOrElse(Map.empty)
-    case FullAnnotation(_, args)         => args.flatMap { case (s, e) => annotationElement(e).map(s -> _) }
+  private def annotationArguments (clazz: JClass): Annotation =?> Map[String, IRAnnotationElement] = read {
+    case MarkerAnnotation(_)             => Some(Map.empty)
+    case SingleElementAnnotation(_, arg) => annotationElement("value", arg, clazz).map(Map(_))
+    case FullAnnotation(_, args)         => args.toList.traverse[Option, (String, IRAnnotationElement)] { case (s, e) => annotationElement(s, e, clazz) }.map(_.toMap)
   }
 
-  private lazy val annotationElement: AnnotationElement =?> IRAnnotationElement = read {
-    case ann: Annotation                 => annotation(ann)
-    case ArrayOfAnnotationElement(array) => rep(annotationElement)(array).map(IRAnnotationElementArray)
-    case e: AnnotationExpression         => evaluate(e)
+  private def annotationElement (name: String, arg: AnnotationElement, clazz: JClass): Option[(String, IRAnnotationElement)] = {
+    clazz.methods.find(_.name == name).flatMap(method => annotationElement(arg, method.erasedReturnType).map(name -> _))
   }
 
-  private lazy val evaluate: AnnotationExpression =?> IRAnnotationElement = read {
+  private def annotationElement (arg: AnnotationElement, annType: JErasedType): Option[IRAnnotationElement] = annType match {
+    case arr: JArrayClass                => annotationElement_Array(arg, arr.component)
+    case enm: JClass if enm.isEnum       => annotationElement_EnumConstant(arg, enm)
+    case ann: JClass if ann.isAnnotation => annotationElement_Annotation(arg, ann)
+    case prm: JPrimitiveClass                                          => evaluate(arg, prm.primitiveType)
+    case str: JClass if compiler.classLoader.stringClass.contains(str) => compiler.typeLoader.stringType.flatMap(evaluate(arg, _))
+  }
+
+  private def annotationElement_Array (arg: AnnotationElement, component: JErasedType): Option[IRAnnotationElementArray] = arg match {
+    case ArrayOfAnnotationElement(array) => array.traverse(annotationElement(_, component)).map(IRAnnotationElementArray)
+    case _ => None
+  }
+
+  private def annotationElement_EnumConstant (arg: AnnotationElement, enum: JClass): Option[IRAnnotationElementEnumConstant] = arg match {
+    case EnumConstantElement(name) =>
+      if (name.size == 1) enum.fields.find(_.name == name.size).map(IRAnnotationElementEnumConstant)
+      else resolver.resolve(name.init).toOption.filter(_ == enum).flatMap(_.fields.find(_.name == name.last)).map(IRAnnotationElementEnumConstant)
+    case _ => None
+  }
+
+  private def annotationElement_Annotation (arg: AnnotationElement, annotationType: JClass): Option[IRAnnotation] = arg match {
+    case ann: Annotation => annotation(ann).filter(_.annotationClass == annotationType)
+    case _ => None
+  }
+
+  private def evaluate (arg: AnnotationElement, expected: JType): Option[IRAnnotationElement] = arg match {
+    case e: AnnotationExpression => evaluate(e).filter(_.staticType.exists(_ <:< expected))
+    case _ => None
+  }
+
+  private def evaluate (arg: AnnotationExpression): Option[IRJavaLiteral] = arg match {
     case StringLiteralExpression(s)   => Some(IRStringLiteral(s, compiler))
     case ClassLiteralExpression(name) =>
       if (name.name.names.size == 1 && compiler.classLoader.primitives.contains(name.name.names.head))
         Some(IRPrimitiveClassLiteral(compiler.classLoader.primitives(name.name.names.head).primitiveType, name.dim))
       else
         resolver.resolve(name.name.names).toOption.map(IRObjectClassLiteral(_, name.dim))
-    case EnumConstantExpression(name) =>
-      if (name.size == 1) Some(IRAnnotationElementEnumConstant(None, name.head))
-      else resolver.resolve(name.init).toOption.map(clazz => IRAnnotationElementEnumConstant(Some(clazz), name.last))
   }
 
   private def unit [A, B](b: => B): A =?> B = Kleisli { _ => Some(b) }
-  private def lift [A, B](f: A => B): A =?> B = Kleisli { a => Some(f(a)) }
   private def read [A, B](f: A => Option[B]): A =?> B = Kleisli[Option, A, B](f)
 
   private def collect [A, B](f: PartialFunction[A, B]): A =?> B = read(f.lift)

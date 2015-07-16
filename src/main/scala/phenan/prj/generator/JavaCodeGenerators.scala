@@ -14,26 +14,37 @@ class JavaCodeGenerators (compiler: JCompiler) extends Generators {
 
   lazy val annotationArgument: Generator[(String, IRAnnotationElement)] = string ~ ( '=' ~> annotationElement )
 
-  lazy val annotationElement: Generator[IRAnnotationElement] = ( annotation | annotationElementArray | annotationElementString | annotationElementClass | annotationElementEnumConst ) ^^ {
-    case ann: IRAnnotation                    => ann.l.l.l.l
-    case arr: IRAnnotationElementArray        => arr.r.l.l.l
-    case str: IRStringLiteral                 => str.r.l.l
-    case cls: IRClassLiteral                  => cls.r.l
+  lazy val annotationElement: Generator[IRAnnotationElement] = ( '{' ~> annotationElement.*(',') <~ '}' | annotation | javaLiteral | annotationElementEnumConst ) ^^ {
+    case IRAnnotationElementArray(array)      => array.l.l.l
+    case ann: IRAnnotation                    => ann.r.l.l
+    case lit: IRJavaLiteral                   => lit.r.l
     case enm: IRAnnotationElementEnumConstant => enm.r
   }
 
-  lazy val annotationElementArray: Generator[IRAnnotationElementArray] = '{' ~> annotationElement.*(',') <~ '}' ^^ { _.array }
-
-  lazy val annotationElementString: Generator[IRStringLiteral] = stringLiteral ^^ { _.value }
-
-  lazy val annotationElementClass: Generator[IRClassLiteral] = ???
-
   lazy val annotationElementEnumConst: Generator[IRAnnotationElementEnumConstant] = ???
+
+  lazy val javaLiteral: Generator[IRJavaLiteral] = ???
+
+  lazy val stringLiteral: Generator[IRStringLiteral] = ???
+
+  lazy val classLiteral: Generator[IRClassLiteral] = ( objectClassLiteral | primitiveClassLiteral ) ^^ {
+    case obj: IRObjectClassLiteral    => obj.l
+    case prm: IRPrimitiveClassLiteral => prm.r
+  }
+
+  lazy val objectClassLiteral: Generator[IRObjectClassLiteral] = elem { obj =>
+    obj.clazz.name + mul("[]", obj.dim) + ".class"
+  }
+
+  lazy val primitiveClassLiteral: Generator[IRPrimitiveClassLiteral] = elem { prm =>
+    prm.primitiveClass.name + mul("[]", prm.dim) + ".class"
+  }
 
   lazy val modifiers: Generator[JModifier] = ???
 
-  lazy val stringLiteral: Generator[String] = ???
+  def mul (s: String, n: Int): String = (0 until n).map(_ => s).mkString
 
+  /*
   lazy val typeArgument: Generator[JTypeArgument] = (typeSignature | wildcardArgument) ^? {
     case sig: JTypeSignature        => sig.l
     case wld: WildcardArgument      => wld.r
@@ -78,7 +89,7 @@ class JavaCodeGenerators (compiler: JCompiler) extends Generators {
   lazy val wildcardArgument: Generator[WildcardArgument] = '?' ~> ( "extends" ~> typeSignature ).? ~ ( "super" ~> typeSignature ).? ^^ { arg =>
     arg.upperBound -> arg.lowerBound
   }
-
+*/
   val spacingBeforeWord: List[Char] = List('?', '(', '{')
 
   val spacingAfterWord: List[Char] = List(',', ')', '}', '>')

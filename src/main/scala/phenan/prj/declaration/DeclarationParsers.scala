@@ -270,7 +270,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val annotationName = '@' ~> "interface".! ~> qualifiedName
 
-  lazy val annotationElement: HParser[AnnotationElement] = annotation | arrayOfAnnotationElement | annotationExpression
+  lazy val annotationElement: HParser[AnnotationElement] = annotation | arrayOfAnnotationElement | annotationExpression | enumConstant
 
   lazy val arrayOfAnnotationElement = '{' ~> annotationElement.*(',') <~ ','.? <~ '}' ^^ ArrayOfAnnotationElement
 
@@ -297,13 +297,13 @@ object DeclarationParsers extends TwoLevelParsers {
 
   /* annotation expression */
 
-  lazy val annotationExpression = stringLiteral | classLiteral | enumConstant
+  lazy val annotationExpression = stringLiteral | classLiteral
 
   lazy val stringLiteral = elem[StrLiteral].^ ^^ { s => StringLiteralExpression(s.value) }
 
   lazy val classLiteral = typeName ^^ ClassLiteralExpression
 
-  lazy val enumConstant = qualifiedName ^^ { name => EnumConstantExpression(name.names) }
+  lazy val enumConstant = qualifiedName ^^ { name => EnumConstantElement(name.names) }
 
   /* primary */
 
