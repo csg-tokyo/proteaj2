@@ -2,6 +2,7 @@ package phenan.prj.generator
 
 import phenan.prj._
 import phenan.prj.ir._
+import phenan.prj.util._
 
 class JavaCodeGenerators (compiler: JCompiler) extends Generators {
   lazy val classDef: Generator[IRClass] = annotation.* ~ modifiers ~ ( "class" ~> string ) ^^ { clazz =>
@@ -15,17 +16,22 @@ class JavaCodeGenerators (compiler: JCompiler) extends Generators {
   lazy val annotationArgument: Generator[(String, IRAnnotationElement)] = string ~ ( '=' ~> annotationElement )
 
   lazy val annotationElement: Generator[IRAnnotationElement] = ( '{' ~> annotationElement.*(',') <~ '}' | annotation | javaLiteral | annotationElementEnumConst ) ^^ {
-    case IRAnnotationElementArray(array)      => array.l.l.l
-    case ann: IRAnnotation                    => ann.r.l.l
-    case lit: IRJavaLiteral                   => lit.r.l
-    case enm: IRAnnotationElementEnumConstant => enm.r
+    case IRAnnotationElementArray(array) => array.l.l.l
+    case ann: IRAnnotation               => ann.r.l.l
+    case lit: IRJavaLiteral              => lit.r.l
+    case enm: IREnumConstantRef          => enm.r
   }
 
-  lazy val annotationElementEnumConst: Generator[IRAnnotationElementEnumConstant] = ???
+  lazy val annotationElementEnumConst: Generator[IREnumConstantRef] = ???
 
-  lazy val javaLiteral: Generator[IRJavaLiteral] = ???
-
-  lazy val stringLiteral: Generator[IRStringLiteral] = ???
+  lazy val javaLiteral: Generator[IRJavaLiteral] = ( classLiteral | stringLiteral | charLiteral | intLiteral | longLiteral | booleanLiteral ) ^^ {
+    case cls: IRClassLiteral    => cls.l.l.l.l.l
+    case str: IRStringLiteral   => str.r.l.l.l.l
+    case char: IRCharLiteral    => char.r.l.l.l
+    case int: IRIntLiteral      => int.r.l.l
+    case long: IRLongLiteral    => long.r.l
+    case bool: IRBooleanLiteral => bool.r
+  }
 
   lazy val classLiteral: Generator[IRClassLiteral] = ( objectClassLiteral | primitiveClassLiteral ) ^^ {
     case obj: IRObjectClassLiteral    => obj.l
@@ -39,6 +45,18 @@ class JavaCodeGenerators (compiler: JCompiler) extends Generators {
   lazy val primitiveClassLiteral: Generator[IRPrimitiveClassLiteral] = elem { prm =>
     prm.primitiveClass.name + mul("[]", prm.dim) + ".class"
   }
+
+  lazy val stringLiteral: Generator[IRStringLiteral] = '\"' ~> literalChar.* <~ '\"' ^^ { _.value.toList }
+
+  lazy val charLiteral: Generator[IRCharLiteral] = '\'' ~> literalChar <~ '\'' ^^ { _.value }
+
+  lazy val intLiteral: Generator[IRIntLiteral] = elem { _.value.toString }
+
+  lazy val longLiteral: Generator[IRLongLiteral] = elem { _.value.toString + 'L' }
+
+  lazy val booleanLiteral: Generator[IRBooleanLiteral] = elem { _.value.toString }
+
+  lazy val literalChar: Generator[Char] = elem { LiteralUtil.escape }
 
   lazy val modifiers: Generator[JModifier] = ???
 

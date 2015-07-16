@@ -175,4 +175,4 @@ case class IRAnnotation (annotationClass: JClass, args: Map[String, IRAnnotation
 
 case class IRAnnotationElementArray (array: List[IRAnnotationElement]) extends IRAnnotationElement
 
-case class IRAnnotationElementEnumConstant (field: JFieldDef) extends IRAnnotationElement
+case class IREnumConstantRef (field: JFieldDef) extends IRAnnotationElement

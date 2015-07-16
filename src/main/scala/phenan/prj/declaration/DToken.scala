@@ -1,5 +1,7 @@
 package phenan.prj.declaration
 
+import phenan.prj.util._
+
 import scalaz.Memo._
 
 sealed trait DToken {
@@ -29,20 +31,6 @@ class StrLiteral private (val value: String) extends DToken {
 
 class ErrorToken private (msg: String) extends DToken {
   def raw = "<error>"
-}
-
-object LiteralUtil {
-  def escape (c: Char): String = c match {
-    case '\b' => "\\b"
-    case '\f' => "\\f"
-    case '\n' => "\\n"
-    case '\r' => "\\r"
-    case '\t' => "\\t"
-    case '\'' => "\\\'"
-    case '\"' => "\\\""
-    case '\\' => "\\\\"
-    case x    => x.toString
-  }
 }
 
 object Identifier {

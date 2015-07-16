@@ -91,7 +91,7 @@ class IRAnnotationReader (file: IRFile) {
   }
 
   private def enumSwitch [T] (name: String)(readers: String => IRAnnotation =?> T): IRAnnotation =?> T = opt(elem(name)) >=> read {
-    case Some(IRAnnotationElementEnumConstant(field)) => Some(field.name)
+    case Some(IREnumConstantRef(field)) => Some(field.name)
     case None => Some("")
     case _    => None
   } flatMap readers
@@ -158,10 +158,10 @@ class IRAnnotationReader (file: IRFile) {
     case _ => None
   }
 
-  private def annotationElement_EnumConstant (arg: AnnotationElement, enum: JClass): Option[IRAnnotationElementEnumConstant] = arg match {
+  private def annotationElement_EnumConstant (arg: AnnotationElement, enum: JClass): Option[IREnumConstantRef] = arg match {
     case EnumConstantElement(name) =>
-      if (name.size == 1) enum.fields.find(_.name == name.size).map(IRAnnotationElementEnumConstant)
-      else resolver.resolve(name.init).toOption.filter(_ == enum).flatMap(_.fields.find(_.name == name.last)).map(IRAnnotationElementEnumConstant)
+      if (name.size == 1) enum.fields.find(_.name == name.size).map(IREnumConstantRef)
+      else resolver.resolve(name.init).toOption.filter(_ == enum).flatMap(_.fields.find(_.name == name.last)).map(IREnumConstantRef)
     case _ => None
   }
 
