@@ -20,42 +20,42 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   private lazy val defaultFieldAnnotations = JFieldAnnotations(None, false)
 
   private def classAnnotations (as: List[(String, BAnnotation)], result: JClassAnnotations): JClassAnnotations = as match {
-    case ("Lproteaj/lang/ClassSig;", ann) :: rest => classAnnotations(rest, JClassAnnotations(classSignature(ann), result.dsl, result.isPure, result.isContext))
-    case ("Lproteaj/lang/DSL;", ann) :: rest      => classAnnotations(rest, JClassAnnotations(result.signature, dsl(ann), result.isPure, result.isContext))
-    case ("Lproteaj/lang/Pure;", _) :: rest       => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, true, result.isContext))
-    case ("Lproteaj/lang/Context;", _) :: rest    => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, result.isPure, true))
-    case (_, ann) :: rest                         => classAnnotations(rest, result)
+    case (CommonNames.classSigClassName, ann) :: rest => classAnnotations(rest, JClassAnnotations(classSignature(ann), result.dsl, result.isPure, result.isContext))
+    case (CommonNames.dslClassName, ann) :: rest      => classAnnotations(rest, JClassAnnotations(result.signature, dsl(ann), result.isPure, result.isContext))
+    case (CommonNames.pureClassName, _) :: rest       => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, true, result.isContext))
+    case (CommonNames.contextClassName, _) :: rest    => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, result.isPure, true))
+    case (_, ann) :: rest                             => classAnnotations(rest, result)
     case Nil => result
   }
 
   private def methodAnnotations (as: List[(String, BAnnotation)], result: JMethodAnnotations): JMethodAnnotations = as match {
-    case ("Lproteaj/lang/MethodSig;", ann) :: rest => methodAnnotations(rest, JMethodAnnotations(methodSignature(ann), result.operator, result.isPure, result.isFinalizer))
-    case ("Lproteaj/lang/Operator;", ann) :: rest  => methodAnnotations(rest, JMethodAnnotations(result.signature, operator(ann), result.isPure, result.isFinalizer))
-    case ("Lproteaj/lang/Pure;", _) :: rest        => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, true, result.isFinalizer))
-    case ("Lproteaj/lang/Finalizer;", _) :: rest   => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, result.isPure, true))
-    case (_, ann) :: rest                        => methodAnnotations(rest, result)
+    case (CommonNames.methodSigClassName, ann) :: rest => methodAnnotations(rest, JMethodAnnotations(methodSignature(ann), result.operator, result.isPure, result.isFinalizer))
+    case (CommonNames.operatorClassName, ann) :: rest  => methodAnnotations(rest, JMethodAnnotations(result.signature, operator(ann), result.isPure, result.isFinalizer))
+    case (CommonNames.pureClassName, _) :: rest        => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, true, result.isFinalizer))
+    case (CommonNames.finalizerClassName, _) :: rest   => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, result.isPure, true))
+    case (_, ann) :: rest                              => methodAnnotations(rest, result)
     case Nil => result
   }
 
   private def fieldAnnotations (as: List[(String, BAnnotation)], result: JFieldAnnotations): JFieldAnnotations = as match {
-    case ("Lproteaj/lang/FieldSig;", ann) :: rest => fieldAnnotations(rest, JFieldAnnotations(fieldSignature(ann), result.isPure))
-    case ("Lproteaj/lang/Pure;", _) :: rest       => fieldAnnotations(rest, JFieldAnnotations(result.signature, true))
-    case (_, ann) :: rest                       => fieldAnnotations(rest, result)
+    case (CommonNames.fieldSigClassName, ann) :: rest => fieldAnnotations(rest, JFieldAnnotations(fieldSignature(ann), result.isPure))
+    case (CommonNames.pureClassName, _) :: rest => fieldAnnotations(rest, JFieldAnnotations(result.signature, true))
+    case (_, ann) :: rest                 => fieldAnnotations(rest, result)
     case Nil => result
   }
 
   private lazy val attributeReader: RuntimeVisibleAnnotationsAttribute =?> List[(String, BAnnotation)] = annotationReader <=< lift { _.annotations }
 
-  private lazy val annotationReader: List[BAnnotation] =?> List[(String, BAnnotation)] = rep { lift { ann => readUTF(ann.annotationType) -> ann } }
+  private lazy val annotationReader: List[BAnnotation] =?> List[(String, BAnnotation)] = rep { lift { ann => annotationTypeName(ann.annotationType) -> ann } }
 
   private lazy val classSignature = for {
-    metaParams <- array("metaParameters")(elementAnnotation("Lproteaj/lang/MetaParameter;", metaParameter))
+    metaParams <- array("metaParameters")(elementAnnotation(CommonNames.metaParamClassName, metaParameter))
     supType    <- optional("superType")(classTypeSignature)
     interfaces <- array("interfaces")(classTypeSignature)
   } yield JClassSignature(metaParams, supType | JTypeSignature.objectTypeSig, interfaces)
 
   private lazy val methodSignature: BAnnotation =?> JMethodSignature = for {
-    metaParams  <- array("metaParameters")(elementAnnotation("Lproteaj/lang/MetaParameter;", metaParameter))
+    metaParams  <- array("metaParameters")(elementAnnotation(CommonNames.metaParamClassName, metaParameter))
     retType     <- required("returnType")(typeSignature)
     parameters  <- array("parameters")(parameterSignature)
     exceptions  <- array("throwsTypes")(typeSignature)
@@ -68,11 +68,11 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
 
   private lazy val dsl: BAnnotation =?> DSLInfo = for {
     priorities  <- array("priorities")(string)
-    constraints <- array("constraints")(elementAnnotation("Lproteaj/lang/Constraint;", constraint))
+    constraints <- array("constraints")(elementAnnotation(CommonNames.constraintClassName, constraint))
     withDSLs    <- array("with")(descriptor)
   } yield DSLInfo(priorities, constraints, withDSLs)
 
-  private lazy val constraint: BAnnotation =?> List[JPriority] = array("value")(elementAnnotation("Lproteaj/lang/Priority;", priority))
+  private lazy val constraint: BAnnotation =?> List[JPriority] = array("value")(elementAnnotation(CommonNames.priorityClassName, priority))
 
   private lazy val priority: BAnnotation =?> JPriority = for {
     dsl  <- required("dsl")(classTypeSignature)
@@ -80,12 +80,12 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   } yield JPriority(dsl, name)
 
   private lazy val operator: BAnnotation =?> JSyntaxDef = for {
-    priority <- required("priority")(elementAnnotation("Lproteaj/lang/Priority;", priority))
-    pattern  <- array("pattern")(elementAnnotation("Lproteaj/lang/OpElem;", operatorElement))
+    priority <- required("priority")(elementAnnotation(CommonNames.priorityClassName, priority))
+    pattern  <- array("pattern")(elementAnnotation(CommonNames.opElemClassName, operatorElement))
     syntax   <- syntaxDef(priority, pattern)
   } yield syntax
 
-  private def syntaxDef (priority: JPriority, pattern: List[JSyntaxElementDef]): BAnnotation =?> JSyntaxDef = enumSwitch("level", "Lproteaj/lang/OpLevel;") {
+  private def syntaxDef (priority: JPriority, pattern: List[JSyntaxElementDef]): BAnnotation =?> JSyntaxDef = enumSwitch("level", CommonNames.opLevelClassName) {
     case "Statement"  => unit(JStatementSyntaxDef(priority, pattern))
     case "Expression" => unit(JExpressionSyntaxDef(priority, pattern))
     case "Literal"    => unit(JLiteralSyntaxDef(priority, pattern))
@@ -95,11 +95,11 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   private lazy val metaParameter: BAnnotation =?> FormalMetaParameter = for {
     name     <- required("name")(string)
     metaType <- optional("type")(typeSignature)
-    priority <- optArray("priority")(elementAnnotation("Lproteaj/lang/Priority;", priority))
+    priority <- optArray("priority")(elementAnnotation(CommonNames.priorityClassName, priority))
     bounds   <- array("bounds")(typeSignature)
   } yield FormalMetaParameter(name, metaType | JTypeSignature.typeTypeSig, priority, bounds)
 
-  private lazy val operatorElement: BAnnotation =?> JSyntaxElementDef = enumSwitch("kind", "Lproteaj/lang/OpElemType;") {
+  private lazy val operatorElement: BAnnotation =?> JSyntaxElementDef = enumSwitch("kind", CommonNames.opElemTypeClassName) {
     case "Name"         => required("name")(string).map(JOperatorNameDef)
     case "Hole"         => unit(JOperandDef)
     case "Star"         => unit(JRepetition0Def)
@@ -112,7 +112,7 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   }
 
   private def enumSwitch [T] (name: String, enumTypeName: String)(readers: String => BAnnotation =?> T): BAnnotation =?> T = opt(elem(name)) >=> collect {
-    case Some(BAnnotationElement_Enum(e, c)) if readUTF(e) == enumTypeName => readUTF(c)
+    case Some(BAnnotationElement_Enum(e, c)) if annotationTypeName(e) == enumTypeName => readUTF(c)
     case None => ""
   } flatMap readers
 
@@ -139,7 +139,7 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   }
 
   private def elementAnnotation [T] (desc: String, reader: BAnnotation =?> T): BAnnotationElement =?> T = reader <=< collect {
-    case BAnnotationElement_Annotation(ann) if readUTF(ann.annotationType) == desc => ann
+    case BAnnotationElement_Annotation(ann) if annotationTypeName(ann.annotationType) == desc => ann
   }
 
   private lazy val string: BAnnotationElement =?> String = read {
@@ -157,6 +157,12 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   private lazy val classTypeSignature: BAnnotationElement =?> JClassTypeSignature = string >==> SignatureParsers.parseClassTypeSignature
 
   private lazy val parameterSignature: BAnnotationElement =?> JParameterSignature = string >==> SignatureParsers.parseParameterSignature
+
+  private def annotationTypeName (annType: Int): String = {
+    val name = readUTF(annType)
+    if (name.startsWith("L") && name.endsWith(";")) name.tail.init
+    else name
+  }
 
   private def unit [A, B](b: => B): A =?> B = Kleisli { _ => Some(b) }
   private def lift [A, B](f: A => B): A =?> B = Kleisli { a => Some(f(a)) }

@@ -15,14 +15,16 @@ class JavaCodeGenerators (compiler: JCompiler) extends Generators {
 
   lazy val annotationArgument: Generator[(String, IRAnnotationElement)] = string ~ ( '=' ~> annotationElement )
 
-  lazy val annotationElement: Generator[IRAnnotationElement] = ( '{' ~> annotationElement.*(',') <~ '}' | annotation | javaLiteral | annotationElementEnumConst ) ^^ {
+  lazy val annotationElement: Generator[IRAnnotationElement] = ( '{' ~> annotationElement.*(',') <~ '}' | annotation | javaLiteral | enumConstRef ) ^^ {
     case IRAnnotationElementArray(array) => array.l.l.l
     case ann: IRAnnotation               => ann.r.l.l
     case lit: IRJavaLiteral              => lit.r.l
     case enm: IREnumConstantRef          => enm.r
   }
 
-  lazy val annotationElementEnumConst: Generator[IREnumConstantRef] = ???
+  lazy val enumConstRef: Generator[IREnumConstantRef] = elem { e =>
+    e.field.declaringClass.name + '.' + e.field.name
+  }
 
   lazy val javaLiteral: Generator[IRJavaLiteral] = ( classLiteral | stringLiteral | charLiteral | intLiteral | longLiteral | booleanLiteral ) ^^ {
     case cls: IRClassLiteral    => cls.l.l.l.l.l
@@ -58,7 +60,7 @@ class JavaCodeGenerators (compiler: JCompiler) extends Generators {
 
   lazy val literalChar: Generator[Char] = elem { LiteralUtil.escape }
 
-  lazy val modifiers: Generator[JModifier] = ???
+  lazy val modifiers: Generator[JModifier] = elem { _.toString }
 
   def mul (s: String, n: Int): String = (0 until n).map(_ => s).mkString
 

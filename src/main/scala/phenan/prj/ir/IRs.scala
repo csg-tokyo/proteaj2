@@ -125,6 +125,30 @@ trait IRModule extends JClass with IRMember {
 
   def compiler: JCompiler = file.compiler
 
+
+  /* for code generation */
+
+  def javaAnnotations: List[IRAnnotation] = {
+    ???
+
+    file.annotationReader.exceptClassAnnotation(annotations)
+  }
+
+  private def classSignatureAnnotation: Option[IRAnnotation] = {
+    ???
+  }
+
+  private def metaParameterAnnotation (fmp: FormalMetaParameter): Option[IRAnnotation] = {
+    ???
+  }
+
+  private def priorityAnnotion (priority: JPriority): Option[IRAnnotation] = {
+    compiler.classLoader.loadClass_PE(CommonNames.priorityClassName).map(IRAnnotation(_,
+      Map("dsl" -> IRStringLiteral(priority.clazz.toString, compiler), "name" -> IRStringLiteral(priority.name, compiler))))
+  }
+
+  /* */
+
   private def metaParametersRef (mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
     case mp :: rest => resolver.environment.get(mp.name) match {
       case Some(arg) => metaParametersRef(rest, arg :: ref)

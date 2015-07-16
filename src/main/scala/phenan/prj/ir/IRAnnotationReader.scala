@@ -5,6 +5,8 @@ import phenan.prj.declaration._
 import phenan.prj.signature._
 import phenan.prj.state.JState
 
+import CommonNames._
+
 import scalaz._
 import Scalaz._
 
@@ -12,12 +14,16 @@ class IRAnnotationReader (file: IRFile) {
 
   def read (as: List[Annotation]): List[IRAnnotation] = annotations(as).getOrElse(Nil)
 
-  lazy val classSignature  = reader("proteaj/lang/ClassSig", classSignatureAnnotation)
-  lazy val methodSignature = reader("proteaj/lang/MethodSig", methodSignatureAnnotation)
-  lazy val fieldSignature  = reader("proteaj/lang/FieldSig", fieldSignatureAnnotation)
-  lazy val operator = reader("proteaj/lang/Operator", operatorAnnotation)
-  lazy val dsl      = reader("proteaj/lang/DSL", dslAnnotation)
-  lazy val context  = marker("proteaj/lang/Context")
+  lazy val classSignature  = reader(classSigClassName, classSignatureAnnotation)
+  lazy val methodSignature = reader(methodSigClassName, methodSignatureAnnotation)
+  lazy val fieldSignature  = reader(fieldSigClassName, fieldSignatureAnnotation)
+  lazy val operator = reader(operatorClassName, operatorAnnotation)
+  lazy val dsl      = reader(dslClassName, dslAnnotation)
+  lazy val context  = marker(contextClassName)
+
+  def exceptClassAnnotation (as: List[IRAnnotation]): List[IRAnnotation] = as.filterNot { ann =>
+    ann.annotationClass.internalName == classSigClassName || ann.annotationClass.internalName == dslClassName
+  }
 
   /* read IRAnnotation */
 
@@ -28,13 +34,13 @@ class IRAnnotationReader (file: IRFile) {
   private def marker (name: String): List[IRAnnotation] => Boolean = { _.exists(_.annotationClass.internalName == name) }
 
   private lazy val classSignatureAnnotation = for {
-    metaParams <- array("metaParameters")(elementAnnotation("proteaj/lang/MetaParameter", metaParameterAnnotation))
+    metaParams <- array("metaParameters")(elementAnnotation(metaParamClassName, metaParameterAnnotation))
     supType    <- optional("superType")(classTypeSignature)
     interfaces <- array("interfaces")(classTypeSignature)
   } yield JClassSignature(metaParams, supType | JTypeSignature.objectTypeSig, interfaces)
 
   private lazy val methodSignatureAnnotation: IRAnnotation =?> JMethodSignature = for {
-    metaParams  <- array("metaParameters")(elementAnnotation("proteaj/lang/MetaParameter", metaParameterAnnotation))
+    metaParams  <- array("metaParameters")(elementAnnotation(metaParamClassName, metaParameterAnnotation))
     retType     <- required("returnType")(typeSignature)
     parameters  <- array("parameters")(parameterSignature)
     exceptions  <- array("throwsTypes")(typeSignature)
@@ -47,11 +53,11 @@ class IRAnnotationReader (file: IRFile) {
 
   private lazy val dslAnnotation: IRAnnotation =?> DSLInfo = for {
     priorities  <- array("priorities")(string)
-    constraints <- array("constraints")(elementAnnotation("proteaj/lang/Constraint", constraintAnnotation))
+    constraints <- array("constraints")(elementAnnotation(constraintClassName, constraintAnnotation))
     withDSLs    <- array("with")(descriptor)
   } yield DSLInfo(priorities, constraints, withDSLs)
 
-  private lazy val constraintAnnotation: IRAnnotation =?> List[JPriority] = array("value")(elementAnnotation("proteaj/lang/Priority", priorityAnnotation))
+  private lazy val constraintAnnotation: IRAnnotation =?> List[JPriority] = array("value")(elementAnnotation(priorityClassName, priorityAnnotation))
 
   private lazy val priorityAnnotation: IRAnnotation =?> JPriority = for {
     dsl  <- required("dsl")(classTypeSignature)
@@ -59,8 +65,8 @@ class IRAnnotationReader (file: IRFile) {
   } yield JPriority(dsl, name)
 
   private lazy val operatorAnnotation: IRAnnotation =?> JSyntaxDef = for {
-    priority <- required("priority")(elementAnnotation("proteaj/lang/Priority", priorityAnnotation))
-    pattern  <- array("pattern")(elementAnnotation("proteaj/lang/OpElem", operatorElementAnnotation))
+    priority <- required("priority")(elementAnnotation(priorityClassName, priorityAnnotation))
+    pattern  <- array("pattern")(elementAnnotation(opElemClassName, operatorElementAnnotation))
     syntax   <- syntaxDefAnnotation(priority, pattern)
   } yield syntax
 
@@ -74,7 +80,7 @@ class IRAnnotationReader (file: IRFile) {
   private lazy val metaParameterAnnotation: IRAnnotation =?> FormalMetaParameter = for {
     name     <- required("name")(string)
     metaType <- optional("type")(typeSignature)
-    priority <- optArray("priority")(elementAnnotation("proteaj/lang/Priority", priorityAnnotation))
+    priority <- optArray("priority")(elementAnnotation(priorityClassName, priorityAnnotation))
     bounds   <- array("bounds")(typeSignature)
   } yield FormalMetaParameter(name, metaType | JTypeSignature.typeTypeSig, priority, bounds)
 
