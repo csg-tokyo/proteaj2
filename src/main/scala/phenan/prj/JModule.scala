@@ -104,7 +104,7 @@ case class JClassModule (clazz: JClass) extends JModule {
   def priorities = clazz.priorities
   def constraints = clazz.priorityConstraints
 
-  lazy val withDSLs = clazz.withDSLs.flatMap(compiler.classLoader.erase_PE).map(_.classModule)
+  lazy val withDSLs = clazz.withDSLs.map(_.classModule)
 
   def compiler = clazz.compiler
 

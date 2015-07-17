@@ -22,3 +22,5 @@ case class JOperatorNameDef (name: String) extends JSyntaxElementDef
 case class JMetaValueRefDef (name: String) extends JSyntaxElementDef
 case class JAndPredicateDef (sig: JParameterSignature) extends JPredicateDef
 case class JNotPredicateDef (sig: JParameterSignature) extends JPredicateDef
+
+case class JPriority (clazz: JClassTypeSignature, name: String)

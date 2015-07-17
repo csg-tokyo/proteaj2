@@ -43,7 +43,7 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler) extends 
 
   def priorityConstraints = annotations.dsl.map(_.constraints).getOrElse(Nil)
 
-  def withDSLs = annotations.dsl.map(_.withDSLs).getOrElse(Nil)
+  lazy val withDSLs = annotations.dsl.map(_.withDSLs.flatMap(compiler.classLoader.erase_PE)).getOrElse(Nil)
 
   lazy val annotations = classAnnotations(attributes.annotations)
 

@@ -125,28 +125,6 @@ trait IRModule extends JClass with IRMember {
 
   def compiler: JCompiler = file.compiler
 
-
-  /* for code generation */
-
-  def javaAnnotations: List[IRAnnotation] = {
-    ???
-
-    file.annotationReader.exceptClassAnnotation(annotations)
-  }
-
-  private def classSignatureAnnotation: Option[IRAnnotation] = {
-    ???
-  }
-
-  private def metaParameterAnnotation (fmp: FormalMetaParameter): Option[IRAnnotation] = {
-    ???
-  }
-
-  private def priorityAnnotion (priority: JPriority): Option[IRAnnotation] = {
-    compiler.classLoader.loadClass_PE(CommonNames.priorityClassName).map(IRAnnotation(_,
-      Map("dsl" -> IRStringLiteral(priority.clazz.toString, compiler), "name" -> IRStringLiteral(priority.name, compiler))))
-  }
-
   /* */
 
   private def metaParametersRef (mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
@@ -288,7 +266,7 @@ trait IRDSL extends IRModule {
 
   override lazy val priorityConstraints: List[List[JPriority]] = priorityDeclarations.flatMap(_.constraints)
 
-  override lazy val withDSLs: List[JClassTypeSignature] = withDSLs(dslAST.withDSLs, Nil)
+  override lazy val withDSLs: List[JClass] = withDSLs(dslAST.withDSLs, Nil)
 
   private def declaredMembers (membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
     case (c: ContextDeclaration) :: rest        => declaredMembers(rest, IRContext(c, this) :: ms)
@@ -300,8 +278,8 @@ trait IRDSL extends IRModule {
 
   private lazy val priorityDeclarations = declaredMembers.collect { case p: IRDSLPriorities => p }
 
-  private def withDSLs (ast: List[QualifiedName], result: List[JClassTypeSignature]): List[JClassTypeSignature] = ast match {
-    case qualifiedName :: rest => resolver.classTypeSignature(qualifiedName) match {
+  private def withDSLs (ast: List[QualifiedName], result: List[JClass]): List[JClass] = ast match {
+    case qualifiedName :: rest => resolver.resolve(qualifiedName.names) match {
       case Success(sig) => withDSLs(rest, sig :: result)
       case Failure(e)   =>
         state.error("invalid DSL name : " + qualifiedName, e)
@@ -712,7 +690,6 @@ case class IRParameterInitializer (method: IRProcedure, returnTypeSignature: JTy
   def declaringClass: JClass = method.declaringClass
 }
 
-
 object IRModifiers {
   def mod (modifiers: List[Modifier]): JModifier = JModifier(modifiers.foldRight(0)((m, flags) => flags | flag(m)))
 
@@ -731,3 +708,5 @@ object IRModifiers {
     case _ => 0
   }
 }
+
+case class IRDSLInfo (priorities: List[String], constraints: List[List[JPriority]], withDSLs: List[JClass])

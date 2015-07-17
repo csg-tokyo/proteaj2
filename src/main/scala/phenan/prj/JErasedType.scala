@@ -24,7 +24,7 @@ trait JClass extends JErasedType {
   def declaredPriorities: Set[JPriority]
   def memberPriorities: Set[JPriority]
   def priorityConstraints: List[List[JPriority]]
-  def withDSLs: List[JClassTypeSignature]
+  def withDSLs: List[JClass]
 
   lazy val packageInternalName: String = internalName.substring(0, internalName.lastIndexOf('/'))
 
@@ -78,7 +78,7 @@ class JTypeClass (val compiler: JCompiler) extends JClass {
   def methods: List[JMethodDef] = Nil
   def fields: List[JFieldDef] = Nil
 
-  def withDSLs: List[JClassTypeSignature] = Nil
+  def withDSLs: List[JClass] = Nil
   def declaredPriorities: Set[JPriority] = Set.empty
   def memberPriorities: Set[JPriority] = Set.empty
   def priorityConstraints: List[List[JPriority]] = Nil

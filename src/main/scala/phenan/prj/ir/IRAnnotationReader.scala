@@ -51,11 +51,11 @@ class IRAnnotationReader (file: IRFile) {
 
   private lazy val fieldSignatureAnnotation: IRAnnotation =?> JTypeSignature = required("value")(typeSignature)
 
-  private lazy val dslAnnotation: IRAnnotation =?> DSLInfo = for {
+  private lazy val dslAnnotation: IRAnnotation =?> IRDSLInfo = for {
     priorities  <- array("priorities")(string)
     constraints <- array("constraints")(elementAnnotation(constraintClassName, constraintAnnotation))
     withDSLs    <- array("with")(descriptor)
-  } yield DSLInfo(priorities, constraints, withDSLs)
+  } yield IRDSLInfo(priorities, constraints, withDSLs)
 
   private lazy val constraintAnnotation: IRAnnotation =?> List[JPriority] = array("value")(elementAnnotation(priorityClassName, priorityAnnotation))
 
@@ -127,7 +127,7 @@ class IRAnnotationReader (file: IRFile) {
   private lazy val parameterSignature: IRAnnotationElement =?> JParameterSignature = string >==> SignatureParsers.parseParameterSignature
 
   private lazy val string: IRAnnotationElement =?> String = collect { case IRStringLiteral(s, _) => s }
-  private lazy val descriptor: IRAnnotationElement =?> JClassTypeSignature = collect { case IRObjectClassLiteral(clazz, 0) => SimpleClassTypeSignature(clazz.internalName, Nil) }
+  private lazy val descriptor: IRAnnotationElement =?> JClass = collect { case IRObjectClassLiteral(clazz, 0) => clazz }
 
 
   /* Annotation => IRAnnotation */
