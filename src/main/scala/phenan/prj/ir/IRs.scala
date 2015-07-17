@@ -119,13 +119,13 @@ trait IRModule extends JClass with IRMember {
     case None      => constructResolver(metaParametersAST, Nil, file.resolver)
   }
 
-  lazy val dslInfo = file.annotationReader.dsl(annotations)
-
   lazy val thisType: Option[JObjectType] = metaParametersRef(signature.metaParams, Nil).flatMap(objectType)
 
   def compiler: JCompiler = file.compiler
 
   /* */
+
+  private lazy val dslInfo = file.annotationReader.dsl(annotations)
 
   private def metaParametersRef (mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
     case mp :: rest => resolver.environment.get(mp.name) match {

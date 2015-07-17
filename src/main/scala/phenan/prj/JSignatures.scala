@@ -25,6 +25,13 @@ case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSi
     val target = if (varArgs) JArrayTypeSignature(typeSig) else typeSig
     contexts.foldRight(target)(JTypeSignature.functionTypeSig)
   }
+  override def toString = {
+    val cs = contexts.map('@' + _.toString).mkString
+    val pr = priority.map(p => '#' + p.clazz.signatureString + '.' + p.name).mkString
+    val da = defaultArg.map('?' + _).mkString
+    if(varArgs) cs + typeSig.toString + pr + '*' + da
+    else cs + typeSig.toString + pr + da
+  }
 }
 
 case class FormalMetaParameter (name: String, metaType: JTypeSignature, priority: Option[JPriority], bounds: List[JTypeSignature]) {
