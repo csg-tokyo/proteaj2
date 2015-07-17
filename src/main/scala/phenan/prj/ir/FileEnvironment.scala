@@ -12,7 +12,7 @@ case class FileEnvironment (file: IRFile) {
   def instanceMethodEnvironment (procedure: IRProcedure): Environment = new Environment_InstanceMethod(procedure, this)
   def staticMethodEnvironment (procedure: IRProcedure): Environment = new Environment_StaticMethod(procedure, this)
 
-  lazy val dsls: List[JClassModule] = collectDSLs(file.importedDSLNames, Nil)
+  lazy val dsls: List[JClassModule] = collectCompanions(collectDSLs(file.importedDSLNames, Set.empty), Set.empty).toList
   lazy val userConstraints: List[List[JPriority]] = file.userConstraints.map(resolver.constraint)
   lazy val priorities: List[JPriority] = sortPriorities(collectPriorities(dsls, Set.empty), dsls.flatMap(_.constraints) ++ userConstraints)
 
@@ -55,9 +55,15 @@ case class FileEnvironment (file: IRFile) {
     case Nil => result
   }
 
-  private def collectDSLs (names: List[QualifiedName], ds: List[JClassModule]): List[JClassModule] = names match {
+  private def collectCompanions (ds: Set[JClassModule], checked: Set[JClassModule]): Set[JClassModule] = {
+    if (ds.isEmpty) checked
+    else collectCompanions(ds.flatMap(_.withDSLs).intersect(checked), checked ++ ds)
+  }
+
+  private def collectDSLs (names: List[QualifiedName], ds: Set[JClassModule]): Set[JClassModule] = names match {
     case n :: rest => resolver.resolve(n.names) match {
-      case Success(d) => collectDSLs(rest, d.classModule :: ds)
+      case Success(d) =>
+        collectDSLs(rest, ds + d.classModule)
       case Failure(e) =>
         file.state.error("invalid DSL name : " + n, e)
         collectDSLs(rest, ds)
