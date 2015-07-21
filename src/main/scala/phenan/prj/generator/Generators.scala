@@ -51,8 +51,6 @@ trait Generators {
 
   implicit def unit (s: String): Generator[Unit] = new Generator[Unit] ((buf, _, spacing, _) => appendString(buf, spacing, s))
 
-  implicit def eitherUtil [T] (v: T): EitherUtil[T] = new EitherUtil[T](v)
-
   def newLine: Generator[Unit] = new Generator[Unit]((buf, indent, _, _) => {
     buf.append('\n').append(indentation(indent))
     false
@@ -82,9 +80,4 @@ object EmptyInput {
   implicit val unit: EmptyInput[Unit] = new EmptyInput(())
 }
 
-class EitherUtil[T] (val v: T) extends AnyVal {
-  type | [+A, +B] = Either[A, B]
 
-  def l : T | Nothing = Left(v)
-  def r : Nothing | T = Right(v)
-}

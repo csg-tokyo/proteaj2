@@ -4,6 +4,8 @@ import phenan.prj._
 import phenan.prj.ir._
 import phenan.prj.util._
 
+import phenan.util.EitherUtil._
+
 class JavaCodeGenerators (compiler: JCompiler) extends Generators {
   lazy val classDef: Generator[IRClass] = annotation.* ~ modifiers ~ ( "class" ~> string ) ^^ { clazz =>
     clazz.annotations -> clazz.mod -> clazz.simpleName

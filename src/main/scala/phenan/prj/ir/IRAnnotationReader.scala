@@ -21,10 +21,6 @@ class IRAnnotationReader (file: IRFile) {
   lazy val dsl      = reader(dslClassName, dslAnnotation)
   lazy val context  = marker(contextClassName)
 
-  def exceptClassAnnotation (as: List[IRAnnotation]): List[IRAnnotation] = as.filterNot { ann =>
-    ann.annotationClass.internalName == classSigClassName || ann.annotationClass.internalName == dslClassName
-  }
-
   /* read IRAnnotation */
 
   private def reader [T] (name: String, reader: IRAnnotation =?> T): List[IRAnnotation] => Option[T] = { as =>

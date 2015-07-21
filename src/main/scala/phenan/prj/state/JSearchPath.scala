@@ -105,7 +105,7 @@ object JSearchPath {
   /* helper method for getting JSearchPath entries */
 
   // for Stream.traverse
-  import phenan.util._
+  import phenan.util.TryUtil._
   import scalaz.Scalaz._
 
   private def parsePath (path: String): Try[Stream[SearchPathEntry]] = {

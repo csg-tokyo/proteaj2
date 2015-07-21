@@ -3,7 +3,7 @@ package phenan.prj.ir
 import phenan.prj._
 import phenan.prj.declaration._
 import phenan.prj.exception._
-import phenan.util._
+import phenan.util.TryUtil._
 
 import scala.util._
 

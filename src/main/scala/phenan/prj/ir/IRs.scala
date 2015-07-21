@@ -124,6 +124,8 @@ trait IRModule extends JClass with IRMember {
   lazy val staticEnvironment = file.environment.staticEnvironment(this)
   lazy val instanceEnvironment = file.environment.instanceEnvironment(this)
 
+  def isDSL: Boolean = dslInfo.nonEmpty
+
   def compiler: JCompiler = file.compiler
 
   /* */
@@ -270,6 +272,8 @@ trait IRDSL extends IRModule {
   override lazy val priorityConstraints: List[List[JPriority]] = priorityDeclarations.flatMap(_.constraints)
 
   override lazy val withDSLs: List[JClass] = withDSLs(dslAST.withDSLs, Nil)
+
+  override def isDSL: Boolean = true
 
   private def declaredMembers (membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
     case (c: ContextDeclaration) :: rest        => declaredMembers(rest, IRContext(c, this) :: ms)
