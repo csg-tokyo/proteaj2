@@ -10,89 +10,68 @@ trait Environment {
   def contexts: List[IRContextRef]
   def locals: Map[String, IRLocalVariableRef]
   def fileEnvironment: FileEnvironment
+  def resolver: NameResolver
 
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator]
   def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator]
 
   def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]]
 
-  def resolver: NameResolver = clazz.resolver
-
   def highestPriority: Option[JPriority] = fileEnvironment.priorities.headOption
   def nextPriority (priority: JPriority): Option[JPriority] = nextPriorities.get(priority)
 
   def localVariable (name: String): Option[IRLocalVariableRef] = locals.get(name)
 
-  def defineLocal (localType: JType, name: String): Environment = new Environment_Local(localType, name, this)
+  def defineLocal (localType: JType, name: String): Environment = Environment_LocalVariables(List((localType, name)), this)
 
-  def modifyContext (statement: IRStatement): Environment = new Environment_Context(statement.activates, statement.deactivates, this)
-  def modifyContext (expression: IRExpression): Environment = new Environment_Context(expression.activates, expression.deactivates, this)
-  def withContexts (contexts: List[IRContextRef]): Environment = new Environment_Context(contexts, Nil, this)
+  def modifyContext (statement: IRStatement): Environment = Environment_LocalContexts(statement.activates, statement.deactivates, this)
+  def modifyContext (expression: IRExpression): Environment = Environment_LocalContexts(expression.activates, expression.deactivates, this)
+  def withContexts (contexts: List[IRContextRef]): Environment = Environment_LocalContexts(contexts, Nil, this)
 
-  def defineLocals (locals: IRLocalDeclaration): Environment = locals.declarators.foldLeft(this) { (e, d) =>
-    e.defineLocal(locals.localType.array(d.dim), d.name)
-  }
+  def defineLocals (locals: IRLocalDeclaration): Environment = Environment_LocalVariables(locals.declarators.map(local => (locals.localType.array(local.dim), local.name)), this)
 
   private lazy val nextPriorities: Map[JPriority, JPriority] = fileEnvironment.priorities.zip(fileEnvironment.priorities.tail).toMap
 }
 
-sealed trait InitialEnvironment extends Environment {
+sealed trait ModuleEnvironment extends Environment {
+  def procedureEnvironment (procedure: IRProcedure): Environment = Environment_Method(procedure, this)
+
   def contexts: List[IRContextRef] = Nil
   def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = fileEnvironment.expressionOperators(expected, priority)
   def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = fileEnvironment.literalOperators(expected, priority)
   def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
+  def resolver = clazz.resolver
   private val inferencer = new MethodContextInferencer(clazz.compiler.unifier, Nil)
 }
 
-class Environment_InstanceField (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends InitialEnvironment {
+class Environment_Instance (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = clazz.thisType
   def locals: Map[String, IRLocalVariableRef] = Map.empty
 }
 
-class Environment_StaticField (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends InitialEnvironment {
+class Environment_Static (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = None
   def locals: Map[String, IRLocalVariableRef] = Map.empty
 }
 
-class Environment_InstanceMethod (val method: IRProcedure, val fileEnvironment: FileEnvironment) extends InitialEnvironment {
-  def clazz: IRModule = method.declaringClass
-  def thisType: Option[JObjectType] = clazz.thisType
-  def locals: Map[String, IRLocalVariableRef] = method.parameterVariables match {
-    case Some(vs) => vs.map(v => v.name -> v).toMap
-    case None     =>
-      clazz.compiler.state.error("invalid local variables")
-      Map.empty
-  }
-}
+sealed trait ChildEnvironment extends Environment {
+  def parent: Environment
 
-class Environment_StaticMethod (val method: IRProcedure, val fileEnvironment: FileEnvironment) extends InitialEnvironment {
-  def clazz: IRModule = method.declaringClass
-  def thisType: Option[JObjectType] = None
-  def locals: Map[String, IRLocalVariableRef] = method.parameterVariables match {
-    case Some(vs) => vs.map(v => v.name -> v).toMap
-    case None     =>
-      clazz.compiler.state.error("invalid local variables")
-      Map.empty
-  }
-}
-
-class Environment_Local (localType: JType, name: String, parent: Environment) extends Environment {
   def clazz = parent.clazz
   def thisType = parent.thisType
-  def contexts = parent.contexts
-  val locals: Map[String, IRLocalVariableRef] = parent.locals + (name -> IRLocalVariableRef(localType, name))
   def fileEnvironment = parent.fileEnvironment
-  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = parent.expressionOperators(expected, priority)
-  def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = parent.literalOperators(expected, priority)
-  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = parent.inferContexts(procedure, bind)
 }
 
-class Environment_Context (activates: List[IRContextRef], deactivates: List[IRContextRef], parent: Environment) extends Environment {
-  def clazz = parent.clazz
-  def thisType = parent.thisType
-  def locals = parent.locals
+trait Environment_Variables extends ChildEnvironment {
+  def variables: List[(JType, String)]
+  val locals: Map[String, IRLocalVariableRef] = parent.locals ++ variables.map { case (t, n) => n -> IRLocalVariableRef(t, n) }
+}
+
+trait Environment_Contexts extends ChildEnvironment {
+  def activates: List[IRContextRef]
+  def deactivates: List[IRContextRef]
+
   val contexts: List[IRContextRef] = activates ++ parent.contexts.diff(deactivates)
-  def fileEnvironment = parent.fileEnvironment
 
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = expressionOperators_cached(expected).getOrElse(priority, Nil)
   def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = literalOperators_cached(expected).getOrElse(priority, Nil)
@@ -138,6 +117,26 @@ class Environment_Context (activates: List[IRContextRef], deactivates: List[IRCo
     }
     case Nil => result
   }
+}
+
+case class Environment_Method (procedure: IRProcedure, parent: Environment) extends Environment_Variables with Environment_Contexts {
+  def variables: List[(JType, String)] = procedure.parameterVariables
+  def activates: List[IRContextRef] = procedure.requiresContexts
+  def deactivates: List[IRContextRef] = Nil
+  def resolver: NameResolver = procedure.resolver
+}
+
+case class Environment_LocalVariables (variables: List[(JType, String)], parent: Environment) extends Environment_Variables {
+  def contexts: List[IRContextRef] = parent.contexts
+  def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = parent.expressionOperators(expected, priority)
+  def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = parent.literalOperators(expected, priority)
+  def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = parent.inferContexts(procedure, bind)
+  def resolver: NameResolver = parent.resolver
+}
+
+case class Environment_LocalContexts (activates: List[IRContextRef], deactivates: List[IRContextRef], parent: Environment) extends Environment_Contexts {
+  def locals: Map[String, IRLocalVariableRef] = parent.locals
+  def resolver: NameResolver = parent.resolver
 }
 
 case class ExpressionOperator (syntax: JExpressionSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression)

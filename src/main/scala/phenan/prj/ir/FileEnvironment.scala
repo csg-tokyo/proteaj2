@@ -7,10 +7,8 @@ import scala.util._
 import scalaz.Memo._
 
 case class FileEnvironment (file: IRFile) {
-  def instanceFieldEnvironment (clazz: IRModule): Environment = new Environment_InstanceField(clazz, this)
-  def staticFieldEnvironment (clazz: IRModule): Environment = new Environment_StaticField(clazz, this)
-  def instanceMethodEnvironment (procedure: IRProcedure): Environment = new Environment_InstanceMethod(procedure, this)
-  def staticMethodEnvironment (procedure: IRProcedure): Environment = new Environment_StaticMethod(procedure, this)
+  def instanceEnvironment (clazz: IRModule): ModuleEnvironment = new Environment_Instance(clazz, this)
+  def staticEnvironment (clazz: IRModule): ModuleEnvironment = new Environment_Static(clazz, this)
 
   lazy val dsls: List[JClassModule] = collectCompanions(collectDSLs(file.importedDSLNames, Set.empty), Set.empty).toList
   lazy val userConstraints: List[List[JPriority]] = file.userConstraints.map(resolver.constraint)

@@ -23,7 +23,6 @@ class BodyParsersTest extends FunSuite with Matchers {
     val file = makeIR(src)
     val test0 = file.modules.head
     val mainMethod = test0.procedures.head
-    val env = file.environment.staticMethodEnvironment(mainMethod)
 
     val body =
       """{
@@ -31,7 +30,7 @@ class BodyParsersTest extends FunSuite with Matchers {
         |}
       """.stripMargin
 
-    val result = parsers.parse(parsers.StatementParsers(compiler.typeLoader.void, env).block, body)
+    val result = parsers.parse(parsers.StatementParsers(compiler.typeLoader.void, mainMethod.environment).block, body)
     result shouldBe a [Success[_]]
 
     val outField = compiler.classLoader.loadClass_PE("java/lang/System").flatMap(_.classModule.findField("out", test0))
@@ -59,7 +58,6 @@ class BodyParsersTest extends FunSuite with Matchers {
     val file = makeIR(src)
     val test0 = file.modules.head
     val mainMethod = test0.procedures.head
-    val env = file.environment.staticMethodEnvironment(mainMethod)
 
     val body =
       """{
@@ -76,7 +74,7 @@ class BodyParsersTest extends FunSuite with Matchers {
       }
     }
 
-    val result = parsers.parse(parsers.StatementParsers(compiler.typeLoader.void, env).block, body)
+    val result = parsers.parse(parsers.StatementParsers(compiler.typeLoader.void, mainMethod.environment).block, body)
     result shouldBe a [Success[_]]
 
     val arrayOfString = compiler.typeLoader.stringType.map(_.array).get

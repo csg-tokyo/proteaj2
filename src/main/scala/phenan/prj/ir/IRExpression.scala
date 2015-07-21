@@ -155,16 +155,22 @@ case class IRContextRef (contextType: JObjectType) extends IRExpression {
 object IRContextRef {
   def createRefs (gts: List[JGenericType], bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = createRefs(gts, bind, Nil)
 
+  def createRefsFromSignatures (ss: List[JTypeSignature], bind: Map[String, MetaArgument], compiler: JCompiler): Option[List[IRContextRef]] = createRefsFromSignatures(ss, bind, Nil, compiler)
+
   private def createRefs (gts: List[JGenericType], bind: Map[String, MetaArgument], refs: List[IRContextRef]): Option[List[IRContextRef]] = gts match {
-    case gt :: rest => createRef(gt, bind) match {
+    case gt :: rest => gt.bind(bind).collect { case obj: JObjectType => IRContextRef(obj) } match {
       case Some(ref) => createRefs(rest, bind, ref :: refs)
       case None      => None
     }
     case Nil => Some(refs.reverse)
   }
 
-  def createRef (gt: JGenericType, bind: Map[String, MetaArgument]): Option[IRContextRef] = {
-    gt.bind(bind).collect { case obj: JObjectType => IRContextRef(obj) }
+  private def createRefsFromSignatures (ss: List[JTypeSignature], bind: Map[String, MetaArgument], refs: List[IRContextRef], compiler: JCompiler): Option[List[IRContextRef]] = ss match {
+    case sig :: rest => compiler.typeLoader.fromTypeSignature_RefType(sig, bind).collect { case obj: JObjectType => IRContextRef(obj)} match {
+      case Some(ref) => createRefsFromSignatures(rest, bind, ref :: refs, compiler)
+      case None      => None
+    }
+    case Nil => Some(refs.reverse)
   }
 }
 

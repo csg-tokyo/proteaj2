@@ -121,6 +121,9 @@ trait IRModule extends JClass with IRMember {
 
   lazy val thisType: Option[JObjectType] = metaParametersRef(signature.metaParams, Nil).flatMap(objectType)
 
+  lazy val staticEnvironment = file.environment.staticEnvironment(this)
+  lazy val instanceEnvironment = file.environment.instanceEnvironment(this)
+
   def compiler: JCompiler = file.compiler
 
   /* */
@@ -451,14 +454,32 @@ trait IRProcedure extends JMethodDef with IRMember {
 
   def paramInitializers = parameters.flatMap(_.initializerMethod)
 
-  def parameterVariables: Option[List[IRLocalVariableRef]] = metaParametersRef(signature.metaParams, Nil).map(args => signature.metaParams.map(_.name).zip(args).toMap).flatMap(bind => parametersRef(parameters, Nil, bind))
+  def parameterVariables: List[(JType, String)] = parametersRef(parameters, Nil, metaParametersRef).getOrElse {
+    state.error("invalid parameter type")
+    Nil
+  }
 
-  private def parametersRef (params: List[IRFormalParameter], ref: List[IRLocalVariableRef], bind: Map[String, MetaArgument]): Option[List[IRLocalVariableRef]] = params match {
+  def requiresContexts: List[IRContextRef] = IRContextRef.createRefsFromSignatures(signature.requires, metaParametersRef, compiler).getOrElse {
+    state.error("invalid required context type")
+    Nil
+  }
+
+  def environment = {
+    if (isStatic) declaringClass.staticEnvironment.procedureEnvironment(this)
+    else declaringClass.instanceEnvironment.procedureEnvironment(this)
+  }
+
+  private def parametersRef (params: List[IRFormalParameter], ref: List[(JType, String)], bind: Map[String, MetaArgument]): Option[List[(JType, String)]] = params match {
     case param :: rest => param.actualTypeSignature.flatMap(compiler.typeLoader.fromTypeSignature(_, bind)) match {
-      case Some(t) => parametersRef(rest, IRLocalVariableRef(t, param.name) :: ref, bind)
+      case Some(t) => parametersRef(rest, (t, param.name) :: ref, bind)
       case None    => None
     }
     case Nil => Some(ref.reverse)
+  }
+
+  private lazy val metaParametersRef: Map[String, MetaArgument] = metaParametersRef(signature.metaParams, Nil).map(args => signature.metaParams.map(_.name).zip(args).toMap).getOrElse {
+    state.error("invalid meta parameters")
+    Map.empty
   }
 
   private def metaParametersRef (mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
