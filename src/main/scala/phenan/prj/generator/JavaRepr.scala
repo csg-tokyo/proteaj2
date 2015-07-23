@@ -9,34 +9,34 @@ import CommonNames._
 
 class JavaRepr (compiler: JCompiler) {
   
-  class JavaFileRepr (file: IRFile) {
+  class JavaFile (file: IRFile) {
     def packageName = file.packageName.map(_.names.mkString("."))
     def importedClasses = file.importedClassNames.map(_.names.mkString("."))
     def importedPackages = file.importedPackageNames.map(_.names.mkString("."))
     def modules = file.topLevelModules.map(ModuleDef(_))
   }
 
-  type ClassMember = JavaFieldRepr :|: JavaMethodRepr :|: JavaConstructorRepr :|: JavaInstanceInitializerRepr :|: JavaStaticInitializerRepr :|: ModuleDef :|: UNil
+  type ClassMember = FieldDef :|: MethodDef :|: ConstructorDef :|: InstanceInitializerDef :|: StaticInitializerDef :|: ModuleDef :|: UNil
 
   object ClassMember {
     def apply (member: IRClassMember): ClassMember = member match {
-      case field: IRClassField             => Union[ClassMember](new JavaFieldRepr(field))
-      case method: IRClassMethod           => Union[ClassMember](JavaMethodRepr(method))
-      case constructor: IRClassConstructor => Union[ClassMember](new JavaConstructorRepr(constructor))
-      case iin: IRClassInstanceInitializer => Union[ClassMember](new JavaInstanceInitializerRepr(iin))
-      case sin: IRClassStaticInitializer   => Union[ClassMember](new JavaStaticInitializerRepr(sin))
+      case field: IRClassField             => Union[ClassMember](new FieldDef(field))
+      case method: IRClassMethod           => Union[ClassMember](MethodDef(method))
+      case constructor: IRClassConstructor => Union[ClassMember](new ConstructorDef(constructor))
+      case iin: IRClassInstanceInitializer => Union[ClassMember](new InstanceInitializerDef(iin))
+      case sin: IRClassStaticInitializer   => Union[ClassMember](new StaticInitializerDef(sin))
       case module: IRModule                => Union[ClassMember](ModuleDef(module))
     }
-    def apply (synthetic: IRSyntheticMethod): ClassMember = Union[ClassMember](JavaMethodRepr(synthetic))
+    def apply (synthetic: IRSyntheticMethod): ClassMember = Union[ClassMember](MethodDef(synthetic))
   }
 
-  type ModuleDef = ClassDef :|: JavaEnumRepr :|: JavaInterfaceRepr :|: UNil
+  type ModuleDef = ClassDef :|: EnumDef :|: InterfaceDef :|: UNil
 
   object ModuleDef {
     def apply (clazz: IRModule): ModuleDef = clazz match {
       case cls: IRTopLevelClass     => Union[ModuleDef](ClassDef(cls))
-      case enm: IRTopLevelEnum      => Union[ModuleDef](new JavaEnumRepr(enm))
-      case ifc: IRTopLevelInterface => Union[ModuleDef](new JavaInterfaceRepr(ifc))
+      case enm: IRTopLevelEnum      => Union[ModuleDef](new EnumDef(enm))
+      case ifc: IRTopLevelInterface => Union[ModuleDef](new InterfaceDef(ifc))
       case dsl: IRTopLevelDSL       => Union[ModuleDef](ClassDef(dsl))
     }
   }
@@ -45,110 +45,110 @@ class JavaRepr (compiler: JCompiler) {
     def annotations: List[JavaAnnotation]
     def modifiers: JModifier
     def name: String
-    def typeParameters: List[JavaTypeParamRepr]
-    def superType: JavaSignatureRepr
-    def interfaces: List[JavaSignatureRepr]
+    def typeParameters: List[TypeParam]
+    def superType: TypeSig
+    def interfaces: List[TypeSig]
     def members: List[ClassMember]
   }
 
   object ClassDef {
     def apply (clazz: IRClass): ClassDef = new ClassDef {
-      def annotations = JavaAnnotationsRepr.javaClassAnnotations(clazz)
+      def annotations = Annotations.classAnnotations(clazz)
       def modifiers = clazz.mod
       def name = clazz.simpleName
-      def typeParameters = clazz.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(new JavaTypeParamRepr(_))
-      def superType = JavaSignatureRepr(clazz.signature.superClass)
-      def interfaces = clazz.signature.interfaces.map(JavaSignatureRepr(_))
+      def typeParameters = clazz.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(new TypeParam(_))
+      def superType = TypeSig(clazz.signature.superClass)
+      def interfaces = clazz.signature.interfaces.map(TypeSig(_))
       def members: List[ClassMember] = clazz.declaredMembers.map(ClassMember(_)) ++ clazz.syntheticMethods.map(ClassMember(_))
     }
     def apply (dsl: IRDSL): ClassDef = new ClassDef {
       def annotations: List[JavaAnnotation] = ???
       def modifiers: JModifier = dsl.mod
       def name: String = dsl.simpleName
-      def typeParameters: List[JavaTypeParamRepr] = Nil
-      def superType: JavaSignatureRepr = ???
-      def interfaces: List[JavaSignatureRepr] = Nil
+      def typeParameters: List[TypeParam] = Nil
+      def superType: TypeSig = ???
+      def interfaces: List[TypeSig] = Nil
       def members: List[ClassMember] = ???
 
     }
   }
 
-  class JavaEnumRepr (clazz: IREnum) {
+  class EnumDef (clazz: IREnum) {
 
   }
 
-  class JavaInterfaceRepr (clazz: IRInterface) {
+  class InterfaceDef (clazz: IRInterface) {
 
   }
 
-  class JavaFieldRepr (field: IRField) {
+  class FieldDef (field: IRField) {
 
     def modifiers = field.mod
-    def fieldType = JavaSignatureRepr(field.signature)
+    def fieldType = TypeSig(field.signature)
     def name = field.name
 
   }
 
-  trait JavaMethodRepr {
+  trait MethodDef {
 
   }
 
-  object JavaMethodRepr {
-    def apply (method: IRMethod): JavaMethodRepr = new JavaMethodRepr {
+  object MethodDef {
+    def apply (method: IRMethod): MethodDef = new MethodDef {
 
     }
-    def apply (synthetic: IRSyntheticMethod): JavaMethodRepr = new JavaMethodRepr {
+    def apply (synthetic: IRSyntheticMethod): MethodDef = new MethodDef {
 
     }
   }
 
-  class JavaConstructorRepr (constructor: IRConstructor) {
+  class ConstructorDef (constructor: IRConstructor) {
 
   }
 
-  class JavaInstanceInitializerRepr (instanceInitializer: IRInstanceInitializer) {
+  class InstanceInitializerDef (instanceInitializer: IRInstanceInitializer) {
 
   }
 
-  class JavaStaticInitializerRepr (staticInitializer: IRStaticInitializer) {
+  class StaticInitializerDef (staticInitializer: IRStaticInitializer) {
 
   }
 
-  class JavaTypeParamRepr (mp: FormalMetaParameter) {
+  class TypeParam (mp: FormalMetaParameter) {
     def name = mp.name
-    def bounds = mp.bounds.map(JavaSignatureRepr(_))
+    def bounds = mp.bounds.map(TypeSig(_))
   }
 
 
-  type JavaTypeArgumentRepr = JavaSignatureRepr :|: JavaWildcardRepr :|: UNil
+  type TypeArg = TypeSig :|: Wildcard :|: UNil
 
-  type JavaWildcardRepr = JavaUnboundWildcardRepr.type :|: JavaUpperBoundWildcardRepr :|: JavaLowerBoundWildcardRepr :|: UNil
+  type Wildcard = UnboundWildcard.type :|: UpperBoundWildcard :|: LowerBoundWildcard :|: UNil
 
-  type JavaSignatureRepr = JavaClassSigRepr :|: JavaArraySigRepr :|: JavaTypeVariableSigRepr :|: JavaPrimitiveSigRepr :|: UNil
+  type TypeSig = ClassSig :|: ArraySig :|: TypeVariableSig :|: PrimitiveSig :|: UNil
 
-  type JavaClassSigRepr = JavaTopLevelClassSigRepr :|: JavaMemberClassSigRepr :|: UNil
+  type ClassSig = TopLevelClassSig :|: MemberClassSig :|: UNil
 
-  object JavaSignatureRepr {
-    def apply (signature: JTypeSignature): JavaSignatureRepr = {
+  object TypeSig {
+    def apply (signature: JTypeSignature): TypeSig = {
       ???
     }
   }
 
-  class JavaTopLevelClassSigRepr ()
+  class TopLevelClassSig ()
 
-  class JavaMemberClassSigRepr ()
+  class MemberClassSig ()
 
-  class JavaArraySigRepr ()
+  class ArraySig ()
 
-  class JavaTypeVariableSigRepr ()
+  class TypeVariableSig ()
 
-  class JavaPrimitiveSigRepr ()
+  class PrimitiveSig ()
 
-  object JavaUnboundWildcardRepr
+  object UnboundWildcard
 
-  class JavaUpperBoundWildcardRepr ()
+  class UpperBoundWildcard ()
 
-  class JavaLowerBoundWildcardRepr ()
+  class LowerBoundWildcard ()
 
 
   /*class JavaSignatureRepr (signature: JTypeSignature) {
@@ -254,53 +254,53 @@ class JavaRepr (compiler: JCompiler) {
     }
   }
 
-  type AnnotationElement = JavaAnnElemArrayRepr :|: JavaAnnotation :|: JavaLiteral :|: JavaEnumConstRefRepr :|: UNil
+  type AnnotationElement = ElementArray :|: JavaAnnotation :|: JavaLiteral :|: EnumConstRef :|: UNil
 
   object AnnotationElement {
     def apply (e: IRAnnotationElement): AnnotationElement = e match {
-      case array: IRAnnotationElementArray => Union[AnnotationElement](JavaAnnElemArrayRepr(array))
+      case array: IRAnnotationElementArray => Union[AnnotationElement](ElementArray(array))
       case annotation: IRAnnotation => Union[AnnotationElement](JavaAnnotation(annotation))
       case literal: IRJavaLiteral   => Union[AnnotationElement](JavaLiteral(literal))
-      case const: IREnumConstantRef => Union[AnnotationElement](JavaEnumConstRefRepr(const))
+      case const: IREnumConstantRef => Union[AnnotationElement](EnumConstRef(const))
     }
   }
 
-  trait JavaAnnElemArrayRepr {
+  trait ElementArray {
     def elements: List[AnnotationElement]
   }
 
-  object JavaAnnElemArrayRepr {
-    def apply (array: IRAnnotationElementArray): JavaAnnElemArrayRepr = new JavaAnnElemArrayRepr {
+  object ElementArray {
+    def apply (array: IRAnnotationElementArray): ElementArray = new ElementArray {
       def elements = array.array.map(AnnotationElement(_))
     }
-    def apply (es: List[AnnotationElement]): JavaAnnElemArrayRepr = new JavaAnnElemArrayRepr {
+    def apply (es: List[AnnotationElement]): ElementArray = new ElementArray {
       def elements = es
     }
   }
 
-  trait JavaEnumConstRefRepr {
+  trait EnumConstRef {
     def enumName: String
     def constantName: String
   }
 
-  object JavaEnumConstRefRepr {
-    def apply (const: IREnumConstantRef): JavaEnumConstRefRepr = new JavaEnumConstRefRepr {
+  object EnumConstRef {
+    def apply (const: IREnumConstantRef): EnumConstRef = new EnumConstRef {
       def enumName = const.field.declaringClass.name
       def constantName = const.field.name
     }
-    def apply (enum: String, const: String): JavaEnumConstRefRepr = new JavaEnumConstRefRepr {
+    def apply (enum: String, const: String): EnumConstRef = new EnumConstRef {
       def enumName = enum
       def constantName = const
     }
   }
 
-  object JavaAnnotationsRepr {
-    def javaClassAnnotations (clazz: IRModule): List[JavaAnnotation] = {
+  object Annotations {
+    def classAnnotations (clazz: IRModule): List[JavaAnnotation] = {
       if (clazz.isDSL) except(classSigClassName, dslClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature) :+ dslAnnotation(clazz.declaredPriorities, clazz.priorityConstraints, clazz.withDSLs)
       else except(classSigClassName, dslClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature)
     }
 
-    def javaFieldAnnotations (field: IRField): List[JavaAnnotation] = {
+    def fieldAnnotations (field: IRField): List[JavaAnnotation] = {
       except(fieldSigClassName)(field.annotations) :+ fieldSignatureAnnotation(field.signature)
     }
 
@@ -387,9 +387,9 @@ class JavaRepr (compiler: JCompiler) {
 
     private def elementAnnotation (ann: JavaAnnotation) = Union[AnnotationElement](ann)
 
-    private def array (es: List[AnnotationElement]) = Union[AnnotationElement](JavaAnnElemArrayRepr(es))
+    private def array (es: List[AnnotationElement]) = Union[AnnotationElement](ElementArray(es))
 
-    private def enumConst (enum: String, const: String) = Union[AnnotationElement](JavaEnumConstRefRepr(enum, const))
+    private def enumConst (enum: String, const: String) = Union[AnnotationElement](EnumConstRef(enum, const))
 
     private def strLit (str: String) = Union[AnnotationElement](Union[JavaLiteral](Literal(str)))
 
