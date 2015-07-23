@@ -3,46 +3,73 @@ package phenan.prj.generator
 import phenan.prj._
 import phenan.prj.ir._
 
-import phenan.util.EitherUtil._
+import phenan.util._
 
 import CommonNames._
 
 class JavaRepr (compiler: JCompiler) {
-
+  
   class JavaFileRepr (file: IRFile) {
     def packageName = file.packageName.map(_.names.mkString("."))
     def importedClasses = file.importedClassNames.map(_.names.mkString("."))
     def importedPackages = file.importedPackageNames.map(_.names.mkString("."))
-    def modules = file.topLevelModules.map(JavaModuleRepr(_))
+    def modules = file.topLevelModules.map(ModuleDef(_))
   }
 
-  type JavaClassMemberRepr = JavaFieldRepr | JavaMethodRepr | JavaConstructorRepr | JavaInstanceInitializerRepr | JavaStaticInitializerRepr | JavaModuleRepr
+  type ClassMember = JavaFieldRepr :|: JavaMethodRepr :|: JavaConstructorRepr :|: JavaInstanceInitializerRepr :|: JavaStaticInitializerRepr :|: ModuleDef :|: UNil
 
-  type JavaModuleRepr = JavaClassRepr | JavaEnumRepr | JavaInterfaceRepr | JavaDSLRepr
+  object ClassMember {
+    def apply (member: IRClassMember): ClassMember = member match {
+      case field: IRClassField             => Union[ClassMember](new JavaFieldRepr(field))
+      case method: IRClassMethod           => Union[ClassMember](JavaMethodRepr(method))
+      case constructor: IRClassConstructor => Union[ClassMember](new JavaConstructorRepr(constructor))
+      case iin: IRClassInstanceInitializer => Union[ClassMember](new JavaInstanceInitializerRepr(iin))
+      case sin: IRClassStaticInitializer   => Union[ClassMember](new JavaStaticInitializerRepr(sin))
+      case module: IRModule                => Union[ClassMember](ModuleDef(module))
+    }
+    def apply (synthetic: IRSyntheticMethod): ClassMember = Union[ClassMember](JavaMethodRepr(synthetic))
+  }
 
-  object JavaModuleRepr {
-    def apply (clazz: IRModule): JavaModuleRepr = clazz match {
-      case cls: IRTopLevelClass     => new JavaClassRepr(cls).l.l.l
-      case enm: IRTopLevelEnum      => new JavaEnumRepr(enm).r.l.l
-      case ifc: IRTopLevelInterface => new JavaInterfaceRepr(ifc).r.l
-      case dsl: IRTopLevelDSL       => new JavaDSLRepr(dsl).r
+  type ModuleDef = ClassDef :|: JavaEnumRepr :|: JavaInterfaceRepr :|: UNil
+
+  object ModuleDef {
+    def apply (clazz: IRModule): ModuleDef = clazz match {
+      case cls: IRTopLevelClass     => Union[ModuleDef](ClassDef(cls))
+      case enm: IRTopLevelEnum      => Union[ModuleDef](new JavaEnumRepr(enm))
+      case ifc: IRTopLevelInterface => Union[ModuleDef](new JavaInterfaceRepr(ifc))
+      case dsl: IRTopLevelDSL       => Union[ModuleDef](ClassDef(dsl))
     }
   }
 
-  class JavaClassRepr (clazz: IRClass) {
-    def annotations = JavaAnnotationsRepr.javaClassAnnotations(clazz)
-    def modifiers = clazz.mod
-    def name = clazz.simpleName
-    def typeParameters = clazz.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(new JavaTypeParamRepr(_))
-    def superType = new JavaSignatureRepr(clazz.signature.superClass)
-    def interfaces = clazz.signature.interfaces.map(new JavaSignatureRepr(_))
-    def members: List[JavaClassMemberRepr] = clazz.declaredMembers.map {
-      case field: IRClassField             => new JavaFieldRepr(field).l.l.l.l.l
-      case method: IRClassMethod           => new JavaMethodRepr(method).r.l.l.l.l
-      case constructor: IRClassConstructor => new JavaConstructorRepr(constructor).r.l.l.l
-      case iin: IRClassInstanceInitializer => new JavaInstanceInitializerRepr(iin).r.l.l
-      case sin: IRClassStaticInitializer   => new JavaStaticInitializerRepr(sin).r.l
-      case module: IRModule                => JavaModuleRepr(module).r
+  trait ClassDef {
+    def annotations: List[JavaAnnotation]
+    def modifiers: JModifier
+    def name: String
+    def typeParameters: List[JavaTypeParamRepr]
+    def superType: JavaSignatureRepr
+    def interfaces: List[JavaSignatureRepr]
+    def members: List[ClassMember]
+  }
+
+  object ClassDef {
+    def apply (clazz: IRClass): ClassDef = new ClassDef {
+      def annotations = JavaAnnotationsRepr.javaClassAnnotations(clazz)
+      def modifiers = clazz.mod
+      def name = clazz.simpleName
+      def typeParameters = clazz.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(new JavaTypeParamRepr(_))
+      def superType = JavaSignatureRepr(clazz.signature.superClass)
+      def interfaces = clazz.signature.interfaces.map(JavaSignatureRepr(_))
+      def members: List[ClassMember] = clazz.declaredMembers.map(ClassMember(_)) ++ clazz.syntheticMethods.map(ClassMember(_))
+    }
+    def apply (dsl: IRDSL): ClassDef = new ClassDef {
+      def annotations: List[JavaAnnotation] = ???
+      def modifiers: JModifier = dsl.mod
+      def name: String = dsl.simpleName
+      def typeParameters: List[JavaTypeParamRepr] = Nil
+      def superType: JavaSignatureRepr = ???
+      def interfaces: List[JavaSignatureRepr] = Nil
+      def members: List[ClassMember] = ???
+
     }
   }
 
@@ -54,20 +81,25 @@ class JavaRepr (compiler: JCompiler) {
 
   }
 
-  class JavaDSLRepr (clazz: IRDSL) {
-
-  }
-
   class JavaFieldRepr (field: IRField) {
 
     def modifiers = field.mod
-    def fieldType = new JavaSignatureRepr(field.signature)
+    def fieldType = JavaSignatureRepr(field.signature)
     def name = field.name
 
   }
 
-  class JavaMethodRepr (method: IRMethod) {
+  trait JavaMethodRepr {
 
+  }
+
+  object JavaMethodRepr {
+    def apply (method: IRMethod): JavaMethodRepr = new JavaMethodRepr {
+
+    }
+    def apply (synthetic: IRSyntheticMethod): JavaMethodRepr = new JavaMethodRepr {
+
+    }
   }
 
   class JavaConstructorRepr (constructor: IRConstructor) {
@@ -84,10 +116,42 @@ class JavaRepr (compiler: JCompiler) {
 
   class JavaTypeParamRepr (mp: FormalMetaParameter) {
     def name = mp.name
-    def bounds = mp.bounds.map(new JavaSignatureRepr(_))
+    def bounds = mp.bounds.map(JavaSignatureRepr(_))
   }
 
-  class JavaSignatureRepr (signature: JTypeSignature) {
+
+  type JavaTypeArgumentRepr = JavaSignatureRepr :|: JavaWildcardRepr :|: UNil
+
+  type JavaWildcardRepr = JavaUnboundWildcardRepr.type :|: JavaUpperBoundWildcardRepr :|: JavaLowerBoundWildcardRepr :|: UNil
+
+  type JavaSignatureRepr = JavaClassSigRepr :|: JavaArraySigRepr :|: JavaTypeVariableSigRepr :|: JavaPrimitiveSigRepr :|: UNil
+
+  type JavaClassSigRepr = JavaTopLevelClassSigRepr :|: JavaMemberClassSigRepr :|: UNil
+
+  object JavaSignatureRepr {
+    def apply (signature: JTypeSignature): JavaSignatureRepr = {
+      ???
+    }
+  }
+
+  class JavaTopLevelClassSigRepr ()
+
+  class JavaMemberClassSigRepr ()
+
+  class JavaArraySigRepr ()
+
+  class JavaTypeVariableSigRepr ()
+
+  class JavaPrimitiveSigRepr ()
+
+  object JavaUnboundWildcardRepr
+
+  class JavaUpperBoundWildcardRepr ()
+
+  class JavaLowerBoundWildcardRepr ()
+
+
+  /*class JavaSignatureRepr (signature: JTypeSignature) {
     def typeName = javaTypeName(signature)
 
     private def javaTypeName (signature: JTypeSignature): String = signature match {
@@ -121,119 +185,95 @@ class JavaRepr (compiler: JCompiler) {
       case MetaVariableSignature(name)   => None
     }
   }
-
+  */
   class JavaTypeRepr (t: JType)
 
   /* literals */
 
-  type JavaLiteralRepr = JavaClassLiteralRepr | JavaStringLiteralRepr | JavaCharLiteralRepr | JavaIntLiteralRepr | JavaLongLiteralRepr | JavaBooleanLiteralRepr
+  type JavaLiteral = ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
 
-  object JavaLiteralRepr {
-    def apply (literal: IRJavaLiteral): JavaLiteralRepr = literal match {
-      case c: IRClassLiteral   => JavaClassLiteralRepr(c).l.l.l.l.l
-      case s: IRStringLiteral  => JavaStringLiteralRepr(s).r.l.l.l.l
-      case c: IRCharLiteral    => new JavaCharLiteralRepr(c).r.l.l.l
-      case i: IRIntLiteral     => new JavaIntLiteralRepr(i).r.l.l
-      case j: IRLongLiteral    => new JavaLongLiteralRepr(j).r.l
-      case z: IRBooleanLiteral => new JavaBooleanLiteralRepr(z).r
+  object JavaLiteral {
+    def apply (literal: IRJavaLiteral): JavaLiteral = literal match {
+      case c: IRClassLiteral   => Union[JavaLiteral](ClassLiteral(c))
+      case s: IRStringLiteral  => Union[JavaLiteral](Literal(s))
+      case c: IRCharLiteral    => Union[JavaLiteral](Literal(c))
+      case i: IRIntLiteral     => Union[JavaLiteral](Literal(i))
+      case j: IRLongLiteral    => Union[JavaLiteral](Literal(j))
+      case z: IRBooleanLiteral => Union[JavaLiteral](Literal(z))
     }
-    def apply (clazz: JavaClassLiteralRepr): JavaLiteralRepr = clazz.l.l.l.l.l
-    def apply (s: JavaStringLiteralRepr): JavaLiteralRepr = s.r.l.l.l.l
   }
 
-  trait JavaClassLiteralRepr {
+  trait ClassLiteral {
     def className: String
     def dim: Int
   }
 
-  object JavaClassLiteralRepr {
-    def apply (c: IRClassLiteral): JavaClassLiteralRepr = c match {
-      case IRObjectClassLiteral(clazz, d) => new JavaClassLiteralRepr {
-        def className: String = clazz.name
-        def dim: Int = d
-      }
-      case IRPrimitiveClassLiteral(primitive, d) => new JavaClassLiteralRepr {
-        def className: String = primitive.name
-        def dim: Int = d
-      }
+  object ClassLiteral {
+    def apply (c: IRClassLiteral): ClassLiteral = c match {
+      case IRObjectClassLiteral(clazz, d) => lit(clazz.name, d)
+      case IRPrimitiveClassLiteral(primitive, d) => lit(primitive.name, d)
     }
-    def apply (clazz: JClass): JavaClassLiteralRepr = new JavaClassLiteralRepr {
-      def className: String = clazz.name
-      def dim: Int = 0
+    def apply (clazz: JClass): ClassLiteral = lit(clazz.name, 0)
+    private def lit (name: String, dimension: Int): ClassLiteral = new ClassLiteral {
+      def className: String = name
+      def dim: Int = dimension
     }
   }
 
-  trait JavaStringLiteralRepr {
-    def value: String
+  trait Literal[T] {
+    def value: T
   }
-
-  object JavaStringLiteralRepr {
-    def apply (literal: IRStringLiteral): JavaStringLiteralRepr = new JavaStringLiteralRepr {
-      def value = literal.value
+  
+  object Literal {
+    def apply (literal: IRStringLiteral): Literal[String] = lit(literal.value)
+    def apply (literal: IRCharLiteral): Literal[Char] = lit(literal.value)
+    def apply (literal: IRIntLiteral): Literal[Int] = lit(literal.value)
+    def apply (literal: IRLongLiteral): Literal[Long] = lit(literal.value)
+    def apply (literal: IRBooleanLiteral): Literal[Boolean] = lit(literal.value)
+    def apply (v: String): Literal[String] = lit(v)
+    private def lit [T] (t: T): Literal[T] = new Literal[T] {
+      def value = t
     }
-    def apply (v: String): JavaStringLiteralRepr = new JavaStringLiteralRepr {
-      def value = v
-    }
-  }
-
-  class JavaCharLiteralRepr (literal: IRCharLiteral) {
-    def value = literal.value
-  }
-
-  class JavaIntLiteralRepr (literal: IRIntLiteral) {
-    def value = literal.value
-  }
-
-  class JavaLongLiteralRepr (literal: IRLongLiteral) {
-    def value = literal.value
-  }
-
-  class JavaBooleanLiteralRepr (literal: IRBooleanLiteral) {
-    def value = literal.value
   }
 
   /* annotation */
 
-  trait JavaAnnotationRepr {
+  trait JavaAnnotation {
     def name: String
-    def arguments: Map[String, JavaAnnotationElementRepr]
+    def arguments: Map[String, AnnotationElement]
   }
 
-  object JavaAnnotationRepr {
-    def apply (ann: IRAnnotation): JavaAnnotationRepr = new JavaAnnotationRepr {
+  object JavaAnnotation {
+    def apply (ann: IRAnnotation): JavaAnnotation = new JavaAnnotation {
       def name: String = ann.annotationClass.name
-      def arguments: Map[String, JavaAnnotationElementRepr] = ann.args.mapValues(JavaAnnotationElementRepr(_))
+      def arguments: Map[String, AnnotationElement] = ann.args.mapValues(AnnotationElement(_))
     }
-    def apply (n: String, args: Map[String, JavaAnnotationElementRepr]): JavaAnnotationRepr = new JavaAnnotationRepr {
+    def apply (n: String, args: Map[String, AnnotationElement]): JavaAnnotation = new JavaAnnotation {
       def name: String = n
-      def arguments: Map[String, JavaAnnotationElementRepr] = args
+      def arguments: Map[String, AnnotationElement] = args
     }
   }
 
-  type JavaAnnotationElementRepr = JavaAnnElemArrayRepr | JavaAnnotationRepr | JavaLiteralRepr | JavaEnumConstRefRepr
+  type AnnotationElement = JavaAnnElemArrayRepr :|: JavaAnnotation :|: JavaLiteral :|: JavaEnumConstRefRepr :|: UNil
 
-  object JavaAnnotationElementRepr {
-    def apply (e: IRAnnotationElement): JavaAnnotationElementRepr = e match {
-      case array: IRAnnotationElementArray => JavaAnnElemArrayRepr(array).l.l.l
-      case annotation: IRAnnotation => JavaAnnotationRepr(annotation).r.l.l
-      case literal: IRJavaLiteral   => JavaLiteralRepr(literal).r.l
-      case const: IREnumConstantRef => JavaEnumConstRefRepr(const).r
+  object AnnotationElement {
+    def apply (e: IRAnnotationElement): AnnotationElement = e match {
+      case array: IRAnnotationElementArray => Union[AnnotationElement](JavaAnnElemArrayRepr(array))
+      case annotation: IRAnnotation => Union[AnnotationElement](JavaAnnotation(annotation))
+      case literal: IRJavaLiteral   => Union[AnnotationElement](JavaLiteral(literal))
+      case const: IREnumConstantRef => Union[AnnotationElement](JavaEnumConstRefRepr(const))
     }
-    def apply (array: JavaAnnElemArrayRepr): JavaAnnotationElementRepr = array.l.l.l
-    def apply (ann: JavaAnnotationRepr): JavaAnnotationElementRepr = ann.r.l.l
-    def apply (lit: JavaLiteralRepr): JavaAnnotationElementRepr = lit.r.l
-    def apply (const: JavaEnumConstRefRepr): JavaAnnotationElementRepr = const.r
   }
 
   trait JavaAnnElemArrayRepr {
-    def elements: List[JavaAnnotationElementRepr]
+    def elements: List[AnnotationElement]
   }
 
   object JavaAnnElemArrayRepr {
     def apply (array: IRAnnotationElementArray): JavaAnnElemArrayRepr = new JavaAnnElemArrayRepr {
-      def elements = array.array.map(JavaAnnotationElementRepr(_))
+      def elements = array.array.map(AnnotationElement(_))
     }
-    def apply (es: List[JavaAnnotationElementRepr]): JavaAnnElemArrayRepr = new JavaAnnElemArrayRepr {
+    def apply (es: List[AnnotationElement]): JavaAnnElemArrayRepr = new JavaAnnElemArrayRepr {
       def elements = es
     }
   }
@@ -254,21 +294,19 @@ class JavaRepr (compiler: JCompiler) {
     }
   }
 
-
-
   object JavaAnnotationsRepr {
-    def javaClassAnnotations (clazz: IRModule): List[JavaAnnotationRepr] = {
+    def javaClassAnnotations (clazz: IRModule): List[JavaAnnotation] = {
       if (clazz.isDSL) except(classSigClassName, dslClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature) :+ dslAnnotation(clazz.declaredPriorities, clazz.priorityConstraints, clazz.withDSLs)
       else except(classSigClassName, dslClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature)
     }
 
-    def javaFieldAnnotations (field: IRField): List[JavaAnnotationRepr] = {
+    def javaFieldAnnotations (field: IRField): List[JavaAnnotation] = {
       except(fieldSigClassName)(field.annotations) :+ fieldSignatureAnnotation(field.signature)
     }
 
-    private def except (names: String*)(as: List[IRAnnotation]): List[JavaAnnotationRepr] = as.filterNot { ann => names.contains(ann.annotationClass.internalName) }.map(JavaAnnotationRepr(_))
+    private def except (names: String*)(as: List[IRAnnotation]): List[JavaAnnotation] = as.filterNot { ann => names.contains(ann.annotationClass.internalName) }.map(JavaAnnotation(_))
 
-    private def classSignatureAnnotation (sig: JClassSignature): JavaAnnotationRepr = {
+    private def classSignatureAnnotation (sig: JClassSignature): JavaAnnotation = {
       mkAnnotation(classSigClassName) (
         "metaParameters" -> array(sig.metaParams.map(metaParameterAnnotation).map(elementAnnotation)),
         "superType" -> strLit(sig.superClass.toString),
@@ -276,7 +314,7 @@ class JavaRepr (compiler: JCompiler) {
       )
     }
 
-    private def methodSignatureAnnotation (sig: JMethodSignature): JavaAnnotationRepr = {
+    private def methodSignatureAnnotation (sig: JMethodSignature): JavaAnnotation = {
       mkAnnotation(methodSigClassName) (
         "metaParameters" -> array(sig.metaParams.map(metaParameterAnnotation).map(elementAnnotation)),
         "returnType" -> strLit(sig.returnType.toString),
@@ -288,11 +326,11 @@ class JavaRepr (compiler: JCompiler) {
       )
     }
 
-    private def fieldSignatureAnnotation (sig: JTypeSignature): JavaAnnotationRepr = {
+    private def fieldSignatureAnnotation (sig: JTypeSignature): JavaAnnotation = {
       mkAnnotation(fieldSigClassName) ("value" -> strLit(sig.toString))
     }
 
-    private def dslAnnotation (declaredPriorities: Set[JPriority], priorityConstraints: List[List[JPriority]], withDSLs: List[JClass]): JavaAnnotationRepr = {
+    private def dslAnnotation (declaredPriorities: Set[JPriority], priorityConstraints: List[List[JPriority]], withDSLs: List[JClass]): JavaAnnotation = {
       mkAnnotation(dslClassName) (
         "priorities" -> array(declaredPriorities.map(p => strLit(p.name)).toList),
         "constraints" -> array(priorityConstraints.map(constraintAnnotation).map(elementAnnotation)),
@@ -300,13 +338,13 @@ class JavaRepr (compiler: JCompiler) {
       )
     }
 
-    private def operatorAnnotation (syntax: JSyntaxDef): JavaAnnotationRepr = syntax match {
+    private def operatorAnnotation (syntax: JSyntaxDef): JavaAnnotation = syntax match {
       case JExpressionSyntaxDef(priority, pattern) => operatorAnnotation("Expression", priority, pattern)
       case JLiteralSyntaxDef(priority, pattern)    => operatorAnnotation("Literal", priority, pattern)
       case JStatementSyntaxDef(priority, pattern)  => operatorAnnotation("Statement", priority, pattern)
     }
 
-    private def operatorAnnotation (level: String, priority: JPriority, pattern: List[JSyntaxElementDef]): JavaAnnotationRepr = {
+    private def operatorAnnotation (level: String, priority: JPriority, pattern: List[JSyntaxElementDef]): JavaAnnotation = {
       mkAnnotation(operatorClassName) (
         "level" -> enumConst(opLevelClassName, level),
         "priority" -> elementAnnotation(priorityAnnotation(priority)),
@@ -314,7 +352,7 @@ class JavaRepr (compiler: JCompiler) {
       )
     }
 
-    private def metaParameterAnnotation (fmp: FormalMetaParameter): JavaAnnotationRepr = {
+    private def metaParameterAnnotation (fmp: FormalMetaParameter): JavaAnnotation = {
       mkAnnotation(metaParamClassName)(
         "name" -> strLit(fmp.name),
         "type" -> strLit(fmp.metaType.toString),
@@ -322,15 +360,15 @@ class JavaRepr (compiler: JCompiler) {
         "bounds" -> array(fmp.bounds.map(sig => strLit(sig.toString))))
     }
 
-    private def constraintAnnotation (constraint: List[JPriority]): JavaAnnotationRepr = {
+    private def constraintAnnotation (constraint: List[JPriority]): JavaAnnotation = {
       mkAnnotation(constraintClassName)("value" -> array(constraint.map(priorityAnnotation).map(elementAnnotation)))
     }
 
-    private def priorityAnnotation (priority: JPriority): JavaAnnotationRepr = {
+    private def priorityAnnotation (priority: JPriority): JavaAnnotation = {
       mkAnnotation(priorityClassName)("dsl" -> strLit(priority.clazz.toString), "name" -> strLit(priority.name))
     }
 
-    private def operatorElementAnnotation (elem: JSyntaxElementDef): JavaAnnotationRepr = elem match {
+    private def operatorElementAnnotation (elem: JSyntaxElementDef): JavaAnnotation = elem match {
       case JOperatorNameDef(name) => operatorElementAnnotation("Name", name)
       case JOperandDef            => operatorElementAnnotation("Hole", "")
       case JRepetition0Def        => operatorElementAnnotation("Star", "")
@@ -341,21 +379,21 @@ class JavaRepr (compiler: JCompiler) {
       case JMetaValueRefDef(name) => operatorElementAnnotation("Reference", name)
     }
 
-    private def operatorElementAnnotation (name: String, value: String): JavaAnnotationRepr = {
+    private def operatorElementAnnotation (name: String, value: String): JavaAnnotation = {
       mkAnnotation(opElemClassName) ( "kind" -> enumConst(opElemTypeClassName, name), name -> strLit(value) )
     }
 
-    private def mkAnnotation (annName: String)(args: (String, JavaAnnotationElementRepr)*): JavaAnnotationRepr = JavaAnnotationRepr(annName, args.toMap)
+    private def mkAnnotation (annName: String)(args: (String, AnnotationElement)*): JavaAnnotation = JavaAnnotation(annName, args.toMap)
 
-    private def elementAnnotation (ann: JavaAnnotationRepr) = JavaAnnotationElementRepr(ann)
+    private def elementAnnotation (ann: JavaAnnotation) = Union[AnnotationElement](ann)
 
-    private def array (es: List[JavaAnnotationElementRepr]) = JavaAnnotationElementRepr(JavaAnnElemArrayRepr(es))
+    private def array (es: List[AnnotationElement]) = Union[AnnotationElement](JavaAnnElemArrayRepr(es))
 
-    private def enumConst (enum: String, const: String) = JavaAnnotationElementRepr(JavaEnumConstRefRepr(enum, const))
+    private def enumConst (enum: String, const: String) = Union[AnnotationElement](JavaEnumConstRefRepr(enum, const))
 
-    private def strLit (str: String) = JavaAnnotationElementRepr(JavaLiteralRepr(JavaStringLiteralRepr(str)))
+    private def strLit (str: String) = Union[AnnotationElement](Union[JavaLiteral](Literal(str)))
 
-    private def classLit (clazz: JClass) = JavaAnnotationElementRepr(JavaLiteralRepr(JavaClassLiteralRepr(clazz)))
+    private def classLit (clazz: JClass) = Union[AnnotationElement](Union[JavaLiteral](ClassLiteral(clazz)))
   }
 }
 

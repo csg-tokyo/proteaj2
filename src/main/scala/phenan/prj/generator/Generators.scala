@@ -2,6 +2,8 @@ package phenan.prj.generator
 
 import phenan.prj.exception.InvalidASTException
 
+import phenan.util._
+
 import scala.language.implicitConversions
 import scala.util._
 
@@ -9,9 +11,7 @@ trait Generators {
   def spacingBeforeWord: List[Char]
   def spacingAfterWord: List[Char]
 
-  type | [+A, +B] = Either[A, B]
-
-  class Generator[-T] private[Generators] (private val g: (StringBuilder, Int, Boolean, T) => Boolean) {
+  class Generator[-T] private[Generators] (private[Generators] val g: (StringBuilder, Int, Boolean, T) => Boolean) {
     def ~ [U] (that: => Generator[U]): Generator[(T, U)] = new Generator[(T, U)]((buf, indent, spacing, tu) => that.g(buf, indent, g(buf, indent, spacing, tu._1), tu._2))
     def <~ [U] (that: => Generator[U])(implicit e: EmptyInput[U]): Generator[T] = new Generator[T]((buf, indent, spacing, t) => that.g(buf, indent, g(buf, indent, spacing, t), e.v))
     def ~> [U, TT <: T] (that: => Generator[U])(implicit e: EmptyInput[TT]): Generator[U] = new Generator[U]((buf, indent, spacing, u) => that.g(buf, indent, g(buf, indent, spacing, e.v), u))
@@ -32,8 +32,6 @@ trait Generators {
       case Nil          => spacing
     })
 
-    def | [U] (that: => Generator[U]): Generator[T | U] = new Generator[T | U]((buf, indent, spacing, either) => either.fold(g(buf, indent, spacing, _), that.g(buf, indent, spacing, _)))
-
     def apply(t: T): Try[String] = try {
       val buf = new StringBuilder
       g(buf, 0, false, t)
@@ -41,6 +39,13 @@ trait Generators {
     } catch {
       case e: InvalidASTException => Failure(e)
     }
+  }
+
+  implicit class UnionGenerator [T <: Union] (generator: Generator[T]) {
+    def :|: [U] (that: => Generator[U]): Generator[U :|: T] = new Generator[U :|: T]((buf, indent, spacing, union) => union match {
+      case -:|: (u) => that.g(buf, indent, spacing, u)
+      case :|:- (t) => generator.g(buf, indent, spacing, t)
+    })
   }
 
   implicit def unit (c: Char): Generator[Unit] = new Generator[Unit] ((buf, _, spacing, _) => {
@@ -59,6 +64,8 @@ trait Generators {
   def string: Generator[String] = elem(a => a)
 
   def ␣ : Generator[Unit] = new Generator[Unit]((_, _, _, _) => true)
+
+  def nil : Generator[UNil] = new Generator[UNil]((_, _, _, _) => false)
 
   def elem [T] (f: T => String): Generator[T] = new Generator[T] ((buf, _, spacing, t) => appendString(buf, spacing, f(t)))
 

@@ -4,9 +4,10 @@ import phenan.prj._
 import phenan.prj.ir._
 import phenan.prj.util._
 
-import phenan.util.EitherUtil._
+import phenan.util._
 
 class JavaCodeGenerators (compiler: JCompiler) extends Generators {
+  /*
   lazy val classDef: Generator[IRClass] = annotation.* ~ modifiers ~ ( "class" ~> string ) ^^ { clazz =>
     clazz.annotations -> clazz.mod -> clazz.simpleName
   }
@@ -65,7 +66,7 @@ class JavaCodeGenerators (compiler: JCompiler) extends Generators {
   lazy val modifiers: Generator[JModifier] = elem { _.toString }
 
   def mul (s: String, n: Int): String = (0 until n).map(_ => s).mkString
-
+  */
   /*
   lazy val typeArgument: Generator[JTypeArgument] = (typeSignature | wildcardArgument) ^? {
     case sig: JTypeSignature        => sig.l
