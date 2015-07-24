@@ -114,9 +114,11 @@ trait IRModule extends JClass with IRMember {
 
   lazy val annotations = file.annotationReader.read(modifiersAST.collect { case ann: Annotation => ann })
 
+  lazy val staticResolver = file.resolver.withInnerClasses(inners).withPriorities(declaredPriorities)
+
   lazy val (signature: JClassSignature, resolver: NameResolver) = file.annotationReader.classSignature(annotations) match {
-    case Some(sig) => (sig, sig.metaParams.foldLeft(file.resolver){ _.withMetaParameter(_) }.withInnerClasses(inners))
-    case None      => constructResolver(metaParametersAST, Nil, file.resolver)
+    case Some(sig) => (sig, sig.metaParams.foldLeft(staticResolver){ _.withMetaParameter(_) })
+    case None      => constructResolver(metaParametersAST, Nil, staticResolver)
   }
 
   lazy val thisType: Option[JObjectType] = metaParametersRef(signature.metaParams, Nil).flatMap(objectType)
@@ -147,7 +149,7 @@ trait IRModule extends JClass with IRMember {
         state.error("invalid meta parameter : " + param, e)
         constructResolver(rest, metaParams, resolver)
     }
-    case Nil => (constructSignature(metaParams.reverse, resolver), resolver.withInnerClasses(inners).withPriorities(declaredPriorities))
+    case Nil => (constructSignature(metaParams.reverse, resolver), resolver)
   }
 
   private def constructSignature (metaParams: List[FormalMetaParameter], resolver: NameResolver): JClassSignature =
@@ -286,7 +288,7 @@ trait IRDSL extends IRModule {
   private lazy val priorityDeclarations = declaredMembers.collect { case p: IRDSLPriorities => p }
 
   private def withDSLs (ast: List[QualifiedName], result: List[JClass]): List[JClass] = ast match {
-    case qualifiedName :: rest => resolver.resolve(qualifiedName.names) match {
+    case qualifiedName :: rest => staticResolver.resolve(qualifiedName.names) match {
       case Success(sig) => withDSLs(rest, sig :: result)
       case Failure(e)   =>
         state.error("invalid DSL name : " + qualifiedName, e)
@@ -402,10 +404,15 @@ trait IRMemberVariable extends IRField {
   def name: String = declaratorAST.name
 
   lazy val signature: JTypeSignature = declaringClass.file.annotationReader.fieldSignature(annotations).getOrElse {
-    declaringClass.resolver.typeSignature(fieldTypeAST) match {
+    resolver.typeSignature(fieldTypeAST) match {
       case Success(t) => JTypeSignature.arraySig(t, declaratorAST.dim)
       case Failure(e) => state.errorAndReturn("invalid type of field : " + name, e, JTypeSignature.objectTypeSig)
     }
+  }
+
+  def resolver = {
+    if (isStatic) declaringClass.staticResolver
+    else declaringClass.resolver
   }
 /*
   lazy val initializer = declaratorAST.initializer.flatMap { snippet =>
@@ -463,8 +470,8 @@ trait IRProcedure extends JMethodDef with IRMember {
   lazy val annotations = annReader.read(modifiersAST.collect { case ann: Annotation => ann })
 
   lazy val (signature: JMethodSignature, parameters: List[IRFormalParameter], resolver: NameResolver) = annReader.methodSignature(annotations) match {
-    case Some(sig) => fromSignature(sig, declaringClass.resolver)
-    case None      => constructResolver(metaParametersAST, Nil, declaringClass.resolver)
+    case Some(sig) => fromSignature(sig, getResolver)
+    case None      => constructResolver(metaParametersAST, Nil, getResolver)
   }
 
   lazy val syntax = annReader.operator(annotations)
@@ -484,6 +491,11 @@ trait IRProcedure extends JMethodDef with IRMember {
   def environment = {
     if (isStatic) declaringClass.staticEnvironment.procedureEnvironment(this)
     else declaringClass.instanceEnvironment.procedureEnvironment(this)
+  }
+
+  private def getResolver = {
+    if (isStatic) declaringClass.staticResolver
+    else declaringClass.resolver
   }
 
   private def parametersRef (params: List[IRFormalParameter], ref: List[(JType, String)], bind: Map[String, MetaArgument]): Option[List[(JType, String)]] = params match {
@@ -708,7 +720,7 @@ case class IRContextOperator (operatorAST: OperatorDeclaration, declaringClass: 
 case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
   def priorityNames = prioritiesAST.names
 
-  lazy val constraints: List[List[JPriority]] = prioritiesAST.constraints.map(declaringDSL.resolver.constraint)
+  lazy val constraints: List[List[JPriority]] = prioritiesAST.constraints.map(declaringDSL.staticResolver.constraint)
 }
 
 

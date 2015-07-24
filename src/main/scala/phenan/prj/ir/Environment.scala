@@ -52,7 +52,7 @@ class Environment_Instance (val clazz: IRModule, val fileEnvironment: FileEnviro
 class Environment_Static (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = None
   def locals: Map[String, IRLocalVariableRef] = Map.empty
-  def resolver = clazz.file.resolver
+  def resolver = clazz.staticResolver
 }
 
 sealed trait ChildEnvironment extends Environment {
