@@ -237,7 +237,7 @@ object JavaRepr {
     def modifiers = field.mod
     def fieldType = typeSig(field.signature)
     def name = field.name
-    def initializer: Option[Expression] = ???
+    def initializer: Option[Expression] = field.initializer.map(expression)
   }
 
   def methodDef (method: IRMethod): MethodDef = new MethodDef {

@@ -121,7 +121,12 @@ trait IRModule extends JClass with IRMember {
     case None      => constructResolver(metaParametersAST, Nil, staticResolver)
   }
 
-  lazy val thisType: Option[JObjectType] = metaParametersRef(signature.metaParams, Nil).flatMap(objectType)
+  lazy val thisType: Option[JObjectType] = metaParametersRef.flatMap(objectType)
+
+  lazy val metaParameters: Map[String, MetaArgument] = metaParametersRef.map(args => signature.metaParams.map(_.name).zip(args).toMap).getOrElse {
+    state.error("invalid meta parameters")
+    Map.empty
+  }
 
   lazy val staticEnvironment = file.environment.staticEnvironment(this)
   lazy val instanceEnvironment = file.environment.instanceEnvironment(this)
@@ -133,6 +138,8 @@ trait IRModule extends JClass with IRMember {
   /* */
 
   private lazy val dslInfo = file.annotationReader.dsl(annotations)
+
+  private lazy val metaParametersRef: Option[List[MetaArgument]] = metaParametersRef(signature.metaParams, Nil)
 
   private def metaParametersRef (mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
     case mp :: rest => resolver.environment.get(mp.name) match {
@@ -394,7 +401,7 @@ trait IRField extends JFieldDef with IRMember {
 
   lazy val mod = IRModifiers.mod(modifiersAST) | implicitModifiers
 
-  //def initializer: Option[IRExpression]
+  def initializer: Option[IRExpression]
 }
 
 trait IRMemberVariable extends IRField {
@@ -414,15 +421,21 @@ trait IRMemberVariable extends IRField {
     if (isStatic) declaringClass.staticResolver
     else declaringClass.resolver
   }
-/*
-  lazy val initializer = declaratorAST.initializer.flatMap { snippet =>
-    if (isStatic) {
-      compiler.typeLoader.fromTypeSignature(signature, Map.empty)
-    }
-    else {
 
+  lazy val initializer = declaratorAST.initializer.flatMap { src =>
+    if (isStatic) compiler.typeLoader.fromTypeSignature(signature, Map.empty).flatMap { expected =>
+      compiler.bodyCompiler.expression(src.snippet, expected, declaringClass.staticEnvironment) match {
+        case Success(e) => Some(e)
+        case Failure(e) => state.errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
+      }
     }
-  }*/
+    else compiler.typeLoader.fromTypeSignature(signature, declaringClass.metaParameters).flatMap { expected =>
+      compiler.bodyCompiler.expression(src.snippet, expected, declaringClass.instanceEnvironment) match {
+        case Success(e) => Some(e)
+        case Failure(e) => state.errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
+      }
+    }
+  }
 
   def compiler = declaringClass.compiler
 }
@@ -452,6 +465,7 @@ case class IREnumConstant (constantAST: EnumConstant, declaringClass: IREnum) ex
   protected def implicitModifiers: Int = accPublic | accStatic | accFinal
   def name: String = constantAST.name
   def signature: JTypeSignature = SimpleClassTypeSignature(declaringClass.internalName, Nil)
+  def initializer: Option[IRExpression] = None
 }
 
 trait IRProcedure extends JMethodDef with IRMember {
