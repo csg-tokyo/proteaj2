@@ -1,124 +1,119 @@
 package phenan.prj.generator
 
 import phenan.prj._
+import phenan.prj.exception.InvalidASTException
 import phenan.prj.ir._
 
 import phenan.util._
 
 import CommonNames._
 
-class JavaRepr (compiler: JCompiler) {
-  
-  class JavaFile (file: IRFile) {
-    def packageName = file.packageName.map(_.names.mkString("."))
-    def importedClasses = file.importedClassNames.map(_.names.mkString("."))
-    def importedPackages = file.importedPackageNames.map(_.names.mkString("."))
-    def modules = file.topLevelModules.map(ModuleDef(_))
-  }
+object JavaRepr {
 
-  type ClassMember = FieldDef :|: MethodDef :|: ConstructorDef :|: InstanceInitializerDef :|: StaticInitializerDef :|: ModuleDef :|: UNil
-
-  object ClassMember {
-    def apply (member: IRClassMember): ClassMember = member match {
-      case field: IRClassField             => Union[ClassMember](new FieldDef(field))
-      case method: IRClassMethod           => Union[ClassMember](MethodDef(method))
-      case constructor: IRClassConstructor => Union[ClassMember](new ConstructorDef(constructor))
-      case iin: IRClassInstanceInitializer => Union[ClassMember](new InstanceInitializerDef(iin))
-      case sin: IRClassStaticInitializer   => Union[ClassMember](new StaticInitializerDef(sin))
-      case module: IRModule                => Union[ClassMember](ModuleDef(module))
-    }
-    def apply (synthetic: IRSyntheticMethod): ClassMember = Union[ClassMember](MethodDef(synthetic))
+  trait JavaFile {
+    def packageName: Option[String]
+    def modules: List[ModuleDef]
   }
 
   type ModuleDef = ClassDef :|: EnumDef :|: InterfaceDef :|: UNil
 
-  object ModuleDef {
-    def apply (clazz: IRModule): ModuleDef = clazz match {
-      case cls: IRTopLevelClass     => Union[ModuleDef](ClassDef(cls))
-      case enm: IRTopLevelEnum      => Union[ModuleDef](new EnumDef(enm))
-      case ifc: IRTopLevelInterface => Union[ModuleDef](new InterfaceDef(ifc))
-      case dsl: IRTopLevelDSL       => Union[ModuleDef](ClassDef(dsl))
-    }
-  }
+  type ClassMember = FieldDef :|: MethodDef :|: ConstructorDef :|: InstanceInitializerDef :|: StaticInitializerDef :|: ModuleDef :|: UNil
 
   trait ClassDef {
     def annotations: List[JavaAnnotation]
     def modifiers: JModifier
     def name: String
     def typeParameters: List[TypeParam]
-    def superType: TypeSig
-    def interfaces: List[TypeSig]
+    def superType: ClassSig
+    def interfaces: List[ClassSig]
     def members: List[ClassMember]
   }
 
-  object ClassDef {
-    def apply (clazz: IRClass): ClassDef = new ClassDef {
-      def annotations = Annotations.classAnnotations(clazz)
-      def modifiers = clazz.mod
-      def name = clazz.simpleName
-      def typeParameters = clazz.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(new TypeParam(_))
-      def superType = TypeSig(clazz.signature.superClass)
-      def interfaces = clazz.signature.interfaces.map(TypeSig(_))
-      def members: List[ClassMember] = clazz.declaredMembers.map(ClassMember(_)) ++ clazz.syntheticMethods.map(ClassMember(_))
-    }
-    def apply (dsl: IRDSL): ClassDef = new ClassDef {
-      def annotations: List[JavaAnnotation] = ???
-      def modifiers: JModifier = dsl.mod
-      def name: String = dsl.simpleName
-      def typeParameters: List[TypeParam] = Nil
-      def superType: TypeSig = ???
-      def interfaces: List[TypeSig] = Nil
-      def members: List[ClassMember] = ???
-
-    }
-  }
-
-  class EnumDef (clazz: IREnum) {
+  trait EnumDef {
 
   }
 
-  class InterfaceDef (clazz: IRInterface) {
+  trait InterfaceDef {
 
   }
 
-  class FieldDef (field: IRField) {
-
-    def modifiers = field.mod
-    def fieldType = TypeSig(field.signature)
-    def name = field.name
-
+  trait FieldDef {
+    def annotations: List[JavaAnnotation]
+    def modifiers: JModifier
+    def fieldType: TypeSig
+    def name: String
+    def initializer: Option[Expression]
   }
 
   trait MethodDef {
 
   }
 
-  object MethodDef {
-    def apply (method: IRMethod): MethodDef = new MethodDef {
-
-    }
-    def apply (synthetic: IRSyntheticMethod): MethodDef = new MethodDef {
-
-    }
-  }
-
-  class ConstructorDef (constructor: IRConstructor) {
+  trait ConstructorDef {
 
   }
 
-  class InstanceInitializerDef (instanceInitializer: IRInstanceInitializer) {
+  trait InstanceInitializerDef {
 
   }
 
-  class StaticInitializerDef (staticInitializer: IRStaticInitializer) {
+  trait StaticInitializerDef {
 
   }
 
-  class TypeParam (mp: FormalMetaParameter) {
-    def name = mp.name
-    def bounds = mp.bounds.map(TypeSig(_))
+  type Statement = LocalDeclaration :|: SingleStatement :|: UNil
+
+  type SingleStatement = ControlStatement :|: Block :|: ExpressionStatement :|: UNil
+
+  type ControlStatement = ReturnStatement
+
+  trait LocalDeclaration {
+
   }
 
+  trait ReturnStatement
+
+  trait Block {
+    def statements: List[Statement]
+  }
+
+  trait ExpressionStatement {
+    def expression: Expression
+  }
+
+  type Expression = JavaLiteral
+
+  type JavaLiteral = ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
+
+  trait ClassLiteral {
+    def className: String
+    def dim: Int
+  }
+
+  trait Literal[T] {
+    def value: T
+  }
+
+  trait JavaAnnotation {
+    def name: String
+    def arguments: Map[String, AnnotationElement]
+  }
+
+  type AnnotationElement = ElementArray :|: JavaAnnotation :|: JavaLiteral :|: EnumConstRef :|: UNil
+
+  trait ElementArray {
+    def elements: List[AnnotationElement]
+  }
+
+  trait EnumConstRef {
+    def enumName: String
+    def constantName: String
+  }
+
+  trait TypeParam {
+    def name: String
+    def bounds: List[TypeSig]
+  }
 
   type TypeArg = TypeSig :|: Wildcard :|: UNil
 
@@ -128,183 +123,319 @@ class JavaRepr (compiler: JCompiler) {
 
   type ClassSig = TopLevelClassSig :|: MemberClassSig :|: UNil
 
-  object TypeSig {
-    def apply (signature: JTypeSignature): TypeSig = {
-      ???
-    }
+  trait TopLevelClassSig {
+    def className: String
+    def typeArguments: List[TypeArg]
   }
 
-  class TopLevelClassSig ()
+  trait MemberClassSig {
+    def outer: ClassSig
+    def className: String
+    def typeArguments: List[TypeArg]
+  }
 
-  class MemberClassSig ()
+  trait ArraySig {
+    def component: TypeSig
+  }
 
-  class ArraySig ()
+  trait TypeVariableSig {
+    def name: String
+  }
 
-  class TypeVariableSig ()
-
-  class PrimitiveSig ()
+  trait PrimitiveSig {
+    def name: String
+  }
 
   object UnboundWildcard
 
-  class UpperBoundWildcard ()
-
-  class LowerBoundWildcard ()
-
-
-  /*class JavaSignatureRepr (signature: JTypeSignature) {
-    def typeName = javaTypeName(signature)
-
-    private def javaTypeName (signature: JTypeSignature): String = signature match {
-      case SimpleClassTypeSignature(clazz, Nil)         => clazz.replace('/', '.')
-      case SimpleClassTypeSignature(clazz, args)        => clazz.replace('/', '.') + args.map(javaTypeArgumentName).mkString("<", ",", ">")
-      case MemberClassTypeSignature(outer, clazz, Nil)  => javaTypeName(outer) + '.' + clazz
-      case MemberClassTypeSignature(outer, clazz, args) => javaTypeName(outer) + '.' + clazz + args.map(javaTypeArgumentName).mkString("<", ",", ">")
-      case JArrayTypeSignature(component)               => javaTypeName(component) + "[]"
-      case JTypeVariableSignature(name)                 => name
-      case primitive: JPrimitiveTypeSignature           => javaPrimitiveTypeName(primitive)
-      case cap: JCapturedWildcardSignature              => compiler.state.errorAndReturn("captured wildcard is found in generated Java code", "#captured#")
-    }
-
-    private def javaPrimitiveTypeName (primitive: JPrimitiveTypeSignature): String = primitive match {
-      case ByteTypeSignature   => "byte"
-      case CharTypeSignature   => "char"
-      case DoubleTypeSignature => "double"
-      case FloatTypeSignature  => "float"
-      case IntTypeSignature    => "int"
-      case LongTypeSignature   => "long"
-      case ShortTypeSignature  => "short"
-      case BoolTypeSignature   => "boolean"
-      case VoidTypeSignature   => "void"
-    }
-
-    private def javaTypeArgumentName (arg: JTypeArgument): Option[String] = arg match {
-      case signature: JTypeSignature     => Some(javaTypeName(signature))
-      case WildcardArgument(Some(ub), _) => Some("? extends " + javaTypeName(ub))
-      case WildcardArgument(_, Some(lb)) => Some("? super " + javaTypeName(lb))
-      case WildcardArgument(None, None)  => Some("?")
-      case MetaVariableSignature(name)   => None
-    }
+  trait UpperBoundWildcard {
+    def bound: TypeSig
   }
-  */
-  class JavaTypeRepr (t: JType)
+
+  trait LowerBoundWildcard {
+    def bound: TypeSig
+  }
+
+  /* AST transformation : ProteaJ IR ==> Java AST */
+
+  def javaFile (file: IRFile): JavaFile = new JavaFile {
+    def packageName = file.packageName.map(_.names.mkString("."))
+    def modules = file.topLevelModules.map(moduleDef)
+  }
+
+  def moduleDef (clazz: IRModule): ModuleDef = clazz match {
+    case cls: IRTopLevelClass     => Union[ModuleDef](classDef(cls))
+    case enm: IRTopLevelEnum      => Union[ModuleDef](enumDef(enm))
+    case ifc: IRTopLevelInterface => Union[ModuleDef](interfaceDef(ifc))
+    case dsl: IRTopLevelDSL       => Union[ModuleDef](dslDef(dsl))
+  }
+
+  def classDef (clazz: IRClass): ClassDef = new ClassDef {
+    def annotations = Annotations.classAnnotations(clazz)
+    def modifiers = clazz.mod
+    def name = clazz.simpleName
+    def typeParameters = clazz.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(typeParam)
+    def superType = classSig(clazz.signature.superClass)
+    def interfaces = clazz.signature.interfaces.map(classSig)
+    def members: List[ClassMember] = clazz.declaredMembers.map(classMember) ++ clazz.syntheticMethods.map(syntheticMember)
+  }
+
+  def enumDef (enum: IREnum): EnumDef = new EnumDef {
+
+  }
+
+  def interfaceDef (interface: IRInterface): InterfaceDef = new InterfaceDef {
+
+  }
+
+  def dslDef (dsl: IRDSL): ClassDef = new ClassDef {
+    def annotations: List[JavaAnnotation] = Annotations.dslAnnotations(dsl)
+    def modifiers = dsl.mod
+    def name = dsl.simpleName
+    def typeParameters = Nil
+    def superType = objectClassSig
+    def interfaces = Nil
+    def members: List[ClassMember] = dsl.declaredMembers.flatMap(dslMember) ++ dsl.syntheticMethods.map(syntheticMember)
+  }
+
+  def contextDef (context: IRContext): ClassDef = new ClassDef {
+    def annotations: List[JavaAnnotation] = Annotations.contextAnnotations(context)
+    def modifiers = context.mod
+    def name = context.simpleName
+    def typeParameters = context.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(typeParam)
+    def superType = objectClassSig
+    def interfaces = Nil
+    def members: List[ClassMember] = context.declaredMembers.map(contextMember) ++ context.syntheticMethods.map(syntheticMember)
+  }
+
+  def classMember (member: IRClassMember): ClassMember = member match {
+    case field: IRClassField             => Union[ClassMember](fieldDef(field))
+    case method: IRClassMethod           => Union[ClassMember](methodDef(method))
+    case constructor: IRClassConstructor => Union[ClassMember](constructorDef(constructor))
+    case iin: IRClassInstanceInitializer => Union[ClassMember](instanceInitializerDef(iin))
+    case sin: IRClassStaticInitializer   => Union[ClassMember](staticInitializerDef(sin))
+    case module: IRModule                => Union[ClassMember](moduleDef(module))
+  }
+
+  def dslMember (member: IRDSLMember): Option[ClassMember] = member match {
+    case field: IRDSLField       => Some(Union[ClassMember](fieldDef(field)))
+    case operator: IRDSLOperator => Some(Union[ClassMember](operatorDef(operator)))
+    case context: IRContext      => Some(Union[ClassMember](Union[ModuleDef](contextDef(context))))
+    case _: IRDSLPriorities      => None
+  }
+
+  def contextMember (member: IRContextMember): ClassMember = member match {
+    case field: IRContextField             => Union[ClassMember](fieldDef(field))
+    case operator: IRContextOperator       => Union[ClassMember](operatorDef(operator))
+    case constructor: IRContextConstructor => Union[ClassMember](constructorDef(constructor))
+  }
+
+  def syntheticMember (synthetic: IRSyntheticMethod): ClassMember = Union[ClassMember](syntheticMethodDef(synthetic))
+
+  def fieldDef (field: IRField): FieldDef = new FieldDef {
+    def annotations = Annotations.fieldAnnotations(field)
+    def modifiers = field.mod
+    def fieldType = typeSig(field.signature)
+    def name = field.name
+    def initializer: Option[Expression] = ???
+  }
+
+  def methodDef (method: IRMethod): MethodDef = new MethodDef {
+
+  }
+
+  def operatorDef (operator: IROperator): MethodDef = new MethodDef {
+
+  }
+
+  def syntheticMethodDef (synthetic: IRSyntheticMethod): MethodDef = new MethodDef {
+
+  }
+
+  def constructorDef (constructor: IRConstructor): ConstructorDef = new ConstructorDef {
+
+  }
+
+  def instanceInitializerDef (iin: IRClassInstanceInitializer): InstanceInitializerDef = new InstanceInitializerDef {
+
+  }
+
+  def staticInitializerDef (sin: IRClassStaticInitializer): StaticInitializerDef = new StaticInitializerDef {
+
+  }
+
+  /* expressions */
+
+  def expression (expression: IRExpression): Expression = ???
 
   /* literals */
 
-  type JavaLiteral = ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
-
-  object JavaLiteral {
-    def apply (literal: IRJavaLiteral): JavaLiteral = literal match {
-      case c: IRClassLiteral   => Union[JavaLiteral](ClassLiteral(c))
-      case s: IRStringLiteral  => Union[JavaLiteral](Literal(s))
-      case c: IRCharLiteral    => Union[JavaLiteral](Literal(c))
-      case i: IRIntLiteral     => Union[JavaLiteral](Literal(i))
-      case j: IRLongLiteral    => Union[JavaLiteral](Literal(j))
-      case z: IRBooleanLiteral => Union[JavaLiteral](Literal(z))
-    }
+  def javaLiteral (literal: IRJavaLiteral): JavaLiteral = literal match {
+    case c: IRClassLiteral   => Union[JavaLiteral](classLiteral(c))
+    case s: IRStringLiteral  => Union[JavaLiteral](stringLiteral(s))
+    case c: IRCharLiteral    => Union[JavaLiteral](charLiteral(c))
+    case i: IRIntLiteral     => Union[JavaLiteral](intLiteral(i))
+    case j: IRLongLiteral    => Union[JavaLiteral](longLiteral(j))
+    case z: IRBooleanLiteral => Union[JavaLiteral](booleanLiteral(z))
   }
 
-  trait ClassLiteral {
-    def className: String
-    def dim: Int
+  def classLiteral (c: IRClassLiteral): ClassLiteral = c match {
+    case IRObjectClassLiteral(clazz, d) => classLiteral(clazz.name, d)
+    case IRPrimitiveClassLiteral(primitive, d) => classLiteral(primitive.name, d)
   }
 
-  object ClassLiteral {
-    def apply (c: IRClassLiteral): ClassLiteral = c match {
-      case IRObjectClassLiteral(clazz, d) => lit(clazz.name, d)
-      case IRPrimitiveClassLiteral(primitive, d) => lit(primitive.name, d)
-    }
-    def apply (clazz: JClass): ClassLiteral = lit(clazz.name, 0)
-    private def lit (name: String, dimension: Int): ClassLiteral = new ClassLiteral {
-      def className: String = name
-      def dim: Int = dimension
-    }
+  def classLiteral (clazz: JClass): ClassLiteral = classLiteral(clazz.name, 0)
+
+  private def classLiteral (name: String, dimension: Int): ClassLiteral = new ClassLiteral {
+    def className: String = name
+    def dim: Int = dimension
   }
 
-  trait Literal[T] {
-    def value: T
+  def stringLiteral (lit: IRStringLiteral): Literal[String] = literal(lit.value)
+
+  def stringLiteral (v: String): Literal[String] = literal(v)
+
+  def charLiteral (lit: IRCharLiteral): Literal[Char] = literal(lit.value)
+
+  def intLiteral (lit: IRIntLiteral): Literal[Int] = literal(lit.value)
+
+  def longLiteral (lit: IRLongLiteral): Literal[Long] = literal(lit.value)
+
+  def booleanLiteral (lit: IRBooleanLiteral): Literal[Boolean] = literal(lit.value)
+
+  private def literal [T] (t: T): Literal[T] = new Literal[T] {
+    def value = t
   }
-  
-  object Literal {
-    def apply (literal: IRStringLiteral): Literal[String] = lit(literal.value)
-    def apply (literal: IRCharLiteral): Literal[Char] = lit(literal.value)
-    def apply (literal: IRIntLiteral): Literal[Int] = lit(literal.value)
-    def apply (literal: IRLongLiteral): Literal[Long] = lit(literal.value)
-    def apply (literal: IRBooleanLiteral): Literal[Boolean] = lit(literal.value)
-    def apply (v: String): Literal[String] = lit(v)
-    private def lit [T] (t: T): Literal[T] = new Literal[T] {
-      def value = t
-    }
+
+  /* signatures */
+
+  def typeParam (mp: FormalMetaParameter): TypeParam = new TypeParam {
+    def name = mp.name
+    def bounds = mp.bounds.map(typeSig)
+  }
+
+  def typeSig (signature: JTypeSignature): TypeSig = signature match {
+    case c: JClassTypeSignature        => Union[TypeSig](classSig(c))
+    case a: JArrayTypeSignature        => Union[TypeSig](arraySig(a))
+    case p: JPrimitiveTypeSignature    => Union[TypeSig](primitiveSig(p))
+    case v: JTypeVariableSignature     => Union[TypeSig](typeVariableSig(v))
+    case c: JCapturedWildcardSignature => throw InvalidASTException("captured wildcard is found in generated Java code")
+  }
+
+  def classSig (signature: JClassTypeSignature): ClassSig = signature match {
+    case s: SimpleClassTypeSignature => Union[ClassSig](topLevelClassSig(s))
+    case m: MemberClassTypeSignature => Union[ClassSig](memberClassSig(m))
+  }
+
+  def objectClassSig: ClassSig = classSig(JTypeSignature.objectTypeSig)
+
+  def topLevelClassSig (signature: SimpleClassTypeSignature): TopLevelClassSig = new TopLevelClassSig {
+    def className: String = signature.internalName.replace('/', '.')
+    def typeArguments: List[TypeArg] = signature.args.flatMap(typeArg)
+  }
+
+  def memberClassSig (signature: MemberClassTypeSignature): MemberClassSig = new MemberClassSig {
+    def outer: ClassSig = classSig(signature.outer)
+    def className: String = signature.clazz
+    def typeArguments: List[TypeArg] = signature.args.flatMap(typeArg)
+  }
+
+  def arraySig (signature: JArrayTypeSignature): ArraySig = new ArraySig {
+    def component: TypeSig = typeSig(signature.component)
+  }
+
+  def primitiveSig (signature: JPrimitiveTypeSignature): PrimitiveSig = signature match {
+    case ByteTypeSignature   => primitiveSig("byte")
+    case CharTypeSignature   => primitiveSig("char")
+    case DoubleTypeSignature => primitiveSig("double")
+    case FloatTypeSignature  => primitiveSig("float")
+    case IntTypeSignature    => primitiveSig("int")
+    case LongTypeSignature   => primitiveSig("long")
+    case ShortTypeSignature  => primitiveSig("short")
+    case BoolTypeSignature   => primitiveSig("boolean")
+    case VoidTypeSignature   => primitiveSig("void")
+  }
+
+  private def primitiveSig (primitiveName: String): PrimitiveSig = new PrimitiveSig {
+    def name = primitiveName
+  }
+
+  def typeVariableSig (v: JTypeVariableSignature) = new TypeVariableSig {
+    def name = v.name
+  }
+
+  def typeArg (arg: JTypeArgument): Option[TypeArg] = arg match {
+    case signature: JTypeSignature      => Some(Union[TypeArg](typeSig(signature)))
+    case wild: WildcardArgument         => Some(Union[TypeArg](wildcard(wild)))
+    case metaVar: MetaVariableSignature => None
+  }
+
+  def wildcard (wild: WildcardArgument): Wildcard = wild match {
+    case WildcardArgument(Some(ub), _) => Union[Wildcard](new UpperBoundWildcard { def bound = typeSig(ub) })
+    case WildcardArgument(_, Some(lb)) => Union[Wildcard](new LowerBoundWildcard { def bound = typeSig(lb) })
+    case WildcardArgument(None, None)  => Union[Wildcard](UnboundWildcard)
   }
 
   /* annotation */
 
-  trait JavaAnnotation {
-    def name: String
-    def arguments: Map[String, AnnotationElement]
+  def annotation (ann: IRAnnotation): JavaAnnotation = new JavaAnnotation {
+    def name: String = ann.annotationClass.name
+    def arguments: Map[String, AnnotationElement] = ann.args.mapValues(annotationElement)
   }
 
-  object JavaAnnotation {
-    def apply (ann: IRAnnotation): JavaAnnotation = new JavaAnnotation {
-      def name: String = ann.annotationClass.name
-      def arguments: Map[String, AnnotationElement] = ann.args.mapValues(AnnotationElement(_))
-    }
-    def apply (n: String, args: Map[String, AnnotationElement]): JavaAnnotation = new JavaAnnotation {
-      def name: String = n
-      def arguments: Map[String, AnnotationElement] = args
-    }
+  def annotation (n: String, args: Map[String, AnnotationElement]): JavaAnnotation = new JavaAnnotation {
+    def name: String = n
+    def arguments: Map[String, AnnotationElement] = args
   }
 
-  type AnnotationElement = ElementArray :|: JavaAnnotation :|: JavaLiteral :|: EnumConstRef :|: UNil
-
-  object AnnotationElement {
-    def apply (e: IRAnnotationElement): AnnotationElement = e match {
-      case array: IRAnnotationElementArray => Union[AnnotationElement](ElementArray(array))
-      case annotation: IRAnnotation => Union[AnnotationElement](JavaAnnotation(annotation))
-      case literal: IRJavaLiteral   => Union[AnnotationElement](JavaLiteral(literal))
-      case const: IREnumConstantRef => Union[AnnotationElement](EnumConstRef(const))
-    }
+  def annotationElement (e: IRAnnotationElement): AnnotationElement = e match {
+    case array: IRAnnotationElementArray => Union[AnnotationElement](elementArray(array))
+    case ann: IRAnnotation        => Union[AnnotationElement](annotation(ann))
+    case literal: IRJavaLiteral   => Union[AnnotationElement](javaLiteral(literal))
+    case const: IREnumConstantRef => Union[AnnotationElement](enumConstRef(const))
   }
 
-  trait ElementArray {
-    def elements: List[AnnotationElement]
+  def elementArray (array: IRAnnotationElementArray): ElementArray = new ElementArray {
+    def elements = array.array.map(annotationElement)
   }
 
-  object ElementArray {
-    def apply (array: IRAnnotationElementArray): ElementArray = new ElementArray {
-      def elements = array.array.map(AnnotationElement(_))
-    }
-    def apply (es: List[AnnotationElement]): ElementArray = new ElementArray {
-      def elements = es
-    }
+  def elementArray (es: List[AnnotationElement]): ElementArray = new ElementArray {
+    def elements = es
   }
 
-  trait EnumConstRef {
-    def enumName: String
-    def constantName: String
+  def enumConstRef (const: IREnumConstantRef): EnumConstRef = new EnumConstRef {
+    def enumName = const.field.declaringClass.name
+    def constantName = const.field.name
   }
 
-  object EnumConstRef {
-    def apply (const: IREnumConstantRef): EnumConstRef = new EnumConstRef {
-      def enumName = const.field.declaringClass.name
-      def constantName = const.field.name
-    }
-    def apply (enum: String, const: String): EnumConstRef = new EnumConstRef {
-      def enumName = enum
-      def constantName = const
-    }
+  def enumConstRef (enum: String, const: String): EnumConstRef = new EnumConstRef {
+    def enumName = enum
+    def constantName = const
   }
 
   object Annotations {
-    def classAnnotations (clazz: IRModule): List[JavaAnnotation] = {
-      if (clazz.isDSL) except(classSigClassName, dslClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature) :+ dslAnnotation(clazz.declaredPriorities, clazz.priorityConstraints, clazz.withDSLs)
-      else except(classSigClassName, dslClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature)
+    def classAnnotations (clazz: IRClass): List[JavaAnnotation] = {
+      if (clazz.isDSL) classLikeAnnotations(clazz) :+ dslAnnotation(clazz.declaredPriorities, clazz.priorityConstraints, clazz.withDSLs)
+      else classLikeAnnotations(clazz)
+    }
+
+    def dslAnnotations (dsl: IRDSL): List[JavaAnnotation] = {
+      classLikeAnnotations(dsl) :+ dslAnnotation(dsl.declaredPriorities, dsl.priorityConstraints, dsl.withDSLs)
+    }
+
+    def contextAnnotations (context: IRContext): List[JavaAnnotation] = {
+      classLikeAnnotations(context) :+ contextAnnotation
     }
 
     def fieldAnnotations (field: IRField): List[JavaAnnotation] = {
       except(fieldSigClassName)(field.annotations) :+ fieldSignatureAnnotation(field.signature)
     }
 
-    private def except (names: String*)(as: List[IRAnnotation]): List[JavaAnnotation] = as.filterNot { ann => names.contains(ann.annotationClass.internalName) }.map(JavaAnnotation(_))
+    private def classLikeAnnotations (clazz: IRModule): List[JavaAnnotation] = {
+      except(classSigClassName, dslClassName, contextClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature)
+    }
+
+    private def except (names: String*)(as: List[IRAnnotation]): List[JavaAnnotation] = as.filterNot { ann => names.contains(ann.annotationClass.internalName) }.map(annotation)
 
     private def classSignatureAnnotation (sig: JClassSignature): JavaAnnotation = {
       mkAnnotation(classSigClassName) (
@@ -337,6 +468,8 @@ class JavaRepr (compiler: JCompiler) {
         "with" -> array(withDSLs.map(classLit))
       )
     }
+
+    private def contextAnnotation: JavaAnnotation = mkAnnotation(contextClassName)()
 
     private def operatorAnnotation (syntax: JSyntaxDef): JavaAnnotation = syntax match {
       case JExpressionSyntaxDef(priority, pattern) => operatorAnnotation("Expression", priority, pattern)
@@ -383,17 +516,17 @@ class JavaRepr (compiler: JCompiler) {
       mkAnnotation(opElemClassName) ( "kind" -> enumConst(opElemTypeClassName, name), name -> strLit(value) )
     }
 
-    private def mkAnnotation (annName: String)(args: (String, AnnotationElement)*): JavaAnnotation = JavaAnnotation(annName, args.toMap)
+    private def mkAnnotation (annName: String)(args: (String, AnnotationElement)*): JavaAnnotation = annotation(annName, args.toMap)
 
     private def elementAnnotation (ann: JavaAnnotation) = Union[AnnotationElement](ann)
 
-    private def array (es: List[AnnotationElement]) = Union[AnnotationElement](ElementArray(es))
+    private def array (es: List[AnnotationElement]) = Union[AnnotationElement](elementArray(es))
 
-    private def enumConst (enum: String, const: String) = Union[AnnotationElement](EnumConstRef(enum, const))
+    private def enumConst (enum: String, const: String) = Union[AnnotationElement](enumConstRef(enum, const))
 
-    private def strLit (str: String) = Union[AnnotationElement](Union[JavaLiteral](Literal(str)))
+    private def strLit (str: String) = Union[AnnotationElement](Union[JavaLiteral](stringLiteral(str)))
 
-    private def classLit (clazz: JClass) = Union[AnnotationElement](Union[JavaLiteral](ClassLiteral(clazz)))
+    private def classLit (clazz: JClass) = Union[AnnotationElement](Union[JavaLiteral](classLiteral(clazz)))
   }
 }
 

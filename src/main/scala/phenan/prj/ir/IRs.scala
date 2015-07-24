@@ -388,9 +388,11 @@ trait IRField extends JFieldDef with IRMember {
   protected def modifiersAST: List[Modifier]
   protected def implicitModifiers: Int
 
+  lazy val annotations = declaringClass.file.annotationReader.read(modifiersAST.collect { case ann: Annotation => ann })
+
   lazy val mod = IRModifiers.mod(modifiersAST) | implicitModifiers
 
-  lazy val annotations = declaringClass.file.annotationReader.read(modifiersAST.collect { case ann: Annotation => ann })
+  //def initializer: Option[IRExpression]
 }
 
 trait IRMemberVariable extends IRField {
@@ -405,6 +407,17 @@ trait IRMemberVariable extends IRField {
       case Failure(e) => state.errorAndReturn("invalid type of field : " + name, e, JTypeSignature.objectTypeSig)
     }
   }
+/*
+  lazy val initializer = declaratorAST.initializer.flatMap { snippet =>
+    if (isStatic) {
+      compiler.typeLoader.fromTypeSignature(signature, Map.empty)
+    }
+    else {
+
+    }
+  }*/
+
+  def compiler = declaringClass.compiler
 }
 
 case class IRClassField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRClass) extends IRMemberVariable with IRClassMember {

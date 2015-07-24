@@ -40,18 +40,19 @@ sealed trait ModuleEnvironment extends Environment {
   def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = fileEnvironment.expressionOperators(expected, priority)
   def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = fileEnvironment.literalOperators(expected, priority)
   def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
-  def resolver = clazz.resolver
   private val inferencer = new MethodContextInferencer(clazz.compiler.unifier, Nil)
 }
 
 class Environment_Instance (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = clazz.thisType
   def locals: Map[String, IRLocalVariableRef] = Map.empty
+  def resolver = clazz.resolver
 }
 
 class Environment_Static (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = None
   def locals: Map[String, IRLocalVariableRef] = Map.empty
+  def resolver = clazz.file.resolver
 }
 
 sealed trait ChildEnvironment extends Environment {
