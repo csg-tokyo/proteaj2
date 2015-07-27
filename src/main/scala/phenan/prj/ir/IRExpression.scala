@@ -30,6 +30,11 @@ case class IRNewExpression (metaArgs: Map[String, MetaArgument], constructor: JC
   }
 }
 
+sealed trait IRExplicitConstructorCall
+
+case class IRThisConstructorCall (metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExplicitConstructorCall
+case class IRSuperConstructorCall (metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExplicitConstructorCall
+
 sealed trait IRArrayCreation extends IRExpression
 
 case class IRNewArray (componentType: JType, length: List[IRExpression], dim: Int) extends IRArrayCreation {

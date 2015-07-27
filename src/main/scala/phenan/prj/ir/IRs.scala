@@ -647,6 +647,13 @@ trait IRConstructor extends IRProcedure {
   protected def returnTypeAST: Option[TypeName] = None
   protected def formalParametersAST: List[FormalParameter] = constructorAST.formalParameters
   protected def clausesAST: List[MethodClause] = constructorAST.clauses
+
+  lazy val constructorBody = {
+    compiler.bodyCompiler.constructorBody(constructorAST.body.snippet, environment) match {
+      case Success(e) => Some(e)
+      case Failure(e) => state.errorAndReturn("parse error at constructor of " + declaringClass.name, e, None)
+    }
+  }
 }
 
 case class IRClassConstructor (constructorAST: ConstructorDeclaration, declaringClass: IRClass) extends IRConstructor with IRClassMember {
@@ -729,6 +736,15 @@ trait IROperator extends IRProcedure {
     case OptionalOperand => JOptionalOperandDef
     case AndPredicate(t, p) => JAndPredicateDef(predicateSignature(t, p))
     case NotPredicate(t, p) => JNotPredicateDef(predicateSignature(t, p))
+  }
+
+  lazy val operatorBody = operatorAST.body.flatMap { src =>
+    compiler.typeLoader.fromTypeSignature(signature.returnType, metaParameters).flatMap { expected =>
+      compiler.bodyCompiler.methodBody(src.snippet, expected, environment) match {
+        case Success(e) => Some(e)
+        case Failure(e) => state.errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
+      }
+    }
   }
 
   private def predicateSignature (t: TypeName, p: Option[QualifiedName]): JParameterSignature = {

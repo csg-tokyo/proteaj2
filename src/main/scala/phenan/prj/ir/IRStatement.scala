@@ -1,8 +1,10 @@
 package phenan.prj.ir
 
-import phenan.prj.JType
+import phenan.prj._
 
 case class IRMethodBody (block: IRBlock)
+
+case class IRConstructorBody (constructorCall: Option[IRExplicitConstructorCall], statements: List[IRStatement])
 
 sealed trait IRStatement {
   def activates: List[IRContextRef] = Nil

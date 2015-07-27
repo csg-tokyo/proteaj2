@@ -23,6 +23,10 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   class StatementParsers private (returnType: JType, env: Environment) {
     lazy val methodBody = block ^^ IRMethodBody
 
+    lazy val constructorBody = '{' ~> ( JavaExpressionParsers(env).explicitConstructorCall.? ~ blockStatements ) <~ '}' ^^ {
+      case ecc ~ statements => IRConstructorBody(ecc, statements)
+    }
+
     lazy val block = '{' ~> blockStatements <~ '}' ^^ IRBlock
 
     lazy val blockStatements: HParser[List[IRStatement]] = HParser.repeat0((List.empty[IRStatement], env)) {
@@ -172,6 +176,16 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case metaArgs ~ constructType => constructType.findConstructor(env.clazz).flatMap(constructorCall(metaArgs, _)).reduceOption(_ | _)
     }
 
+    lazy val explicitConstructorCall: HParser[IRExplicitConstructorCall] = thisConstructorCall | superConstructorCall
+
+    lazy val thisConstructorCall: HParser[IRThisConstructorCall] = typeParsers.metaArguments <~ "this" >>? { metaArgs =>
+      env.thisType.flatMap { _.findConstructor(env.clazz).flatMap(thisConstructorCall(metaArgs, _)).reduceOption(_ | _) }
+    }
+
+    lazy val superConstructorCall: HParser[IRSuperConstructorCall] = typeParsers.metaArguments <~ "super" >>? { metaArgs =>
+      env.thisType.flatMap(_.superType).flatMap { _.findConstructor(env.clazz).flatMap(superConstructorCall(metaArgs, _)).reduceOption(_ | _) }
+    }
+
     lazy val methodCall: HParser[IRMethodCall] = staticMethodCall | superMethodCall | instanceMethodCall
 
     lazy val abbreviatedMethodCall: HParser[IRMethodCall] = thisClassMethodCall | thisMethodCall
@@ -264,6 +278,12 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     private def constructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRNewExpression]] =
       procedureCall(constructor, metaArgs) { IRNewExpression(_, constructor, _, _) }
+
+    private def thisConstructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRThisConstructorCall]] =
+      procedureCall(constructor, metaArgs) { IRThisConstructorCall(_, constructor, _, _) }
+
+    private def superConstructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRSuperConstructorCall]] =
+      procedureCall(constructor, metaArgs) { IRSuperConstructorCall(_, constructor, _, _) }
 
     private def invokeVirtual (instance: IRExpression, method: JMethod): HParser[IRInstanceMethodCall] =
       procedureCall(method) { IRInstanceMethodCall(instance, _, method, _, _) }
