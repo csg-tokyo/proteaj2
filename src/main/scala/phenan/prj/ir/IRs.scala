@@ -680,6 +680,13 @@ trait IRInstanceInitializer extends IRProcedure {
   protected def clausesAST: List[MethodClause] = Nil
 
   protected def implicitModifiers: Int = 0
+
+  lazy val initializerBody = {
+    compiler.bodyCompiler.initializerBody(instanceInitializerAST.block.snippet, environment) match {
+      case Success(e) => Some(e)
+      case Failure(e) => state.errorAndReturn("parse error at instance initializer of " + declaringClass.name, e, None)
+    }
+  }
 }
 
 case class IRClassInstanceInitializer (instanceInitializerAST: InstanceInitializer, declaringClass: IRClass) extends IRInstanceInitializer with IRClassMember
@@ -698,6 +705,13 @@ trait IRStaticInitializer extends IRProcedure {
   protected def clausesAST: List[MethodClause] = Nil
 
   protected def implicitModifiers: Int = accStatic
+
+  lazy val initializerBody = {
+    compiler.bodyCompiler.initializerBody(staticInitializerAST.block.snippet, environment) match {
+      case Success(e) => Some(e)
+      case Failure(e) => state.errorAndReturn("parse error at static initializer of " + declaringClass.name, e, None)
+    }
+  }
 }
 
 case class IRClassStaticInitializer (staticInitializerAST: StaticInitializer, declaringClass: IRClass) extends IRStaticInitializer with IRClassMember
@@ -773,17 +787,36 @@ case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: 
 sealed trait IRSyntheticMethod extends JMethodDef with IRMember {
   def mod: JModifier = JModifier(modifiers)
   def syntax: Option[JSyntaxDef] = None
-  def signature: JMethodSignature = JMethodSignature(Nil, parameterSignatures, returnTypeSignature, Nil, Nil, Nil, Nil)
+  def signature: JMethodSignature = JMethodSignature(metaParameters, parameterSignatures, returnTypeSignature, Nil, Nil, Nil, Nil)
   
   protected def modifiers: Int
+  protected def metaParameters: List[FormalMetaParameter]
   protected def parameterSignatures: List[JParameterSignature]
   protected def returnTypeSignature: JTypeSignature
 }
 
 case class IRParameterInitializer (method: IRProcedure, returnTypeSignature: JTypeSignature, name: String, snippet: ExpressionSnippet) extends IRSyntheticMethod {
-  protected def modifiers = accPublic | accStatic | accFinal
+  protected def modifiers = {
+    if (method.isStatic) accPublic | accStatic | accFinal
+    else accPublic | accFinal
+  }
+  protected def metaParameters = method.signature.metaParams
   protected def parameterSignatures: List[JParameterSignature] = Nil
-  def declaringClass: JClass = method.declaringClass
+  def declaringClass = method.declaringClass
+
+  def environment = {
+    if (isStatic) declaringClass.staticEnvironment
+    else declaringClass.instanceEnvironment
+  }
+
+  lazy val expression = {
+    compiler.typeLoader.fromTypeSignature(returnTypeSignature, method.metaParameters).flatMap { expected =>
+      compiler.bodyCompiler.expression(snippet.snippet, expected, environment) match {
+        case Success(e) => Some(e)
+        case Failure(e) => state.errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
+      }
+    }
+  }
 }
 
 object IRModifiers {

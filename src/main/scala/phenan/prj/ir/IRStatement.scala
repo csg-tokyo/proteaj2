@@ -6,6 +6,8 @@ case class IRMethodBody (block: IRBlock)
 
 case class IRConstructorBody (constructorCall: Option[IRExplicitConstructorCall], statements: List[IRStatement])
 
+case class IRInitializerBody (block: IRBlock)
+
 sealed trait IRStatement {
   def activates: List[IRContextRef] = Nil
   def deactivates: List[IRContextRef] = Nil

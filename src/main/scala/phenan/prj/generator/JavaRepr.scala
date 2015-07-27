@@ -63,6 +63,7 @@ object JavaRepr {
     def name: String
     def parameters: List[Param]
     def throws: List[TypeSig]
+    def body: Option[Block]
   }
 
   trait ConstructorDef {
@@ -72,18 +73,19 @@ object JavaRepr {
     def className: String
     def parameters: List[Param]
     def throws: List[TypeSig]
+    def body: Block
   }
 
   trait InstanceInitializerDef {
-
+    def body: Block
   }
 
   trait StaticInitializerDef {
-
+    def body: Block
   }
 
   trait EnumConstantDef {
-
+    def name: String
   }
 
   trait Param {
@@ -285,7 +287,9 @@ object JavaRepr {
     case constructor: IRContextConstructor => Union[ClassMember](constructorDef(constructor))
   }
 
-  def syntheticMember (synthetic: IRSyntheticMethod): ClassMember = Union[ClassMember](syntheticMethodDef(synthetic))
+  def syntheticMember (synthetic: IRSyntheticMethod): ClassMember = synthetic match {
+    case ini: IRParameterInitializer => Union[ClassMember](parameterInitializerDef(ini))
+  }
 
   def fieldDef (field: IRField): FieldDef = new FieldDef {
     def annotations = Annotations.fieldAnnotations(field)
@@ -303,6 +307,7 @@ object JavaRepr {
     def name = method.name
     def parameters = method.parameters.map(parameter)
     def throws = method.signature.throwTypes.map(typeSig)
+    def body = method.methodBody.map(methodBody)
   }
 
   def operatorDef (operator: IROperator): MethodDef = new MethodDef {
@@ -313,18 +318,18 @@ object JavaRepr {
     def name = operator.name
     def parameters = operator.parameters.map(parameter)
     def throws = operator.signature.throwTypes.map(typeSig)
+    def body = operator.operatorBody.map(methodBody)
   }
-
-  def syntheticMethodDef (synthetic: IRSyntheticMethod): MethodDef = new MethodDef {
-    def annotations = Annotations.syntheticMethodAnnotations(synthetic)
-    def modifiers = synthetic.mod
+  
+  def parameterInitializerDef (initializer: IRParameterInitializer): MethodDef = new MethodDef {
+    def annotations = Annotations.paramInitializerAnnotations(initializer)
+    def modifiers = initializer.mod
     def typeParameters = Nil
-    def returnType = typeSig(synthetic.signature.returnType)
-    def name = synthetic.name
-    def parameters = synthetic.signature.parameters.zipWithIndex.map {
-      case (sig, id) => parameter(sig, id)
-    }
+    def returnType = typeSig(initializer.signature.returnType)
+    def name = initializer.name
+    def parameters = Nil
     def throws = Nil
+    def body = initializer.expression.map(parameterInitializer)
   }
 
   def constructorDef (constructor: IRConstructor): ConstructorDef = new ConstructorDef {
@@ -334,27 +339,42 @@ object JavaRepr {
     def className = constructor.declaringClass.simpleName
     def parameters = constructor.parameters.map(parameter)
     def throws = constructor.signature.throwTypes.map(typeSig)
+    def body = constructor.constructorBody.map(constructorBody).getOrElse {
+      throw InvalidASTException("constructor must have its body")
+    }
   }
 
   def instanceInitializerDef (iin: IRInstanceInitializer): InstanceInitializerDef = new InstanceInitializerDef {
-
+    def body = iin.initializerBody.map(initializerBody).getOrElse {
+      throw InvalidASTException("invalid instance initializer")
+    }
   }
 
   def staticInitializerDef (sin: IRStaticInitializer): StaticInitializerDef = new StaticInitializerDef {
-
+    def body = sin.initializerBody.map(initializerBody).getOrElse {
+      throw InvalidASTException("invalid static initializer")
+    }
   }
 
   def enumConstantDef (constant: IREnumConstant): EnumConstantDef = new EnumConstantDef {
-
+    def name = constant.name
   }
 
   def parameter (param: IRFormalParameter): Param = new Param {
-
+    
   }
 
   def parameter (sig: JParameterSignature, id: Int): Param = new Param {
 
   }
+
+  def methodBody (body: IRMethodBody): Block = ???
+
+  def constructorBody (body: IRConstructorBody): Block = ???
+
+  def initializerBody (body: IRInitializerBody): Block = ???
+
+  def parameterInitializer (body: IRExpression): Block = ???
 
   /* expressions */
 
@@ -540,7 +560,7 @@ object JavaRepr {
 
     def constructorAnnotations (constructor: IRConstructor): List[JavaAnnotation] = methodLikeAnnotations(constructor)
 
-    def syntheticMethodAnnotations (synthetic: IRSyntheticMethod): List[JavaAnnotation] = List(methodSignatureAnnotation(synthetic.signature))
+    def paramInitializerAnnotations (initializer: IRParameterInitializer): List[JavaAnnotation] = List(methodSignatureAnnotation(initializer.signature))
 
     private def classLikeAnnotations (clazz: IRModule): List[JavaAnnotation] = {
       except(classSigClassName, dslClassName, contextClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature)

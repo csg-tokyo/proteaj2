@@ -27,6 +27,8 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       case ecc ~ statements => IRConstructorBody(ecc, statements)
     }
 
+    lazy val initializerBody = block ^^ IRInitializerBody
+
     lazy val block = '{' ~> blockStatements <~ '}' ^^ IRBlock
 
     lazy val blockStatements: HParser[List[IRStatement]] = HParser.repeat0((List.empty[IRStatement], env)) {
