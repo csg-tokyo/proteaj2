@@ -44,6 +44,8 @@ class BodyParsersTest extends FunSuite with Matchers {
     val expected = IRBlock(List(IRExpressionStatement(IRInstanceMethodCall(IRStaticFieldAccess(outField.get), Map.empty, printMethod.get, List(IRStringLiteral("Hello, world!", compiler)), Nil))))
 
     result.get shouldBe expected
+
+    mainMethod.asInstanceOf[IRMethod].methodBody shouldBe Some(IRMethodBody(expected))
   }
 
   test ("引数") {
@@ -59,12 +61,6 @@ class BodyParsersTest extends FunSuite with Matchers {
     val test0 = file.modules.head
     val mainMethod = test0.procedures.head
 
-    val body =
-      """{
-        |  System.out.println(args[0]);
-        |}
-      """.stripMargin
-
     val outField = compiler.classLoader.loadClass_PE("java/lang/System").flatMap(_.classModule.findField("out", test0))
 
     val printMethods = compiler.classLoader.loadClass_PE("java/io/PrintStream").flatMap(_.objectType(Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
@@ -74,14 +70,13 @@ class BodyParsersTest extends FunSuite with Matchers {
       }
     }
 
-    val result = parsers.parse(parsers.StatementParsers(compiler.typeLoader.void, mainMethod.environment).block, body)
-    result shouldBe a [Success[_]]
+    val result = mainMethod.asInstanceOf[IRMethod].methodBody
 
     val arrayOfString = compiler.typeLoader.stringType.map(_.array).get
 
-    val expected = IRBlock(List(IRExpressionStatement(IRInstanceMethodCall(IRStaticFieldAccess(outField.get), Map.empty, printMethod.get, List(IRArrayAccess(IRLocalVariableRef(arrayOfString, "args"), IRIntLiteral(0, compiler))), Nil))))
+    val expected = IRMethodBody(IRBlock(List(IRExpressionStatement(IRInstanceMethodCall(IRStaticFieldAccess(outField.get), Map.empty, printMethod.get, List(IRArrayAccess(IRLocalVariableRef(arrayOfString, "args"), IRIntLiteral(0, compiler))), Nil)))))
 
-    result.get shouldBe expected
+    result shouldBe Some(expected)
   }
 
   lazy val compiler = {

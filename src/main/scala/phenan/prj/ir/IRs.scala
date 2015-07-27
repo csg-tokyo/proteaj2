@@ -493,12 +493,12 @@ trait IRProcedure extends JMethodDef with IRMember {
 
   def paramInitializers = parameters.flatMap(_.initializerMethod)
 
-  def parameterVariables: List[(JType, String)] = parametersRef(parameters, Nil, metaParametersRef).getOrElse {
+  def parameterVariables: List[(JType, String)] = parametersRef(parameters, Nil, metaParameters).getOrElse {
     state.error("invalid parameter type")
     Nil
   }
 
-  def requiresContexts: List[IRContextRef] = IRContextRef.createRefsFromSignatures(signature.requires, metaParametersRef, compiler).getOrElse {
+  def requiresContexts: List[IRContextRef] = IRContextRef.createRefsFromSignatures(signature.requires, metaParameters, compiler).getOrElse {
     state.error("invalid required context type")
     Nil
   }
@@ -506,6 +506,11 @@ trait IRProcedure extends JMethodDef with IRMember {
   def environment = {
     if (isStatic) declaringClass.staticEnvironment.procedureEnvironment(this)
     else declaringClass.instanceEnvironment.procedureEnvironment(this)
+  }
+
+  lazy val metaParameters: Map[String, MetaArgument] = {
+    if (isStatic) metaParameters(signature.metaParams, Map.empty)
+    else metaParameters(signature.metaParams, declaringClass.metaParameters)
   }
 
   private lazy val methodSyntax = annReader.operator(annotations)
@@ -523,17 +528,14 @@ trait IRProcedure extends JMethodDef with IRMember {
     case Nil => Some(ref.reverse)
   }
 
-  private lazy val metaParametersRef: Map[String, MetaArgument] = metaParametersRef(signature.metaParams, Nil).map(args => signature.metaParams.map(_.name).zip(args).toMap).getOrElse {
-    state.error("invalid meta parameters")
-    Map.empty
-  }
-
-  private def metaParametersRef (mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
+  private def metaParameters (mps: List[FormalMetaParameter], bind: Map[String, MetaArgument]): Map[String, MetaArgument] = mps match {
     case mp :: rest => resolver.environment.get(mp.name) match {
-      case Some(arg) => metaParametersRef(rest, arg :: ref)
-      case None      => None
+      case Some(arg) => metaParameters(rest, bind + (mp.name -> arg))
+      case None      =>
+        state.error("invalid meta parameters : " + mp.name)
+        metaParameters(rest, bind)
     }
-    case Nil => Some(ref.reverse)
+    case Nil => bind
   }
 
   private def annReader = declaringClass.file.annotationReader
@@ -614,8 +616,12 @@ trait IRMethod extends IRProcedure {
   protected def clausesAST: List[MethodClause] = methodAST.clauses
 
   lazy val methodBody = methodAST.body.flatMap { src =>
-    if (isStatic) ???
-    else ???
+    compiler.typeLoader.fromTypeSignature(signature.returnType, metaParameters).flatMap { expected =>
+      compiler.bodyCompiler.methodBody(src.snippet, expected, environment) match {
+        case Success(e) => Some(e)
+        case Failure(e) => state.errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
+      }
+    }
   }
 }
 

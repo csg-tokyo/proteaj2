@@ -21,6 +21,8 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   class StatementParsers private (returnType: JType, env: Environment) {
+    lazy val methodBody = block ^^ IRMethodBody
+
     lazy val block = '{' ~> blockStatements <~ '}' ^^ IRBlock
 
     lazy val blockStatements: HParser[List[IRStatement]] = HParser.repeat0((List.empty[IRStatement], env)) {
