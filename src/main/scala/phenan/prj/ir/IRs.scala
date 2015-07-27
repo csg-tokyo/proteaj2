@@ -217,8 +217,9 @@ trait IREnum extends IRModule {
 
   def simpleName: String = enumAST.name
 
-  lazy val declaredMembers: List[IREnumMember] = enumConstants ++ declaredMembers(enumAST.members, Nil)
+  def declaredMembers: List[IREnumMember] = enumConstants ++ enumMembers
   lazy val enumConstants: List[IREnumConstant] = enumAST.enumConstants.map(IREnumConstant(_, this))
+  lazy val enumMembers: List[IREnumMember] = declaredMembers(enumAST.members, Nil)
 
   protected def modifiersAST: List[Modifier] = enumAST.modifiers
   protected def metaParametersAST: List[MetaParameter] = Nil
@@ -488,7 +489,7 @@ trait IRProcedure extends JMethodDef with IRMember {
     case None      => constructResolver(metaParametersAST, Nil, getResolver)
   }
 
-  lazy val syntax = annReader.operator(annotations)
+  def syntax = methodSyntax
 
   def paramInitializers = parameters.flatMap(_.initializerMethod)
 
@@ -506,6 +507,8 @@ trait IRProcedure extends JMethodDef with IRMember {
     if (isStatic) declaringClass.staticEnvironment.procedureEnvironment(this)
     else declaringClass.instanceEnvironment.procedureEnvironment(this)
   }
+
+  private lazy val methodSyntax = annReader.operator(annotations)
 
   private def getResolver = {
     if (isStatic) declaringClass.staticResolver
@@ -609,6 +612,11 @@ trait IRMethod extends IRProcedure {
   protected def returnTypeAST: Option[TypeName] = Some(methodAST.returnType)
   protected def formalParametersAST: List[FormalParameter] = methodAST.formalParameters
   protected def clausesAST: List[MethodClause] = methodAST.clauses
+
+  lazy val methodBody = methodAST.body.flatMap { src =>
+    if (isStatic) ???
+    else ???
+  }
 }
 
 case class IRClassMethod (methodAST: MethodDeclaration, declaringClass: IRClass) extends IRMethod with IRClassMember {
@@ -695,7 +703,9 @@ trait IROperator extends IRProcedure {
   protected def formalParametersAST: List[FormalParameter] = operatorAST.formalParameters
   protected def clausesAST: List[MethodClause] = operatorAST.clauses
 
-  override lazy val syntax = Some {
+  override def syntax = Some(operatorSyntax)
+
+  lazy val operatorSyntax = {
     if (modifiersAST.contains(LiteralModifier)) JLiteralSyntaxDef(priority, pattern)
     else JExpressionSyntaxDef(priority, pattern)
   }

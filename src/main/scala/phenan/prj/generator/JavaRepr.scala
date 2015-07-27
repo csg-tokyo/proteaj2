@@ -30,11 +30,21 @@ object JavaRepr {
   }
 
   trait EnumDef {
-
+    def annotations: List[JavaAnnotation]
+    def modifiers: JModifier
+    def name: String
+    def interfaces: List[ClassSig]
+    def constants: List[EnumConstantDef]
+    def members: List[ClassMember]
   }
 
   trait InterfaceDef {
-
+    def annotations: List[JavaAnnotation]
+    def modifiers: JModifier
+    def name: String
+    def typeParameters: List[TypeParam]
+    def superInterfaces: List[ClassSig]
+    def members: List[ClassMember]
   }
 
   trait FieldDef {
@@ -46,11 +56,22 @@ object JavaRepr {
   }
 
   trait MethodDef {
-
+    def annotations: List[JavaAnnotation]
+    def modifiers: JModifier
+    def typeParameters: List[TypeParam]
+    def returnType: TypeSig
+    def name: String
+    def parameters: List[Param]
+    def throws: List[TypeSig]
   }
 
   trait ConstructorDef {
-
+    def annotations: List[JavaAnnotation]
+    def modifiers: JModifier
+    def typeParameters: List[TypeParam]
+    def className: String
+    def parameters: List[Param]
+    def throws: List[TypeSig]
   }
 
   trait InstanceInitializerDef {
@@ -58,6 +79,14 @@ object JavaRepr {
   }
 
   trait StaticInitializerDef {
+
+  }
+
+  trait EnumConstantDef {
+
+  }
+
+  trait Param {
 
   }
 
@@ -174,38 +203,48 @@ object JavaRepr {
     def annotations = Annotations.classAnnotations(clazz)
     def modifiers = clazz.mod
     def name = clazz.simpleName
-    def typeParameters = clazz.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(typeParam)
+    def typeParameters = typeParams(clazz.signature.metaParams)
     def superType = classSig(clazz.signature.superClass)
     def interfaces = clazz.signature.interfaces.map(classSig)
-    def members: List[ClassMember] = clazz.declaredMembers.map(classMember) ++ clazz.syntheticMethods.map(syntheticMember)
+    def members = clazz.declaredMembers.map(classMember) ++ clazz.syntheticMethods.map(syntheticMember)
   }
 
   def enumDef (enum: IREnum): EnumDef = new EnumDef {
-
+    def annotations = Annotations.enumAnnotations(enum)
+    def modifiers = enum.mod
+    def name = enum.simpleName
+    def interfaces = enum.signature.interfaces.map(classSig)
+    def constants = enum.enumConstants.map(enumConstantDef)
+    def members = enum.enumMembers.map(enumMember)
   }
 
   def interfaceDef (interface: IRInterface): InterfaceDef = new InterfaceDef {
-
+    def annotations = Annotations.interfaceAnnotations(interface)
+    def modifiers = interface.mod
+    def name = interface.simpleName
+    def typeParameters = typeParams(interface.signature.metaParams)
+    def superInterfaces = interface.signature.interfaces.map(classSig)
+    def members = interface.declaredMembers.map(interfaceMember)
   }
 
   def dslDef (dsl: IRDSL): ClassDef = new ClassDef {
-    def annotations: List[JavaAnnotation] = Annotations.dslAnnotations(dsl)
+    def annotations = Annotations.dslAnnotations(dsl)
     def modifiers = dsl.mod
     def name = dsl.simpleName
     def typeParameters = Nil
     def superType = objectClassSig
     def interfaces = Nil
-    def members: List[ClassMember] = dsl.declaredMembers.flatMap(dslMember) ++ dsl.syntheticMethods.map(syntheticMember)
+    def members = dsl.declaredMembers.flatMap(dslMember) ++ dsl.syntheticMethods.map(syntheticMember)
   }
 
   def contextDef (context: IRContext): ClassDef = new ClassDef {
-    def annotations: List[JavaAnnotation] = Annotations.contextAnnotations(context)
+    def annotations = Annotations.contextAnnotations(context)
     def modifiers = context.mod
     def name = context.simpleName
-    def typeParameters = context.signature.metaParams.filter(_.metaType == JTypeSignature.typeTypeSig).map(typeParam)
+    def typeParameters = typeParams(context.signature.metaParams)
     def superType = objectClassSig
     def interfaces = Nil
-    def members: List[ClassMember] = context.declaredMembers.map(contextMember) ++ context.syntheticMethods.map(syntheticMember)
+    def members = context.declaredMembers.map(contextMember) ++ context.syntheticMethods.map(syntheticMember)
   }
 
   def classMember (member: IRClassMember): ClassMember = member match {
@@ -215,6 +254,22 @@ object JavaRepr {
     case iin: IRClassInstanceInitializer => Union[ClassMember](instanceInitializerDef(iin))
     case sin: IRClassStaticInitializer   => Union[ClassMember](staticInitializerDef(sin))
     case module: IRModule                => Union[ClassMember](moduleDef(module))
+  }
+
+  def enumMember (member: IREnumMember): ClassMember = member match {
+    case field: IREnumField             => Union[ClassMember](fieldDef(field))
+    case method: IREnumMethod           => Union[ClassMember](methodDef(method))
+    case constructor: IREnumConstructor => Union[ClassMember](constructorDef(constructor))
+    case iin: IREnumInstanceInitializer => Union[ClassMember](instanceInitializerDef(iin))
+    case sin: IREnumStaticInitializer   => Union[ClassMember](staticInitializerDef(sin))
+    case module: IRModule               => Union[ClassMember](moduleDef(module))
+    case _ => throw InvalidASTException("invalid enum declaration AST")
+  }
+
+  def interfaceMember (member: IRInterfaceMember): ClassMember = member match {
+    case field: IRInterfaceField   => Union[ClassMember](fieldDef(field))
+    case method: IRInterfaceMethod => Union[ClassMember](methodDef(method))
+    case module: IRModule          => Union[ClassMember](moduleDef(module))
   }
 
   def dslMember (member: IRDSLMember): Option[ClassMember] = member match {
@@ -241,26 +296,63 @@ object JavaRepr {
   }
 
   def methodDef (method: IRMethod): MethodDef = new MethodDef {
-
+    def annotations = Annotations.methodAnnotations(method)
+    def modifiers = method.mod
+    def typeParameters = typeParams(method.signature.metaParams)
+    def returnType = typeSig(method.signature.returnType)
+    def name = method.name
+    def parameters = method.parameters.map(parameter)
+    def throws = method.signature.throwTypes.map(typeSig)
   }
 
   def operatorDef (operator: IROperator): MethodDef = new MethodDef {
-
+    def annotations = Annotations.operatorAnnotations(operator)
+    def modifiers = operator.mod
+    def typeParameters = typeParams(operator.signature.metaParams)
+    def returnType = typeSig(operator.signature.returnType)
+    def name = operator.name
+    def parameters = operator.parameters.map(parameter)
+    def throws = operator.signature.throwTypes.map(typeSig)
   }
 
   def syntheticMethodDef (synthetic: IRSyntheticMethod): MethodDef = new MethodDef {
-
+    def annotations = Annotations.syntheticMethodAnnotations(synthetic)
+    def modifiers = synthetic.mod
+    def typeParameters = Nil
+    def returnType = typeSig(synthetic.signature.returnType)
+    def name = synthetic.name
+    def parameters = synthetic.signature.parameters.zipWithIndex.map {
+      case (sig, id) => parameter(sig, id)
+    }
+    def throws = Nil
   }
 
   def constructorDef (constructor: IRConstructor): ConstructorDef = new ConstructorDef {
+    def annotations = Annotations.constructorAnnotations(constructor)
+    def modifiers = constructor.mod
+    def typeParameters = typeParams(constructor.signature.metaParams)
+    def className = constructor.declaringClass.simpleName
+    def parameters = constructor.parameters.map(parameter)
+    def throws = constructor.signature.throwTypes.map(typeSig)
+  }
+
+  def instanceInitializerDef (iin: IRInstanceInitializer): InstanceInitializerDef = new InstanceInitializerDef {
 
   }
 
-  def instanceInitializerDef (iin: IRClassInstanceInitializer): InstanceInitializerDef = new InstanceInitializerDef {
+  def staticInitializerDef (sin: IRStaticInitializer): StaticInitializerDef = new StaticInitializerDef {
 
   }
 
-  def staticInitializerDef (sin: IRClassStaticInitializer): StaticInitializerDef = new StaticInitializerDef {
+  def enumConstantDef (constant: IREnumConstant): EnumConstantDef = new EnumConstantDef {
+
+  }
+
+  def parameter (param: IRFormalParameter): Param = new Param {
+
+  }
+
+  def parameter (sig: JParameterSignature, id: Int): Param = new Param {
 
   }
 
@@ -308,6 +400,8 @@ object JavaRepr {
   }
 
   /* signatures */
+
+  def typeParams (mps: List[FormalMetaParameter]): List[TypeParam] = mps.filter(_.metaType == JTypeSignature.typeTypeSig).map(typeParam)
 
   def typeParam (mp: FormalMetaParameter): TypeParam = new TypeParam {
     def name = mp.name
@@ -419,6 +513,10 @@ object JavaRepr {
       else classLikeAnnotations(clazz)
     }
 
+    def enumAnnotations (enum: IREnum): List[JavaAnnotation] = classLikeAnnotations(enum)
+
+    def interfaceAnnotations (interface: IRInterface): List[JavaAnnotation] = classLikeAnnotations(interface)
+
     def dslAnnotations (dsl: IRDSL): List[JavaAnnotation] = {
       classLikeAnnotations(dsl) :+ dslAnnotation(dsl.declaredPriorities, dsl.priorityConstraints, dsl.withDSLs)
     }
@@ -431,8 +529,25 @@ object JavaRepr {
       except(fieldSigClassName)(field.annotations) :+ fieldSignatureAnnotation(field.signature)
     }
 
+    def methodAnnotations (method: IRMethod): List[JavaAnnotation] = method.syntax match {
+      case Some(syntax) => methodLikeAnnotations(method) :+ operatorAnnotation(syntax)
+      case None         => methodLikeAnnotations(method)
+    }
+
+    def operatorAnnotations (operator: IROperator): List[JavaAnnotation] = {
+      methodLikeAnnotations(operator) :+ operatorAnnotation(operator.operatorSyntax)
+    }
+
+    def constructorAnnotations (constructor: IRConstructor): List[JavaAnnotation] = methodLikeAnnotations(constructor)
+
+    def syntheticMethodAnnotations (synthetic: IRSyntheticMethod): List[JavaAnnotation] = List(methodSignatureAnnotation(synthetic.signature))
+
     private def classLikeAnnotations (clazz: IRModule): List[JavaAnnotation] = {
       except(classSigClassName, dslClassName, contextClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature)
+    }
+
+    private def methodLikeAnnotations (method: IRProcedure): List[JavaAnnotation] = {
+      except(methodSigClassName, operatorClassName)(method.annotations) :+ methodSignatureAnnotation(method.signature)
     }
 
     private def except (names: String*)(as: List[IRAnnotation]): List[JavaAnnotation] = as.filterNot { ann => names.contains(ann.annotationClass.internalName) }.map(annotation)
