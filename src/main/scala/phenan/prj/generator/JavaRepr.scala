@@ -152,7 +152,40 @@ object JavaRepr {
     def statementExpression: Expression
   }
 
-  type Expression = JavaLiteral
+  type Expression = CastExpression :|: ArrayAccess :|: NewExpression :|: NewArray :|: ArrayInit :|: LocalRef :|: JavaLiteral :|: UNil
+
+
+  trait CastExpression {
+    def destType: TypeSig
+    def castedExpression: Expression
+  }
+
+  trait ArrayAccess {
+    def array: Expression
+    def index: Expression
+  }
+
+  trait NewExpression {
+    def typeArguments: List[TypeArg]
+    def constructType: TypeSig
+    def arguments: List[Expression]
+  }
+
+  trait NewArray {
+    def componentType: TypeSig
+    def arraySize: List[Expression]
+    def dim: Int
+  }
+
+  trait ArrayInit {
+    def componentType: TypeSig
+    def dim: Int
+    def components: List[Expression]
+  }
+
+  trait LocalRef {
+    def name: String
+  }
 
   type JavaLiteral = ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
 
