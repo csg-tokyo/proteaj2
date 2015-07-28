@@ -89,27 +89,67 @@ object JavaRepr {
   }
 
   trait Param {
-
+    def parameterType: TypeSig
+    def name: String
   }
 
-  type Statement = LocalDeclaration :|: SingleStatement :|: UNil
+  type Statement = Block :|: LocalDeclarationStatement :|: IfStatement :|: WhileStatement :|: ForStatement :|: ReturnStatement :|: ExpressionStatement :|: UNil
 
-  type SingleStatement = ControlStatement :|: Block :|: ExpressionStatement :|: UNil
-
-  type ControlStatement = ReturnStatement
-
+  trait LocalDeclarationStatement {
+    def declaration: LocalDeclaration
+  }
+  
   trait LocalDeclaration {
-
+    def localType: TypeSig
+    def declarators: List[LocalDeclarator]
   }
 
-  trait ReturnStatement
+  trait LocalDeclarator {
+    def name: String
+    def dim: Int
+    def initializer: Option[Expression]
+  }
+
+  trait IfStatement {
+    def condition: Expression
+    def thenStatement: Statement
+    def elseStatement: Option[Statement]
+  }
+
+  trait WhileStatement {
+    def condition: Expression
+    def loopBody: Statement
+  }
+
+  type ForStatement = NormalForStatement :|: EnhancedForStatement :|: UNil
+
+  type ForInit = LocalDeclaration :|: List[Expression] :|: UNil
+
+  trait NormalForStatement {
+    def forInit: ForInit
+    def condition: Option[Expression]
+    def update: List[Expression]
+    def loopBody: Statement
+  }
+
+  trait EnhancedForStatement {
+    def elementType: TypeSig
+    def name: String
+    def dim: Int
+    def iterable: Expression
+    def loopBody: Statement
+  }
+
+  trait ReturnStatement {
+    def returnValue: Expression
+  }
 
   trait Block {
     def statements: List[Statement]
   }
 
   trait ExpressionStatement {
-    def expression: Expression
+    def statementExpression: Expression
   }
 
   type Expression = JavaLiteral
@@ -361,20 +401,105 @@ object JavaRepr {
   }
 
   def parameter (param: IRFormalParameter): Param = new Param {
-    
+    def parameterType = param.actualTypeSignature.map(typeSig).getOrElse {
+      throw InvalidASTException("invalid parameter type")
+    }
+    def name = param.name
   }
 
-  def parameter (sig: JParameterSignature, id: Int): Param = new Param {
-
-  }
-
-  def methodBody (body: IRMethodBody): Block = ???
+  def methodBody (body: IRMethodBody): Block = block(body.block)
 
   def constructorBody (body: IRConstructorBody): Block = ???
 
-  def initializerBody (body: IRInitializerBody): Block = ???
+  def initializerBody (body: IRInitializerBody): Block = block(body.block)
 
-  def parameterInitializer (body: IRExpression): Block = ???
+  def parameterInitializer (body: IRExpression): Block = {
+    block(List(Union[Statement](returnStatement(expression(body)))))
+  }
+
+  /* statements */
+
+  def block (b: IRBlock): Block = block(b.statements.map(statement))
+
+  def block (sts: List[Statement]): Block = new Block {
+    def statements = sts
+  }
+
+  def statement (stmt: IRStatement): Statement = stmt match {
+    case b: IRBlock                     => Union[Statement](block(b))
+    case l: IRLocalDeclarationStatement => Union[Statement](localDeclarationStatement(l))
+    case i: IRIfStatement               => Union[Statement](ifStatement(i))
+    case w: IRWhileStatement            => Union[Statement](whileStatement(w))
+    case f: IRForStatement              => Union[Statement](forStatement(f))
+    case r: IRReturnStatement           => Union[Statement](returnStatement(r))
+    case e: IRExpressionStatement       => Union[Statement](expressionStatement(e))
+  }
+
+  def localDeclarationStatement (stmt: IRLocalDeclarationStatement): LocalDeclarationStatement = new LocalDeclarationStatement {
+    def declaration = localDeclaration(stmt.declaration)
+  }
+
+  def localDeclaration (declaration: IRLocalDeclaration): LocalDeclaration = new LocalDeclaration {
+    def localType = typeToSig(declaration.localType)
+    def declarators = declaration.declarators.map(localDeclarator)
+  }
+
+  def localDeclarator (declarator: IRVariableDeclarator): LocalDeclarator = new LocalDeclarator {
+    def name = declarator.name
+    def dim = declarator.dim
+    def initializer = declarator.init.map(expression)
+  }
+
+  def ifStatement (stmt: IRIfStatement): IfStatement = new IfStatement {
+    def condition = expression(stmt.condition)
+    def thenStatement = statement(stmt.thenStatement)
+    def elseStatement = stmt.elseStatement.map(statement)
+  }
+
+  def whileStatement (stmt: IRWhileStatement): WhileStatement = new WhileStatement {
+    def condition = expression(stmt.condition)
+    def loopBody = statement(stmt.statement)
+  }
+
+  def forStatement (stmt: IRForStatement): ForStatement = stmt match {
+    case s: IRNormalForStatement   => Union[ForStatement](normalForStatement(s))
+    case s: IRAncientForStatement  => Union[ForStatement](ancientForStatement(s))
+    case s: IREnhancedForStatement => Union[ForStatement](enhancedForStatement(s))
+  }
+
+  def normalForStatement (stmt: IRNormalForStatement): NormalForStatement = new NormalForStatement {
+    def forInit = Union[ForInit](localDeclaration(stmt.local))
+    def condition = stmt.condition.map(expression)
+    def update = stmt.update.map(expression)
+    def loopBody = statement(stmt.statement)
+  }
+
+  def ancientForStatement (stmt: IRAncientForStatement): NormalForStatement = new NormalForStatement {
+    def forInit = Union[ForInit](stmt.init.map(expression))
+    def condition = stmt.condition.map(expression)
+    def update = stmt.update.map(expression)
+    def loopBody = statement(stmt.statement)
+  }
+
+  def enhancedForStatement (stmt: IREnhancedForStatement): EnhancedForStatement = new EnhancedForStatement {
+    def elementType = typeToSig(stmt.elementType)
+    def name = stmt.name
+    def dim = stmt.dim
+    def iterable = expression(stmt.iterable)
+    def loopBody = statement(stmt.statement)
+  }
+
+  def returnStatement (stmt: IRReturnStatement): ReturnStatement = new ReturnStatement {
+    def returnValue = expression(stmt.expression)
+  }
+
+  def returnStatement (expression: Expression): ReturnStatement = new ReturnStatement {
+    def returnValue = expression
+  }
+
+  def expressionStatement (stmt: IRExpressionStatement): ExpressionStatement = new ExpressionStatement {
+    def statementExpression = expression(stmt.expression)
+  }
 
   /* expressions */
 
@@ -420,6 +545,46 @@ object JavaRepr {
   }
 
   /* signatures */
+
+  def typeToSig (t: JType): TypeSig = t match {
+    case obj: JObjectType    => Union[TypeSig](objectType(obj))
+    case ary: JArrayType     => Union[TypeSig](arrayType(ary))
+    case prm: JPrimitiveType => Union[TypeSig](primitiveType(prm))
+    case tvr: JTypeVariable  => Union[TypeSig](typeVariable(tvr))
+    case cap: JCapturedWildcardType => throw InvalidASTException("captured wildcard is found in generated Java AST")
+    case unb: JUnboundTypeVariable  => throw InvalidASTException("unbound type variable is found in generated Java AST")
+  }
+
+  def objectType (obj: JObjectType): ClassSig = Union[ClassSig](topLevelClassObjectType(obj))
+
+  def topLevelClassObjectType (obj: JObjectType): TopLevelClassSig = new TopLevelClassSig {
+    def className: String = obj.erase.name
+    def typeArguments: List[TypeArg] = obj.erase.signature.metaParams.flatMap { param =>
+      metaArgument(obj.env.getOrElse(param.name, throw InvalidASTException("invalid type argument")))
+    }
+  }
+
+  def arrayType (ary: JArrayType): ArraySig = new ArraySig {
+    def component: TypeSig = typeToSig(ary.componentType)
+  }
+
+  def primitiveType (prm: JPrimitiveType): PrimitiveSig = primitiveSig(prm.name)
+
+  def typeVariable (tvr: JTypeVariable): TypeVariableSig = new TypeVariableSig {
+    def name: String = tvr.name
+  }
+
+  def metaArgument (arg: MetaArgument): Option[TypeArg] = arg match {
+    case ref: JRefType   => Some(Union[TypeArg](typeToSig(ref)))
+    case wild: JWildcard => Some(Union[TypeArg](wildcard(wild)))
+    case meta: MetaValue => None
+  }
+
+  def wildcard (wild: JWildcard): Wildcard = wild match {
+    case JWildcard(Some(ub), _) => Union[Wildcard](new UpperBoundWildcard { def bound: TypeSig = typeToSig(ub) })
+    case JWildcard(_, Some(lb)) => Union[Wildcard](new LowerBoundWildcard { def bound: TypeSig = typeToSig(lb) })
+    case JWildcard(None, None)  => Union[Wildcard](UnboundWildcard)
+  }
 
   def typeParams (mps: List[FormalMetaParameter]): List[TypeParam] = mps.filter(_.metaType == JTypeSignature.typeTypeSig).map(typeParam)
 
