@@ -431,6 +431,7 @@ object JavaRepr {
     case i: IRIfStatement               => Union[Statement](ifStatement(i))
     case w: IRWhileStatement            => Union[Statement](whileStatement(w))
     case f: IRForStatement              => Union[Statement](forStatement(f))
+    case a: IRActivateStatement         => ???
     case r: IRReturnStatement           => Union[Statement](returnStatement(r))
     case e: IRExpressionStatement       => Union[Statement](expressionStatement(e))
   }

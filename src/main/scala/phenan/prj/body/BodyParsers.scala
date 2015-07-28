@@ -42,7 +42,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val statement: HParser[IRStatement] = block | controlStatement | expressionStatement
 
-    lazy val controlStatement: HParser[IRStatement] = ifStatement | whileStatement | forStatement | returnStatement
+    lazy val controlStatement: HParser[IRStatement] = ifStatement | whileStatement | forStatement | activateStatement | returnStatement
 
     lazy val ifStatement: HParser[IRIfStatement] = ( "if" ~> '(' ~> expression(compiler.typeLoader.boolean) <~ ')' ) ~ statement ~ ( "else" ~> statement ).? ^^ {
       case cond ~ thenStmt ~ elseStmt => IRIfStatement(cond, thenStmt, elseStmt)
@@ -72,6 +72,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     private lazy val forControlRest = expression(compiler.typeLoader.boolean).? ~ ( ';' ~> statementExpressionList ) ~ ( ')' ~> statement )
 
+    lazy val activateStatement = "activate" ~> env.activateTypes.map(expression).reduceOption(_ | _).getOrElse(HParser.failure("activates clause is not found")) <~ ';' ^^ IRActivateStatement
 
     lazy val returnStatement = "return" ~> expression(returnType) <~ ';' ^^ IRReturnStatement
 

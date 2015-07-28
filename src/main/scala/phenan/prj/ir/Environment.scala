@@ -8,6 +8,7 @@ trait Environment {
   def clazz: IRModule
   def thisType: Option[JObjectType]
   def contexts: List[IRContextRef]
+  def activateTypes: List[JRefType]
   def locals: Map[String, IRLocalVariableRef]
   def fileEnvironment: FileEnvironment
   def resolver: NameResolver
@@ -46,12 +47,14 @@ sealed trait ModuleEnvironment extends Environment {
 class Environment_Instance (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = clazz.thisType
   def locals: Map[String, IRLocalVariableRef] = Map.empty
+  def activateTypes = Nil
   def resolver = clazz.resolver
 }
 
 class Environment_Static (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = None
   def locals: Map[String, IRLocalVariableRef] = Map.empty
+  def activateTypes = Nil
   def resolver = clazz.staticResolver
 }
 
@@ -69,10 +72,10 @@ trait Environment_Variables extends ChildEnvironment {
 }
 
 trait Environment_Contexts extends ChildEnvironment {
-  def activates: List[IRContextRef]
-  def deactivates: List[IRContextRef]
+  def activated: List[IRContextRef]
+  def deactivated: List[IRContextRef]
 
-  val contexts: List[IRContextRef] = activates ++ parent.contexts.diff(deactivates)
+  val contexts: List[IRContextRef] = activated ++ parent.contexts.diff(deactivated)
 
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = expressionOperators_cached(expected).getOrElse(priority, Nil)
   def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = literalOperators_cached(expected).getOrElse(priority, Nil)
@@ -122,8 +125,9 @@ trait Environment_Contexts extends ChildEnvironment {
 
 case class Environment_Method (procedure: IRProcedure, parent: Environment) extends Environment_Variables with Environment_Contexts {
   def variables: List[(JType, String)] = procedure.parameterVariables
-  def activates: List[IRContextRef] = procedure.requiresContexts
-  def deactivates: List[IRContextRef] = Nil
+  def activated: List[IRContextRef] = procedure.requiresContexts
+  def deactivated: List[IRContextRef] = Nil
+  lazy val activateTypes = procedure.activateTypes
   def resolver: NameResolver = procedure.resolver
 }
 
@@ -132,11 +136,13 @@ case class Environment_LocalVariables (variables: List[(JType, String)], parent:
   def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = parent.expressionOperators(expected, priority)
   def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = parent.literalOperators(expected, priority)
   def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = parent.inferContexts(procedure, bind)
+  def activateTypes = parent.activateTypes
   def resolver: NameResolver = parent.resolver
 }
 
-case class Environment_LocalContexts (activates: List[IRContextRef], deactivates: List[IRContextRef], parent: Environment) extends Environment_Contexts {
+case class Environment_LocalContexts (activated: List[IRContextRef], deactivated: List[IRContextRef], parent: Environment) extends Environment_Contexts {
   def locals: Map[String, IRLocalVariableRef] = parent.locals
+  def activateTypes = parent.activateTypes
   def resolver: NameResolver = parent.resolver
 }
 
