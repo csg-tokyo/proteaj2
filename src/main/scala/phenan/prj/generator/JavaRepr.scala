@@ -152,8 +152,28 @@ object JavaRepr {
     def statementExpression: Expression
   }
 
-  type Expression = CastExpression :|: ArrayAccess :|: NewExpression :|: NewArray :|: ArrayInit :|: LocalRef :|: JavaLiteral :|: UNil
+  type Expression = MethodCall :|: FieldAccess :|: CastExpression :|: ArrayAccess :|: NewExpression :|: NewArray :|: ArrayInit :|: LocalRef :|: ThisRef.type :|: JavaLiteral :|: UNil
 
+  type Receiver = Expression :|: ClassRef :|: SuperRef.type :|: UNil
+
+  type Assignment = SimpleAssignment
+
+  trait SimpleAssignment {
+    def left: Expression
+    def right: Expression
+  }
+
+  trait MethodCall {
+    def receiver: Receiver
+    def typeArguments: List[TypeArg]
+    def methodName: String
+    def arguments: List[Expression]
+  }
+
+  trait FieldAccess {
+    def receiver: Receiver
+    def fieldName: String
+  }
 
   trait CastExpression {
     def destType: TypeSig
@@ -186,6 +206,13 @@ object JavaRepr {
   trait LocalRef {
     def name: String
   }
+
+  trait ClassRef {
+    def name: String
+  }
+
+  object SuperRef
+  object ThisRef
 
   type JavaLiteral = ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
 
