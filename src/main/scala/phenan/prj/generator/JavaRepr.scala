@@ -152,7 +152,7 @@ object JavaRepr {
     def statementExpression: Expression
   }
 
-  type Expression = MethodCall :|: FieldAccess :|: CastExpression :|: ArrayAccess :|: NewExpression :|: NewArray :|: ArrayInit :|: LocalRef :|: ThisRef.type :|: JavaLiteral :|: UNil
+  type Expression = Assignment :|: MethodCall :|: FieldAccess :|: CastExpression :|: ArrayAccess :|: NewExpression :|: NewArray :|: ArrayInit :|: LocalRef :|: ThisRef.type :|: JavaLiteral :|: UNil
 
   type Receiver = Expression :|: ClassRef :|: SuperRef.type :|: UNil
 
@@ -564,7 +564,43 @@ object JavaRepr {
 
   /* expressions */
 
-  def expression (expression: IRExpression): Expression = ???
+  def expression (expression: IRExpression): Expression = expression match {
+    case e: IRAssignmentExpression => Union[Expression](assignment(e))
+    case e: IRMethodCall           => Union[Expression](methodCall(e))
+    case e: IRFieldAccess          => Union[Expression](fieldAccess(e))
+    case e: IRNewExpression        => Union[Expression](newExpression(e))
+    case e: IRNewArray             => Union[Expression](newArray(e))
+    case e: IRArrayInitializer     => Union[Expression](arrayInit(e))
+    case e: IRArrayAccess          => Union[Expression](arrayAccess(e))
+    case e: IRCastExpression       => Union[Expression](castExpression(e))
+    case e: IRLocalVariableRef     => Union[Expression](localRef(e))
+    case e: IRThisRef              => Union[Expression](ThisRef)
+    case e: IRJavaLiteral          => Union[Expression](javaLiteral(e))
+    case e: IRVariableArguments    => Union[Expression](variableArguments(e))
+    case e: IRContextRef           => Union[Expression](contextRef(e))
+  }
+
+  def assignment (e: IRAssignmentExpression): Assignment = ???
+
+  def methodCall (e: IRMethodCall): MethodCall = ???
+
+  def fieldAccess (e: IRFieldAccess): FieldAccess = ???
+
+  def newExpression (e: IRNewExpression): NewExpression = ???
+
+  def newArray (e: IRNewArray): NewArray = ???
+
+  def arrayInit (e: IRArrayInitializer): ArrayInit = ???
+
+  def arrayAccess (e: IRArrayAccess): ArrayAccess = ???
+
+  def castExpression (e: IRCastExpression): CastExpression = ???
+
+  def localRef (e: IRLocalVariableRef): LocalRef = ???
+
+  def variableArguments (e: IRVariableArguments): ArrayInit = ???
+
+  def contextRef (e: IRContextRef): MethodCall = ???
 
   /* literals */
 
