@@ -99,7 +99,8 @@ case class IRDSLOperation (method: JMethod, metaArgs: Map[String, MetaArgument],
 
 case class IRContextOperation (context: IRContextRef, method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 
-case class IRVariableArguments (args: List[IRExpression], staticType: Option[JType]) extends IRExpression {
+case class IRVariableArguments (args: List[IRExpression], componentType: Option[JType]) extends IRExpression {
+  def staticType: Option[JType] = componentType.map(_.array)
   def activates: List[IRContextRef] = args.flatMap(_.activates)
   def deactivates: List[IRContextRef] = args.flatMap(_.deactivates)
 }

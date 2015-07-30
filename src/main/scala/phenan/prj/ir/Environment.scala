@@ -127,7 +127,7 @@ case class Environment_Method (procedure: IRProcedure, parent: Environment) exte
   def variables: List[(JType, String)] = procedure.parameterVariables
   def activated: List[IRContextRef] = procedure.requiresContexts
   def deactivated: List[IRContextRef] = Nil
-  lazy val activateTypes = procedure.activateTypes
+  def activateTypes = procedure.activateTypes
   def resolver: NameResolver = procedure.resolver
 }
 

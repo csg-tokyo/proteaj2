@@ -498,9 +498,9 @@ trait IRProcedure extends JMethodDef with IRMember {
     Nil
   }
 
-  def activateTypes = signature.activates.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, metaParameters))
+  lazy val activateTypes = signature.activates.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, metaParameters))
 
-  def requiresContexts: List[IRContextRef] = IRContextRef.createRefsFromSignatures(signature.requires, metaParameters, compiler).getOrElse {
+  lazy val requiresContexts: List[IRContextRef] = IRContextRef.createRefsFromSignatures(signature.requires, metaParameters, compiler).getOrElse {
     state.error("invalid required context type")
     Nil
   }
