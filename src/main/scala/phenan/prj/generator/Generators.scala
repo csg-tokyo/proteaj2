@@ -61,6 +61,8 @@ trait Generators {
     false
   })
 
+  def block [T] (g: Generator[T]): Generator[T] = (newLine ~> g <~ newLine).indented
+
   def string: Generator[String] = elem(a => a)
 
   def ␣ : Generator[Unit] = new Generator[Unit]((_, _, _, _) => true)
