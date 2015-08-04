@@ -198,7 +198,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
 
     lazy val superMethodCall: HParser[IRSuperMethodCall] = ( "super" ~> '.' ~> typeParsers.metaArguments ) ~ identifier >>? {
-      case metaArgs ~ name => env.thisType.flatMap(_.superType).flatMap { t => t.findMethod(name, env.clazz, true).flatMap(invokeSpecial(t, metaArgs, _)).reduceOption(_ | _) }
+      case metaArgs ~ name => env.thisType.flatMap { thisType =>
+        thisType.superType.flatMap(_.findMethod(name, env.clazz, true).flatMap(invokeSpecial(thisType, metaArgs, _)).reduceOption(_ | _))
+      }
     }
 
     lazy val staticMethodCall: HParser[IRStaticMethodCall] = typeParsers.className ~ ( '.' ~> typeParsers.metaArguments ) ~ identifier >>? {
@@ -222,7 +224,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
 
     lazy val superFieldAccess: HParser[IRSuperFieldAccess] = "super" ~> '.' ~> identifier ^^? { name =>
-      env.thisType.flatMap(_.superType).flatMap { t => t.findField(name, env.clazz, true).map(IRSuperFieldAccess(t, _)) }
+      env.thisType.flatMap { thisType => thisType.superType.flatMap(_.findField(name, env.clazz, true).map(IRSuperFieldAccess(thisType, _))) }
     }
 
     lazy val staticFieldAccess: HParser[IRStaticFieldAccess] = typeParsers.className ~ ( '.' ~> identifier ) ^^? {
@@ -294,8 +296,8 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     private def invokeVirtual (instance: IRExpression, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRInstanceMethodCall]] =
       procedureCall(method, metaArgs) { IRInstanceMethodCall(instance, _, method, _, _) }
 
-    private def invokeSpecial (superType: JObjectType, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRSuperMethodCall]] =
-      procedureCall(method, metaArgs) { IRSuperMethodCall(superType, _, method, _, _) }
+    private def invokeSpecial (thisType: JObjectType, metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRSuperMethodCall]] =
+      procedureCall(method, metaArgs) { IRSuperMethodCall(thisType, _, method, _, _) }
 
     private def invokeStatic (method: JMethod): HParser[IRStaticMethodCall] =
       procedureCall(method) { IRStaticMethodCall(_, method, _, _) }

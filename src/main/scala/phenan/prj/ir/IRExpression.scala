@@ -73,13 +73,15 @@ sealed trait IRFieldAccess extends IRLeftHandSide {
 
 case class IRInstanceFieldAccess (instance: IRExpression, field: JField) extends IRFieldAccess
 
-case class IRSuperFieldAccess (superType: JObjectType, field: JField) extends IRFieldAccess
+case class IRSuperFieldAccess (thisType: JObjectType, field: JField) extends IRFieldAccess
 
 case class IRStaticFieldAccess (field: JField) extends IRFieldAccess
 
 sealed trait IRMethodCall extends IRExpression {
   def metaArgs: Map[String, MetaArgument]
   def method: JMethod
+  def args: List[IRExpression]
+  def requiredContexts: List[IRContextRef]
   lazy val staticType: Option[JType] = method.returnType.bind(metaArgs)
   lazy val activates: List[IRContextRef] = IRContextRef.createRefs(method.activates, metaArgs).getOrElse {
     method.compiler.state.errorAndReturn("invalid context type", Nil)
@@ -87,11 +89,12 @@ sealed trait IRMethodCall extends IRExpression {
   lazy val deactivates: List[IRContextRef] = IRContextRef.createRefs(method.deactivates, metaArgs).getOrElse {
     method.compiler.state.errorAndReturn("invalid context type", Nil)
   }
+  lazy val throws: List[JType] = method.exceptionTypes.flatMap(_.bind(metaArgs))
 }
 
 case class IRInstanceMethodCall (instance: IRExpression, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 
-case class IRSuperMethodCall (superType: JObjectType, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
+case class IRSuperMethodCall (thisType: JObjectType, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 
 case class IRStaticMethodCall (metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 

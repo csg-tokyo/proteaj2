@@ -103,9 +103,9 @@ object JavaRepr {
 
   case class ExpressionStatement (statementExpression: Expression)
 
-  type Expression = Assignment :|: MethodCall :|: FieldAccess :|: CastExpression :|: ArrayAccess :|: NewExpression :|: NewArray :|: ArrayInit :|: LocalRef :|: ThisRef.type :|: JavaLiteral :|: UNil
+  type Expression = Assignment :|: MethodCall :|: FieldAccess :|: CastExpression :|: ArrayAccess :|: NewExpression :|: AnonymousClass :|: NewArray :|: ArrayInit :|: LocalRef :|: ThisRef :|: JavaLiteral :|: UNil
 
-  type Receiver = Expression :|: ClassRef :|: SuperRef.type :|: UNil
+  type Receiver = Expression :|: ClassRef :|: SuperRef :|: UNil
 
   type Assignment = SimpleAssignment
 
@@ -121,6 +121,8 @@ object JavaRepr {
 
   case class NewExpression (typeArguments: List[TypeArg], constructType: TypeSig, arguments: List[Expression])
 
+  case class AnonymousClass (baseType: ClassSig, arguments: List[Expression], members: List[ClassMember])
+
   case class NewArray (componentType: TypeSig, arraySize: List[Expression], dim: Int)
 
   case class ArrayInit (componentType: TypeSig, dim: Int, components: List[Expression])
@@ -129,8 +131,9 @@ object JavaRepr {
 
   case class ClassRef (name: String)
 
-  object SuperRef
-  object ThisRef
+  case class SuperRef (thisType: ClassSig)
+
+  case class ThisRef (thisType: ClassSig)
 
   type JavaLiteral = ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
 

@@ -12,6 +12,7 @@ trait JMember {
 case class JField (fieldDef: JFieldDef, fieldType: JType, declaring: JModule) extends JMember {
   def modifier: JModifier = fieldDef.mod
   def name: String = fieldDef.name
+  def declaringClass = fieldDef.declaringClass
 }
 
 trait JProcedure extends JMember {
