@@ -77,7 +77,7 @@ object JavaRepr {
 
   case class Param (parameterType: TypeSig, name: String)
 
-  type Statement = Block :|: LocalDeclarationStatement :|: IfStatement :|: WhileStatement :|: ForStatement :|: ReturnStatement :|: ExpressionStatement :|: UNil
+  type Statement = Block :|: LocalDeclarationStatement :|: IfStatement :|: WhileStatement :|: ForStatement :|: ReturnStatement :|: ExpressionStatement :|: ExplicitConstructorCall :|: UNil
 
   case class LocalDeclarationStatement (declaration: LocalDeclaration)
   
@@ -103,6 +103,12 @@ object JavaRepr {
 
   case class ExpressionStatement (statementExpression: Expression)
 
+  type ExplicitConstructorCall = ThisConstructorCall :|: SuperConstructorCall :|: UNil
+
+  case class ThisConstructorCall (typeArguments: List[TypeArg], arguments: List[Expression])
+
+  case class SuperConstructorCall (typeArguments: List[TypeArg], arguments: List[Expression])
+
   type Expression = Assignment :|: MethodCall :|: FieldAccess :|: CastExpression :|: ArrayAccess :|: NewExpression :|: AnonymousClass :|: NewArray :|: ArrayInit :|: LocalRef :|: ThisRef :|: JavaLiteral :|: UNil
 
   type Receiver = Expression :|: ClassRef :|: SuperRef :|: UNil
@@ -119,7 +125,7 @@ object JavaRepr {
 
   case class ArrayAccess (array: Expression, index: Expression)
 
-  case class NewExpression (typeArguments: List[TypeArg], constructType: TypeSig, arguments: List[Expression])
+  case class NewExpression (typeArguments: List[TypeArg], constructType: ClassSig, arguments: List[Expression])
 
   case class AnonymousClass (baseType: ClassSig, arguments: List[Expression], members: List[ClassMember])
 

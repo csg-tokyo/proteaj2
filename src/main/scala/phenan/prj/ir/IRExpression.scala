@@ -28,6 +28,7 @@ case class IRNewExpression (metaArgs: Map[String, MetaArgument], constructor: JC
   lazy val deactivates: List[IRContextRef] = IRContextRef.createRefs(constructor.deactivates, metaArgs).getOrElse {
     constructor.compiler.state.errorAndReturn("invalid context type", Nil)
   }
+  lazy val throws: List[JType] = constructor.exceptionTypes.flatMap(_.bind(metaArgs))
 }
 
 sealed trait IRExplicitConstructorCall

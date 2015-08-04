@@ -158,7 +158,7 @@ object JavaReprGenerator {
     def className = constructor.declaringClass.simpleName
     def parameters = constructor.parameters.map(parameter)
     def throws = constructor.signature.throwTypes.map(typeSig)
-    def body = constructor.constructorBody.map(constructorBody).getOrElse {
+    def body = constructor.constructorBody.map(constructorBody(_, constructor.requiresContexts, constructor.activateTypes)).getOrElse {
       throw InvalidASTException("constructor must have its body")
     }
   }
@@ -185,7 +185,10 @@ object JavaReprGenerator {
     contextDeclarations(contexts, 0) ++ blockStatements(body.block.statements, contexts, activates, Nil)
   }
 
-  def constructorBody (body: IRConstructorBody): Block = ???
+  def constructorBody (body: IRConstructorBody, contexts: List[IRContextRef], activates: List[JRefType]): Block = body.constructorCall match {
+    case Some(c) => Block(Union[Statement](explicitConstructorCall(c, Nil)) :: contextDeclarations(contexts, 0) ++ blockStatements(body.statements, contexts, activates, Nil))
+    case None    => Block(contextDeclarations(contexts, 0) ++ blockStatements(body.statements, contexts, activates, Nil))
+  }
 
   def initializerBody (body: IRInitializerBody): Block = block(body.block, Nil, Nil)
 
@@ -261,15 +264,30 @@ object JavaReprGenerator {
     else throw InvalidASTException("activated context is not declared in the activates clause")
   }
 
-  def contextAccess (contextType: JObjectType, index: Int): Expression = Union[Expression](MethodCall(activatedContextRef, List(Union[TypeArg](typeToSig(contextType))), "get", List(intLiteral(index))))
+  def explicitConstructorCall (constructorCall: IRExplicitConstructorCall, contexts: List[IRContextRef]): ExplicitConstructorCall = constructorCall match {
+    case c: IRThisConstructorCall  => Union[ExplicitConstructorCall](thisConstructorCall(c, contexts))
+    case c: IRSuperConstructorCall => Union[ExplicitConstructorCall](superConstructorCall(c, contexts))
+  }
 
-  def activateContext (context: Expression, index: Int): ExpressionStatement = ExpressionStatement(Union[Expression](MethodCall(activatedContextRef, Nil, "set", List(intLiteral(index), context))))
+  def thisConstructorCall (constructorCall: IRThisConstructorCall, contexts: List[IRContextRef]): ThisConstructorCall = {
+    if (constructorCall.requiredContexts.nonEmpty) ???
+    else ThisConstructorCall(typeArgs(constructorCall.constructor, constructorCall.metaArgs), constructorCall.args.map(expression(_, contexts)))
+  }
 
-  def intLiteral (value: Int): Expression = Union[Expression](Union[JavaLiteral](Literal(value)))
+  def superConstructorCall (constructorCall: IRSuperConstructorCall, contexts: List[IRContextRef]): SuperConstructorCall = {
+    if (constructorCall.requiredContexts.nonEmpty) ???
+    else SuperConstructorCall(typeArgs(constructorCall.constructor, constructorCall.metaArgs), constructorCall.args.map(expression(_, contexts)))
+  }
 
-  def contextName (index: Int): String = "ProteaJLocalContext$$" + index
+  private def contextAccess (contextType: JObjectType, index: Int): Expression = Union[Expression](MethodCall(activatedContextRef, List(Union[TypeArg](typeToSig(contextType))), "get", List(intLiteral(index))))
 
-  def activatedContextRef = Union[Receiver](ClassRef("proteaj.lang.ActivatedContexts"))
+  private def activateContext (context: Expression, index: Int): ExpressionStatement = ExpressionStatement(Union[Expression](MethodCall(activatedContextRef, Nil, "set", List(intLiteral(index), context))))
+
+  private def intLiteral (value: Int): Expression = Union[Expression](Union[JavaLiteral](Literal(value)))
+
+  private def contextName (index: Int): String = "ProteaJLocalContext$$" + index
+
+  private def activatedContextRef = Union[Receiver](ClassRef("proteaj.lang.ActivatedContexts"))
 
   /* expressions */
 
@@ -277,7 +295,7 @@ object JavaReprGenerator {
     case e: IRAssignmentExpression => Union[Expression](assignment(e, contexts))
     case e: IRMethodCall           => Union[Expression](methodCall(e, contexts))
     case e: IRFieldAccess          => Union[Expression](fieldAccess(e, contexts))
-    case e: IRNewExpression        => Union[Expression](newExpression(e, contexts))
+    case e: IRNewExpression        => newExpression(e, contexts)
     case e: IRNewArray             => Union[Expression](newArray(e, contexts))
     case e: IRArrayInitializer     => Union[Expression](arrayInit(e, contexts))
     case e: IRArrayAccess          => Union[Expression](arrayAccess(e, contexts))
@@ -333,7 +351,13 @@ object JavaReprGenerator {
     else MethodCall(Union[Receiver](SuperRef(objectType(e.thisType))), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
   }
 
-  def newExpression (e: IRNewExpression, contexts: List[IRContextRef]): NewExpression = ???
+  def newExpression (e: IRNewExpression, contexts: List[IRContextRef]): Expression = {
+    if (e.requiredContexts.nonEmpty) {
+      val lam = newExpressionWrapper(e.constructor.declaring, typeArgs(e.constructor, e.metaArgs), e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
+      Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", e.args.map(expression(_, contexts))))
+    }
+    else Union[Expression](NewExpression(typeArgs(e.constructor, e.metaArgs), objectType(e.constructor.declaring), e.args.map(expression(_, contexts))))
+  }
 
   def newArray (e: IRNewArray, contexts: List[IRContextRef]): NewArray = NewArray(typeToSig(e.componentType), e.length.map(expression(_, contexts)), e.dim)
 
@@ -352,50 +376,52 @@ object JavaReprGenerator {
     else throw InvalidASTException("context not found")
   }
 
-  def getStaticType (e: IRExpression): JType = e.staticType.getOrElse {
+  private def getStaticType (e: IRExpression): JType = e.staticType.getOrElse {
     throw InvalidASTException("invalid expression : compiler cannot determine the static type of " + e)
   }
 
-  def typeArgs (procedure: JProcedure, metaArgs: Map[String, MetaArgument]): List[TypeArg] = procedure.metaParameters.map { case (name, _) =>
+  private def typeArgs (procedure: JProcedure, metaArgs: Map[String, MetaArgument]): List[TypeArg] = procedure.metaParameters.map { case (name, _) =>
     metaArgs.get(name).flatMap(metaArgument).getOrElse {
       throw InvalidASTException("invalid type argument for " + name)
     }
   }.toList
 
-  def instanceMethodWrapper (returnType: JType, receiverType: JType, typeArgs: List[TypeArg], name: String, argTypes: List[JType], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef]): Expression = Union[Expression](lambda (
-    typeToSig(returnType), parameter(receiverType, "receiver") :: argTypes.zipWithIndex.map { case (t, i) => parameter(t, "arg" + i) }, throws.map(typeToSig), Block {
-      sendRequiredContexts(required, contexts) :+ returnStatement(instanceMethodCallExpression(localRefExpression("receiver"), typeArgs, name, argTypes.indices.map(i => localRefExpression("arg" + i)).toList))
-    }
-  ))
+  private def instanceMethodWrapper (returnType: JType, receiverType: JType, typeArgs: List[TypeArg], name: String, argTypes: List[JType], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef]): Expression =
+    functionWrapper(returnType, parameter(receiverType, "receiver") :: argTypes.zipWithIndex.map { case (t, i) => parameter(t, "arg" + i) }, throws, required, contexts,
+      instanceMethodCallExpression(localRefExpression("receiver"), typeArgs, name, argTypes.indices.map(i => localRefExpression("arg" + i)).toList))
 
-  def staticMethodWrapper (returnType: JType, receiver: ClassRef, typeArgs: List[TypeArg], name: String, argTypes: List[JType], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef]): Expression = Union[Expression](lambda (
-    typeToSig(returnType), argTypes.zipWithIndex.map { case (t, i) => parameter(t, "arg" + i) }, throws.map(typeToSig), Block {
-      sendRequiredContexts(required, contexts) :+ returnStatement(staticMethodCallExpression(receiver, typeArgs, name, argTypes.indices.map(i => localRefExpression("arg" + i)).toList))
-    }
-  ))
+  private def staticMethodWrapper (returnType: JType, receiver: ClassRef, typeArgs: List[TypeArg], name: String, argTypes: List[JType], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef]): Expression =
+    functionWrapper(returnType, argTypes.zipWithIndex.map { case (t, i) => parameter(t, "arg" + i) }, throws, required, contexts,
+      staticMethodCallExpression(receiver, typeArgs, name, argTypes.indices.map(i => localRefExpression("arg" + i)).toList))
 
-  def superMethodWrapper (returnType: JType, receiver: SuperRef, typeArgs: List[TypeArg], name: String, argTypes: List[JType], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef]): Expression = Union[Expression](lambda (
-    typeToSig(returnType), argTypes.zipWithIndex.map { case (t, i) => parameter(t, "arg" + i) }, throws.map(typeToSig), Block {
-      sendRequiredContexts(required, contexts) :+ returnStatement(superMethodCallExpression(receiver, typeArgs, name, argTypes.indices.map(i => localRefExpression("arg" + i)).toList))
-    }
+  private def superMethodWrapper (returnType: JType, receiver: SuperRef, typeArgs: List[TypeArg], name: String, argTypes: List[JType], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef]): Expression =
+    functionWrapper(returnType, argTypes.zipWithIndex.map { case (t, i) => parameter(t, "arg" + i) }, throws, required, contexts,
+      superMethodCallExpression(receiver, typeArgs, name, argTypes.indices.map(i => localRefExpression("arg" + i)).toList))
+
+  private def newExpressionWrapper (returnType: JObjectType, typeArgs: List[TypeArg], argTypes: List[JType], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef]): Expression =
+    functionWrapper(returnType, argTypes.zipWithIndex.map { case (t, i) => parameter(t, "arg" + i) }, throws, required, contexts,
+      Union[Expression](NewExpression(typeArgs, objectType(returnType), argTypes.indices.map(i => localRefExpression("arg" + i)).toList)))
+
+  private def functionWrapper (returnType: JType, params: List[Param], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef], application: Expression): Expression = Union[Expression](lambda (
+    typeToSig(returnType), params, throws.map(typeToSig), Block { sendRequiredContexts(required, contexts) :+ returnStatement(application) }
   ))
   
-  def returnStatement (e: Expression): Statement = Union[Statement](ReturnStatement(e))
+  private def returnStatement (e: Expression): Statement = Union[Statement](ReturnStatement(e))
 
-  def localRefExpression (name: String): Expression = Union[Expression](LocalRef(name))
+  private def localRefExpression (name: String): Expression = Union[Expression](LocalRef(name))
 
-  def instanceMethodCallExpression (receiver: Expression, typeArgs: List[TypeArg], name: String, args: List[Expression]): Expression = Union[Expression](MethodCall(Union[Receiver](receiver), typeArgs, name, args))
-  def staticMethodCallExpression (receiver: ClassRef, typeArgs: List[TypeArg], name: String, args: List[Expression]): Expression = Union[Expression](MethodCall(Union[Receiver](receiver), typeArgs, name, args))
-  def superMethodCallExpression (receiver: SuperRef, typeArgs: List[TypeArg], name: String, args: List[Expression]): Expression = Union[Expression](MethodCall(Union[Receiver](receiver), typeArgs, name, args))
+  private def instanceMethodCallExpression (receiver: Expression, typeArgs: List[TypeArg], name: String, args: List[Expression]): Expression = Union[Expression](MethodCall(Union[Receiver](receiver), typeArgs, name, args))
+  private def staticMethodCallExpression (receiver: ClassRef, typeArgs: List[TypeArg], name: String, args: List[Expression]): Expression = Union[Expression](MethodCall(Union[Receiver](receiver), typeArgs, name, args))
+  private def superMethodCallExpression (receiver: SuperRef, typeArgs: List[TypeArg], name: String, args: List[Expression]): Expression = Union[Expression](MethodCall(Union[Receiver](receiver), typeArgs, name, args))
 
-  def sendRequiredContexts (required: List[IRContextRef], contexts: List[IRContextRef]) = required.zipWithIndex.map { case (c, i) =>
+  private def sendRequiredContexts (required: List[IRContextRef], contexts: List[IRContextRef]) = required.zipWithIndex.map { case (c, i) =>
     Union[Statement](activateContext(Union[Expression](contextRef(c, contexts)), i))
   }
 
-  def lambda (retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): AnonymousClass =
+  private def lambda (retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): AnonymousClass =
     AnonymousClass(objectClassSig, Nil, List(Union[ClassMember](lambdaMethodDef(retType, params, exceptions, block))))
 
-  def lambdaMethodDef (retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): MethodDef = new MethodDef {
+  private def lambdaMethodDef (retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): MethodDef = new MethodDef {
     def annotations: List[JavaAnnotation] = Nil
     def modifiers: JModifier = JModifier(JModifier.accPublic)
     def typeParameters: List[TypeParam] = Nil
