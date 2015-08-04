@@ -15,26 +15,81 @@ object JavaCodeGenerators extends Generators {
 
   lazy val moduleDef: Generator[ModuleDef] = classDef :|: enumDef :|: interfaceDef :|: nil
 
-  lazy val classDef: Generator[ClassDef] = annotation.* ~ modifier ~ ( "class" ~> string ) ~ typeParam.*?('<', ',', '>') ~ ( "extends" ~> classSig ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> block(classMember.*(newLine)) <~ '}' ) ^^ { clazz =>
+  lazy val classDef: Generator[ClassDef] = annotation.* ~ modifier ~ ( "class" ~> string ) ~ typeParam.*?('<', ',', '>') ~ ( "extends" ~> classSig ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { clazz =>
     clazz.annotations -> clazz.modifiers -> clazz.name -> clazz.typeParameters -> clazz.superType -> clazz.interfaces -> clazz.members
   }
 
-  lazy val enumDef: Generator[EnumDef] = annotation.* ~ modifier ~ ( "enum" ~> string ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> block(enumConstantDef.*(',') ~ classMember.*?(';' ~> newLine, newLine, "")) <~ '}' ) ^^ { enum =>
+  lazy val enumDef: Generator[EnumDef] = annotation.* ~ modifier ~ ( "enum" ~> string ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(enumConstantDef.*(',') ~ classMember.*?(';' ~> newLine, newLine, "")) <~ '}' ) ^^ { enum =>
     enum.annotations -> enum.modifiers -> enum.name -> enum.interfaces -> ( enum.constants -> enum.members )
   }
 
-  lazy val interfaceDef: Generator[InterfaceDef] = annotation.* ~ modifier ~ ( "interface" ~> string ) ~ typeParam.*?('<', ',', '>') ~ classSig.*?("extends", ',', "") ~ ( '{' ~> block(classMember.*(newLine)) <~ '}' ) ^^ { interface =>
+  lazy val interfaceDef: Generator[InterfaceDef] = annotation.* ~ modifier ~ ( "interface" ~> string ) ~ typeParam.*?('<', ',', '>') ~ classSig.*?("extends", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { interface =>
     interface.annotations -> interface.modifiers -> interface.name -> interface.typeParameters -> interface.superInterfaces -> interface.members
   }
 
-  lazy val classMember: Generator[ClassMember] = ???
+  lazy val classMember: Generator[ClassMember] = fieldDef :|: methodDef :|: constructorDef :|: instanceInitializerDef :|: staticInitializerDef :|: moduleDef :|: nil
 
-  lazy val enumConstantDef: Generator[EnumConstantDef] = ???
+  lazy val fieldDef: Generator[FieldDef] = annotation.* ~ modifier ~ typeSig ~ string ~ ( "=" ~> expression ).? <~ ';' ^^ { field =>
+    field.annotations -> field.modifiers -> field.fieldType -> field.name -> field.initializer
+  }
 
+  lazy val methodDef: Generator[MethodDef] = annotation.* ~ modifier ~ typeParam.*?('<', ',', '>') ~ typeSig ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block.?(';') ^^ { method =>
+    method.annotations -> method.modifiers -> method.typeParameters -> method.returnType -> method.name -> method.parameters -> method.throws -> method.body
+  }
+
+  lazy val constructorDef: Generator[ConstructorDef] = annotation.* ~ modifier ~ typeParam.*?('<', ',', '>') ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block ^^ { constructor =>
+    constructor.annotations -> constructor.modifiers -> constructor.typeParameters -> constructor.className -> constructor.parameters -> constructor.throws -> constructor.body
+  }
+
+  lazy val instanceInitializerDef: Generator[InstanceInitializerDef] = block ^^ { _.body }
+
+  lazy val staticInitializerDef: Generator[StaticInitializerDef] = "static" ~> block ^^ { _.body }
+
+  lazy val enumConstantDef: Generator[EnumConstantDef] = string ^^ { _.name }
+
+  lazy val parameter: Generator[Param] = typeSig ~ string ^^ { param =>
+    param.parameterType -> param.name
+  }
+
+  lazy val statement: Generator[Statement] = block :|: localDeclarationStatement :|: ifStatement :|: whileStatement :|: forStatement :|: returnStatement :|: expressionStatement :|: explicitConstructorCall :|: nil
+
+  lazy val block: Generator[Block] = '{' ~> indent(statement.*(newLine)) <~ '}' ^^ { _.statements }
+
+  lazy val localDeclarationStatement: Generator[LocalDeclarationStatement] = localDeclaration <~ ';' ^^ { _.declaration }
+
+  lazy val localDeclaration: Generator[LocalDeclaration] = typeSig ~ localDeclarator.*(',') ^^ { local =>
+    local.localType -> local.declarators
+  }
+
+  lazy val localDeclarator: Generator[LocalDeclarator] = string ~ dimension ~ ( '=' ~> expression ).? ^^ { local =>
+    local.name -> local.dim -> local.initializer
+  }
+
+  lazy val ifStatement: Generator[IfStatement] = "if" ~> ( '(' ~> expression <~ ')' ) ~ statement ~ ( "else" ~> statement ).? ^^ { stmt =>
+    stmt.condition -> stmt.thenStatement -> stmt.elseStatement
+  }
+
+  lazy val whileStatement: Generator[WhileStatement] = "while" ~> ( '(' ~> expression <~ ')' ) ~ statement ^^ { stmt =>
+    stmt.condition -> stmt.loopBody
+  }
+
+  lazy val forStatement: Generator[ForStatement] = ???
+
+  lazy val returnStatement: Generator[ReturnStatement] = "return" ~> expression <~ ';' ^^ { _.returnValue }
+
+  lazy val expressionStatement: Generator[ExpressionStatement] = expression <~ ';' ^^ { _.statementExpression }
+
+  lazy val explicitConstructorCall: Generator[ExplicitConstructorCall] = ???
+
+  lazy val expression: Generator[Expression] = ???
 
   lazy val javaLiteral: Generator[JavaLiteral] = classLiteral :|: stringLiteral :|: charLiteral :|: intLiteral :|: longLiteral :|: booleanLiteral :|: nil
 
-  lazy val classLiteral: Generator[ClassLiteral] = ???
+  lazy val classLiteral: Generator[ClassLiteral] = string ~ dimension <~ ".class" ^^ { lit =>
+    lit.className -> lit.dim
+  }
+
+  lazy val dimension: Generator[Int] = elem { dim => mul("[]", dim) }
 
   lazy val stringLiteral: Generator[Literal[String]] = '\"' ~> literalChar.* <~ '\"' ^^ { _.value.toList }
 
@@ -49,9 +104,37 @@ object JavaCodeGenerators extends Generators {
   lazy val literalChar: Generator[Char] = elem { LiteralUtil.escape }
 
 
-  lazy val typeParam: Generator[TypeParam] = ???
+  lazy val typeParam: Generator[TypeParam] = string ~ typeSig.*?("extends", "&", "") ^^ { param =>
+    param.name -> param.bounds
+  }
 
-  lazy val classSig: Generator[ClassSig] = ???
+  lazy val typeArg: Generator[TypeArg] = typeSig :|: wildcard :|: nil
+
+  lazy val typeSig: Generator[TypeSig] = classSig :|: arraySig :|: typeVariableSig :|: primitiveSig :|: nil
+
+  lazy val classSig: Generator[ClassSig] = topLevelClassSig :|: memberClassSig :|: nil
+
+  lazy val topLevelClassSig: Generator[TopLevelClassSig] = string ~ typeArg.*?('<', ',', '>') ^^ { sig =>
+    sig.className -> sig.typeArguments
+  }
+
+  lazy val memberClassSig: Generator[MemberClassSig] = classSig ~ ( '.' ~> string ) ~ typeArg.*?('<', ',', '>') ^^ { sig =>
+    sig.outer -> sig.className -> sig.typeArguments
+  }
+
+  lazy val arraySig: Generator[ArraySig] = typeSig <~ '[' <~ ']' ^^ { _.component }
+
+  lazy val typeVariableSig: Generator[TypeVariableSig] = elem { _.name }
+
+  lazy val primitiveSig: Generator[PrimitiveSig] = elem { _.name }
+
+  lazy val wildcard: Generator[Wildcard] = unboundWildcard :|: upperBoundWildcard :|: lowerBoundWildcard :|: nil
+
+  lazy val unboundWildcard: Generator[UnboundWildcard.type] = '?' ^^ { _ => () }
+
+  lazy val upperBoundWildcard: Generator[UpperBoundWildcard] = '?' ~> "extends" ~> typeSig ^^ { _.bound }
+
+  lazy val lowerBoundWildcard: Generator[LowerBoundWildcard] = '?' ~> "super" ~> typeSig ^^ { _.bound }
 
   lazy val modifier: Generator[JModifier] = elem { _.toString }
 
@@ -69,98 +152,8 @@ object JavaCodeGenerators extends Generators {
     e.enumName + '.' + e.constantName
   }
 
-  /*
-  lazy val classDef: Generator[IRClass] = annotation.* ~ modifiers ~ ( "class" ~> string ) ^^ { clazz =>
-    clazz.annotations -> clazz.mod -> clazz.simpleName
-  }
-
-  lazy val annotation: Generator[IRAnnotation] = ( '@' ~> string ) ~ ( '(' ~> annotationArgument.*(',') <~ ')' ) ^^ { ann =>
-    ann.annotationClass.name -> ann.args.toList
-  }
-
-  lazy val annotationArgument: Generator[(String, IRAnnotationElement)] = string ~ ( '=' ~> annotationElement )
-
-  lazy val annotationElement: Generator[IRAnnotationElement] = ( '{' ~> annotationElement.*(',') <~ '}' | annotation | javaLiteral | enumConstRef ) ^^ {
-    case IRAnnotationElementArray(array) => array.l.l.l
-    case ann: IRAnnotation               => ann.r.l.l
-    case lit: IRJavaLiteral              => lit.r.l
-    case enm: IREnumConstantRef          => enm.r
-  }
-
-  lazy val enumConstRef: Generator[IREnumConstantRef] = elem { e =>
-    e.field.declaringClass.name + '.' + e.field.name
-  }
-
-  lazy val javaLiteral: Generator[IRJavaLiteral] = ( classLiteral | stringLiteral | charLiteral | intLiteral | longLiteral | booleanLiteral ) ^^ {
-    case cls: IRClassLiteral    => cls.l.l.l.l.l
-    case str: IRStringLiteral   => str.r.l.l.l.l
-    case char: IRCharLiteral    => char.r.l.l.l
-    case int: IRIntLiteral      => int.r.l.l
-    case long: IRLongLiteral    => long.r.l
-    case bool: IRBooleanLiteral => bool.r
-  }
-
-  lazy val classLiteral: Generator[IRClassLiteral] = ( objectClassLiteral | primitiveClassLiteral ) ^^ {
-    case obj: IRObjectClassLiteral    => obj.l
-    case prm: IRPrimitiveClassLiteral => prm.r
-  }
-
-  lazy val objectClassLiteral: Generator[IRObjectClassLiteral] = elem { obj =>
-    obj.clazz.name + mul("[]", obj.dim) + ".class"
-  }
-
-  lazy val primitiveClassLiteral: Generator[IRPrimitiveClassLiteral] = elem { prm =>
-    prm.primitiveClass.name + mul("[]", prm.dim) + ".class"
-  }
-
   def mul (s: String, n: Int): String = (0 until n).map(_ => s).mkString
-  */
-  /*
-  lazy val typeArgument: Generator[JTypeArgument] = (typeSignature | wildcardArgument) ^? {
-    case sig: JTypeSignature        => sig.l
-    case wld: WildcardArgument      => wld.r
-  }
-
-  lazy val typeSignature: Generator[JTypeSignature] = (primitiveTypeSignature | classTypeSignature | arrayTypeSignature | typeVariableSignature) ^? {
-    case pts: JPrimitiveTypeSignature => pts.l.l.l
-    case cts: JClassTypeSignature     => cts.r.l.l
-    case ats: JArrayTypeSignature     => ats.r.l
-    case tvs: JTypeVariableSignature  => tvs.r
-  }
-
-  lazy val classTypeSignature: Generator[JClassTypeSignature] = (simpleClassTypeSignature | memberClassTypeSignature) ^^ {
-    case sig: SimpleClassTypeSignature => sig.l
-    case sig: MemberClassTypeSignature => sig.r
-  }
-
-  lazy val simpleClassTypeSignature: Generator[SimpleClassTypeSignature] = string ~ typeArgument.*?('<', ',', '>') ^^ { sig =>
-    sig.clazz.replace('/', '.') -> sig.args
-  }
-
-  lazy val memberClassTypeSignature: Generator[MemberClassTypeSignature] = classTypeSignature ~ ( '.' ~> string ) ~ typeArgument.*?('<', ',', '>') ^^ { sig =>
-    sig.outer -> sig.clazz -> sig.args
-  }
-
-  lazy val primitiveTypeSignature: Generator[JPrimitiveTypeSignature] = elem {
-    case ByteTypeSignature   => "byte"
-    case CharTypeSignature   => "char"
-    case DoubleTypeSignature => "double"
-    case FloatTypeSignature  => "float"
-    case IntTypeSignature    => "int"
-    case LongTypeSignature   => "long"
-    case ShortTypeSignature  => "short"
-    case BoolTypeSignature   => "boolean"
-    case VoidTypeSignature   => "void"
-  }
-
-  lazy val arrayTypeSignature: Generator[JArrayTypeSignature] = typeSignature <~ '[' <~ ']' ^^ { _.component }
-
-  lazy val typeVariableSignature: Generator[JTypeVariableSignature] = elem(_.name)
-
-  lazy val wildcardArgument: Generator[WildcardArgument] = '?' ~> ( "extends" ~> typeSignature ).? ~ ( "super" ~> typeSignature ).? ^^ { arg =>
-    arg.upperBound -> arg.lowerBound
-  }
-*/
+  
   val spacingBeforeWord: List[Char] = List('?', '(', '{')
 
   val spacingAfterWord: List[Char] = List(',', ')', '}', '>')

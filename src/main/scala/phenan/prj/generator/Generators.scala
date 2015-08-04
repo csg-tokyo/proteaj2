@@ -21,6 +21,8 @@ trait Generators {
     def ^? [U] (f: PartialFunction[U, T]): Generator[U] = ^^ { u: U => f.applyOrElse(u, { v: U => throw InvalidASTException("compiler cannot generate Java code for " + v) }) }
 
     def ? : Generator[Option[T]] = new Generator[Option[T]]((buf, indent, spacing, optional) => optional.fold(spacing)(g(buf, indent, spacing, _)))
+    def ? [U] (default: Generator[U])(implicit e: EmptyInput[U]) : Generator[Option[T]] = new Generator[Option[T]]((buf, indent, spacing, optional) => optional.fold(default.g(buf, indent, spacing, e.v))(g(buf, indent, spacing, _)))
+
     def * : Generator[List[T]] = new Generator[List[T]]((buf, indent, spacing, list) => list.foldLeft(spacing) { (s, t) => g(buf, indent, s, t) })
     def * [U] (sep: Generator[U])(implicit e: EmptyInput[U]): Generator[List[T]] = new Generator[List[T]]((buf, indent, spacing, list) => list match {
       case head :: tail => tail.foldLeft(g(buf, indent, spacing, head)) { (s, t) => g(buf, indent, sep.g(buf, indent, s, e.v), t) }
@@ -61,7 +63,7 @@ trait Generators {
     false
   })
 
-  def block [T] (g: Generator[T]): Generator[T] = (newLine ~> g <~ newLine).indented
+  def indent [T] (g: Generator[T]): Generator[T] = (newLine ~> g <~ newLine).indented
 
   def string: Generator[String] = elem(a => a)
 
