@@ -22,7 +22,7 @@ object JavaReprGenerator {
 
   def classDef (clazz: IRClass): ClassDef = new ClassDef {
     def annotations = Annotations.classAnnotations(clazz)
-    def modifiers = clazz.mod
+    def modifiers = clazz.mod ^ JModifier.accSuper
     def name = clazz.simpleName
     def typeParameters = typeParams(clazz.signature.metaParams)
     def superType = classSig(clazz.signature.superClass)

@@ -47,6 +47,7 @@ trait JClass extends JErasedType {
   lazy val instanceFields   = fields.filterNot(_.isStatic)
   lazy val staticFields     = fields.filter(_.isStatic)
 
+  def isClass = ! (mod.check(JModifier.accInterface) || mod.check(JModifier.accEnum))
   def isEnum = mod.check(JModifier.accEnum)
   def isAnnotation = mod.check(JModifier.accAnnotation)
 }

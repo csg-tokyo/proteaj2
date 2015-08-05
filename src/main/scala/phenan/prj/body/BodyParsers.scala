@@ -173,7 +173,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       }
     }
 
-    lazy val primaryNoNewArray: HParser[IRExpression] = newExpression | methodCall | fieldAccess | arrayAccess | abbreviatedMethodCall | abbreviatedFieldAccess | classLiteral | variableRef | thisRef | parenthesized
+    lazy val primaryNoNewArray: HParser[IRExpression] = methodCall | fieldAccess | arrayAccess | newExpression | abbreviatedMethodCall | abbreviatedFieldAccess | classLiteral | variableRef | thisRef | parenthesized
 
     lazy val newExpression: HParser[IRNewExpression] = ( "new" ~> typeParsers.metaArguments ) ~ typeParsers.objectType >>? {
       case metaArgs ~ constructType => constructType.findConstructor(env.clazz).flatMap(constructorCall(metaArgs, _)).reduceOption(_ | _)

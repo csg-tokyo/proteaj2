@@ -5,12 +5,13 @@ case class JModifier (flags: Int) extends AnyVal {
 
   def | (flag: Int): JModifier = JModifier(flags | flag)
 
-  private def toFlagList(checked: Int, list: List[Int]): List[Int] = {
-    if (flags < checked) list.reverse
+  def ^ (flag: Int): JModifier = JModifier(flags ^ flag)
+
+  private def toFlagList(flag: Int, list: List[Int]): List[Int] = {
+    if (flags < flag) list.reverse
     else {
-      val flag = checked << 1
-      if (check(flag)) toFlagList(flag, flag :: list)
-      else toFlagList(flag, list)
+      if (check(flag)) toFlagList(flag << 1, flag :: list)
+      else toFlagList(flag << 1, list)
     }
   }
 

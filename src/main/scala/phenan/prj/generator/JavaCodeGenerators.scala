@@ -12,29 +12,29 @@ object JavaCodeGenerators extends Generators {
 
   lazy val moduleDef: Generator[ModuleDef] = classDef :|: enumDef :|: interfaceDef :|: nil
 
-  lazy val classDef: Generator[ClassDef] = annotation.* ~ modifier ~ ( "class" ~> string ) ~ typeParam.*?('<', ',', '>') ~ ( "extends" ~> classSig ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { clazz =>
+  lazy val classDef: Generator[ClassDef] = ( annotation.* <~ newLine ) ~ modifier ~ ( "class" ~> string ) ~ typeParam.*?('<', ',', '>') ~ ( "extends" ~> classSig ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { clazz =>
     clazz.annotations -> clazz.modifiers -> clazz.name -> clazz.typeParameters -> clazz.superType -> clazz.interfaces -> clazz.members
   }
 
-  lazy val enumDef: Generator[EnumDef] = annotation.* ~ modifier ~ ( "enum" ~> string ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(enumConstantDef.*(',') ~ classMember.*?(';' ~> newLine, newLine, "")) <~ '}' ) ^^ { enum =>
+  lazy val enumDef: Generator[EnumDef] = ( annotation.* <~ newLine ) ~ modifier ~ ( "enum" ~> string ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(enumConstantDef.*(',') ~ classMember.*?(';' ~> newLine, newLine, "")) <~ '}' ) ^^ { enum =>
     enum.annotations -> enum.modifiers -> enum.name -> enum.interfaces -> ( enum.constants -> enum.members )
   }
 
-  lazy val interfaceDef: Generator[InterfaceDef] = annotation.* ~ modifier ~ ( "interface" ~> string ) ~ typeParam.*?('<', ',', '>') ~ classSig.*?("extends", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { interface =>
+  lazy val interfaceDef: Generator[InterfaceDef] = ( annotation.* <~ newLine ) ~ modifier ~ ( "interface" ~> string ) ~ typeParam.*?('<', ',', '>') ~ classSig.*?("extends", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { interface =>
     interface.annotations -> interface.modifiers -> interface.name -> interface.typeParameters -> interface.superInterfaces -> interface.members
   }
 
   lazy val classMember: Generator[ClassMember] = fieldDef :|: methodDef :|: constructorDef :|: instanceInitializerDef :|: staticInitializerDef :|: moduleDef :|: nil
 
-  lazy val fieldDef: Generator[FieldDef] = annotation.* ~ modifier ~ typeSig ~ string ~ ( "=" ~> expression ).? <~ ';' ^^ { field =>
+  lazy val fieldDef: Generator[FieldDef] = ( annotation.* <~ newLine ) ~ modifier ~ typeSig ~ string ~ ( "=" ~> expression ).? <~ ';' ^^ { field =>
     field.annotations -> field.modifiers -> field.fieldType -> field.name -> field.initializer
   }
 
-  lazy val methodDef: Generator[MethodDef] = annotation.* ~ modifier ~ typeParam.*?('<', ',', '>') ~ typeSig ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block.?(';') ^^ { method =>
+  lazy val methodDef: Generator[MethodDef] = ( annotation.* <~ newLine ) ~ modifier ~ typeParam.*?('<', ',', '>') ~ typeSig ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block.?(';') ^^ { method =>
     method.annotations -> method.modifiers -> method.typeParameters -> method.returnType -> method.name -> method.parameters -> method.throws -> method.body
   }
 
-  lazy val constructorDef: Generator[ConstructorDef] = annotation.* ~ modifier ~ typeParam.*?('<', ',', '>') ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block ^^ { constructor =>
+  lazy val constructorDef: Generator[ConstructorDef] = ( annotation.* <~ newLine ) ~ modifier ~ typeParam.*?('<', ',', '>') ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block ^^ { constructor =>
     constructor.annotations -> constructor.modifiers -> constructor.typeParameters -> constructor.className -> constructor.parameters -> constructor.throws -> constructor.body
   }
 
@@ -44,7 +44,7 @@ object JavaCodeGenerators extends Generators {
 
   lazy val enumConstantDef: Generator[EnumConstantDef] = string ^^ { _.name }
 
-  lazy val parameter: Generator[Param] = typeSig ~ string ^^ { param =>
+  lazy val parameter: Generator[Param] = typeSig ~ ( ␣ ~> string ) ^^ { param =>
     param.parameterType -> param.name
   }
 
@@ -164,7 +164,7 @@ object JavaCodeGenerators extends Generators {
 
   lazy val booleanLiteral: Generator[Literal[Boolean]] = elem { _.value.toString }
 
-  lazy val literalChar: Generator[Char] = elem { LiteralUtil.escape }
+  lazy val literalChar: Generator[Char] = lexical { LiteralUtil.escape }
 
 
   lazy val typeParam: Generator[TypeParam] = string ~ typeSig.*?("extends", "&", "") ^^ { param =>
@@ -193,7 +193,7 @@ object JavaCodeGenerators extends Generators {
 
   lazy val wildcard: Generator[Wildcard] = unboundWildcard :|: upperBoundWildcard :|: lowerBoundWildcard :|: nil
 
-  lazy val unboundWildcard: Generator[UnboundWildcard.type] = '?' ^^ { _ => () }
+  lazy val unboundWildcard: Generator[UnboundWildcard.type] = unit('?') ^^ { _ => () }
 
   lazy val upperBoundWildcard: Generator[UpperBoundWildcard] = '?' ~> "extends" ~> typeSig ^^ { _.bound }
 
@@ -217,7 +217,7 @@ object JavaCodeGenerators extends Generators {
 
   def mul (s: String, n: Int): String = (0 until n).map(_ => s).mkString
 
-  val spacingBeforeWord: List[Char] = List('?', '(', '{')
+  val spacingBeforeWord: List[Char] = List('?', '{')
 
   val spacingAfterWord: List[Char] = List(',', ')', '}', '>')
 }

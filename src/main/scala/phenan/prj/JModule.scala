@@ -175,8 +175,18 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
   }
 
   lazy val constructors: List[JConstructor] = {
-    erase.methods.filter(_.isConstructor).map { constructorDef => new JConstructor(constructorDef, env, this) }
+    val cs = erase.methods.filter(_.isConstructor).map { constructorDef => new JConstructor(constructorDef, env, this) }
+    if (cs.isEmpty && erase.isClass) List(createDefaultConstructor)
+    else cs
   }
+
+  def createDefaultConstructor = new JConstructor(new JMethodDef {
+    def syntax: Option[JSyntaxDef] = None
+    def declaringClass: JClass = erase
+    def name: String = CommonNames.constructorName
+    def signature: JMethodSignature = JMethodSignature(Nil, Nil, VoidTypeSignature, Nil, Nil, Nil, Nil)
+    def mod: JModifier = JModifier(JModifier.accPublic)
+  }, env, this)
 
   lazy val declaredFields: List[JField] = erase.fields.filterNot(_.isStatic).flatMap { fieldDef =>
     compiler.typeLoader.fromTypeSignature(fieldDef.signature, env).map(fieldType => new JField(fieldDef, fieldType, this))

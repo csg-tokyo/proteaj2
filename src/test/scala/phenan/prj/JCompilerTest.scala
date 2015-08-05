@@ -1,6 +1,7 @@
 package phenan.prj
 
 import org.scalatest._
+import phenan.prj.generator.{JavaCodeGenerators, JavaReprGenerator}
 import phenan.prj.ir._
 import phenan.prj.state._
 
@@ -18,6 +19,9 @@ class JCompilerTest extends FunSuite with Matchers {
     clazz.get shouldBe a [IRModule]
 
     clazz.get.methods should have (size (2))
+
+    val repr = JavaReprGenerator.moduleDef(clazz.get)
+    println(JavaCodeGenerators.moduleDef(repr))
   }
 
   test ("Foo をコンパイルしてみる") {
