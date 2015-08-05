@@ -1,10 +1,7 @@
 package phenan.prj.generator
 
 import phenan.prj._
-import phenan.prj.ir._
 import phenan.prj.util._
-
-import phenan.util._
 
 import JavaRepr._
 
@@ -73,15 +70,81 @@ object JavaCodeGenerators extends Generators {
     stmt.condition -> stmt.loopBody
   }
 
-  lazy val forStatement: Generator[ForStatement] = ???
+  lazy val forStatement: Generator[ForStatement] = normalForStatement :|: enhancedForStatement :|: nil
+
+  lazy val normalForStatement: Generator[NormalForStatement] = "for" ~> ( '(' ~> forInit ~ ( ';' ~> expression.? <~ ';' ) ~ expression.*(',') <~ ')' ) ~ statement ^^ { stmt =>
+    stmt.forInit -> stmt.condition -> stmt.update -> stmt.loopBody
+  }
+
+  lazy val enhancedForStatement: Generator[EnhancedForStatement] = "for" ~> ( '(' ~> typeSig ~ string ~ dimension ~ ( ':' ~> expression ) <~ ')' ) ~ statement ^^ { stmt =>
+    stmt.elementType -> stmt.name -> stmt.dim -> stmt.iterable -> stmt.loopBody
+  }
+
+  lazy val forInit: Generator[ForInit] = localDeclaration :|: expression.*(',') :|: nil
 
   lazy val returnStatement: Generator[ReturnStatement] = "return" ~> expression <~ ';' ^^ { _.returnValue }
 
   lazy val expressionStatement: Generator[ExpressionStatement] = expression <~ ';' ^^ { _.statementExpression }
 
-  lazy val explicitConstructorCall: Generator[ExplicitConstructorCall] = ???
+  lazy val explicitConstructorCall: Generator[ExplicitConstructorCall] = thisConstructorCall :|: superConstructorCall :|: nil
 
-  lazy val expression: Generator[Expression] = ???
+  lazy val thisConstructorCall: Generator[ThisConstructorCall] = typeArg.*?('<', ',', '>') ~ ( "this" ~> '(' ~> expression.*(',') <~ ')' ) ^^ { cc =>
+    cc.typeArguments -> cc.arguments
+  }
+
+  lazy val superConstructorCall: Generator[SuperConstructorCall] = typeArg.*?('<', ',', '>') ~ ( "super" ~> '(' ~> expression.*(',') <~ ')' ) ^^ { cc =>
+    cc.typeArguments -> cc.arguments
+  }
+
+  lazy val expression: Generator[Expression] = assignment :|: methodCall :|: fieldAccess :|: castExpression :|: arrayAccess :|: newExpression :|: anonymousClass :|: newArray :|: arrayInit :|: localRef :|: thisRef :|: javaLiteral :|: nil
+
+  lazy val receiver: Generator[Receiver] = expression :|: classRef :|: superRef :|: nil
+
+  lazy val assignment: Generator[Assignment] = simpleAssignment
+
+  lazy val simpleAssignment: Generator[SimpleAssignment] = expression ~ ( '=' ~> expression ) ^^ { assign =>
+    assign.left -> assign.right
+  }
+
+  lazy val methodCall: Generator[MethodCall] = ( receiver <~ '.' ) ~ typeArg.*?('<', ',', '>') ~ string ~ ( '(' ~> expression.*(',') <~ ')' ) ^^ { m =>
+    m.receiver -> m.typeArguments -> m.methodName -> m.arguments
+  }
+
+  lazy val fieldAccess: Generator[FieldAccess] = ( receiver <~ '.' ) ~ string ^^ { f =>
+    f.receiver -> f.fieldName
+  }
+
+  lazy val castExpression: Generator[CastExpression] = ( '(' ~> typeSig <~ ')' ) ~ ( '(' ~> expression <~ ')' ) ^^ { cast =>
+    cast.destType -> cast.castedExpression
+  }
+
+  lazy val arrayAccess: Generator[ArrayAccess] = expression ~ ( '[' ~> expression <~ ']' ) ^^ { expr =>
+    expr.array -> expr.index
+  }
+
+  lazy val newExpression: Generator[NewExpression] = "new" ~> typeArg.*?('<', ',', '>') ~ classSig ~ ( '(' ~> expression.*(',') <~ ')' ) ^^ { expr =>
+    expr.typeArguments -> expr.constructType -> expr.arguments
+  }
+
+  lazy val anonymousClass: Generator[AnonymousClass] = "new" ~> classSig ~ ( '(' ~> expression.*(',') <~ ')' ) ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { expr =>
+    expr.baseType -> expr.arguments -> expr.members
+  }
+
+  lazy val newArray: Generator[NewArray] = "new" ~> typeSig ~ ( '[' ~> expression <~ ']' ).* ~ dimension ^^ { expr =>
+    expr.componentType -> expr.arraySize -> expr.dim
+  }
+
+  lazy val arrayInit: Generator[ArrayInit] = "new" ~> typeSig ~ dimension ~ ( '{' ~> expression.*(',') <~ '}' ) ^^ { expr =>
+    expr.componentType -> expr.dim -> expr.components
+  }
+
+  lazy val localRef: Generator[LocalRef] = elem { _.name }
+
+  lazy val thisRef: Generator[ThisRef] = classSig <~ ".this" ^^ { _.thisType }
+
+  lazy val classRef: Generator[ClassRef] = elem { _.name }
+
+  lazy val superRef: Generator[SuperRef] = classSig <~ ".super" ^^ { _.thisType }
 
   lazy val javaLiteral: Generator[JavaLiteral] = classLiteral :|: stringLiteral :|: charLiteral :|: intLiteral :|: longLiteral :|: booleanLiteral :|: nil
 
@@ -153,7 +216,7 @@ object JavaCodeGenerators extends Generators {
   }
 
   def mul (s: String, n: Int): String = (0 until n).map(_ => s).mkString
-  
+
   val spacingBeforeWord: List[Char] = List('?', '(', '{')
 
   val spacingAfterWord: List[Char] = List(',', ')', '}', '>')
