@@ -217,7 +217,7 @@ object JavaCodeGenerators extends Generators {
 
   def mul (s: String, n: Int): String = (0 until n).map(_ => s).mkString
 
-  val spacingBeforeWord: List[Char] = List('?', '{')
+  val spacingBeforeWord: List[Char] = List('?', '@', '{')
 
   val spacingAfterWord: List[Char] = List(',', ')', '}', '>')
 }

@@ -32,7 +32,7 @@ object JavaReprGenerator {
 
   def enumDef (enum: IREnum): EnumDef = new EnumDef {
     def annotations = Annotations.enumAnnotations(enum)
-    def modifiers = enum.mod
+    def modifiers = enum.mod ^ JModifier.accSuper
     def name = enum.simpleName
     def interfaces = enum.signature.interfaces.map(classSig)
     def constants = enum.enumConstants.map(enumConstantDef)
@@ -50,7 +50,7 @@ object JavaReprGenerator {
 
   def dslDef (dsl: IRDSL): ClassDef = new ClassDef {
     def annotations = Annotations.dslAnnotations(dsl)
-    def modifiers = dsl.mod
+    def modifiers = dsl.mod ^ JModifier.accSuper
     def name = dsl.simpleName
     def typeParameters = Nil
     def superType = objectClassSig
@@ -60,7 +60,7 @@ object JavaReprGenerator {
 
   def contextDef (context: IRContext): ClassDef = new ClassDef {
     def annotations = Annotations.contextAnnotations(context)
-    def modifiers = context.mod
+    def modifiers = context.mod ^ JModifier.accSuper
     def name = context.simpleName
     def typeParameters = typeParams(context.signature.metaParams)
     def superType = objectClassSig

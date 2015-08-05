@@ -21,7 +21,21 @@ class JCompilerTest extends FunSuite with Matchers {
     clazz.get.methods should have (size (2))
 
     val repr = JavaReprGenerator.moduleDef(clazz.get)
-    println(JavaCodeGenerators.moduleDef(repr))
+
+    val expected =
+      """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={})
+        |public class Hello extends java.lang.Object {
+        |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={})
+        |  public void greet() {
+        |    java.lang.System.out.println("Hello, world!");
+        |  }
+        |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"[Ljava/lang/String;"})
+        |  public static void main(java.lang.String[] args) {
+        |    new test.Hello().greet();
+        |  }
+        |}""".stripMargin
+
+    JavaCodeGenerators.moduleDef(repr) shouldBe expected
   }
 
   test ("Foo をコンパイルしてみる") {
@@ -43,5 +57,42 @@ class JCompilerTest extends FunSuite with Matchers {
     hello.get shouldBe a [IRModule]
 
     hello.get.methods should have (size (2))
+  }
+
+  test ("PrintDSL") {
+    val compiler = new JCompiler()
+
+    compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/print/PrintDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/print/Main.pj"))
+    val clazz = compiler.findIR("print/PrintDSL")
+    clazz shouldBe a [Some[_]]
+
+    val repr1 = JavaReprGenerator.moduleDef(clazz.get)
+
+    val expected1 =
+    """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={}) @proteaj/lang/DSL(priorities={}, constraints={}, with={})
+      |class PrintDSL extends java.lang.Object {
+      |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"Ljava/lang/String;"}) @proteaj/lang/Operator(level=proteaj/lang/OpLevel.Expression, priority=@proteaj/lang/Priority(dsl="Lprint/PrintDSL;", name="ProteanOperatorPriority$0"), pattern={@proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="p"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole="")})
+      |  static final void ProteanOperator$1(java.lang.String msg) {
+      |    java.lang.System.out.println(msg);
+      |  }
+      |}""".stripMargin
+
+    JavaCodeGenerators.moduleDef(repr1) shouldBe expected1
+
+    val main = compiler.findIR("print/Main")
+    main shouldBe a [Some[_]]
+
+    val repr2 = JavaReprGenerator.moduleDef(main.get)
+
+    val expected2 =
+    """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={})
+      |public class Main extends java.lang.Object {
+      |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"[Ljava/lang/String;"})
+      |  public static void main(java.lang.String[] args) {
+      |    print.PrintDSL.ProteanOperator$1("Hello, world!");
+      |  }
+      |}""".stripMargin
+
+    JavaCodeGenerators.moduleDef(repr2) shouldBe expected2
   }
 }

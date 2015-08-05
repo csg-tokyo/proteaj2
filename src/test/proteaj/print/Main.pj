@@ -1,0 +1,9 @@
+package print;
+
+import dsl PrintDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    p "Hello, world!";
+  }
+}
