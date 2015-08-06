@@ -11,7 +11,98 @@ import phenan.prj.state._
 import scala.util._
 
 class BodyParsersTest extends FunSuite with Matchers {
-  test ("メソッドボディ") {
+  test ("this") {
+    val src =
+      """package test;
+        |public class Test0 {
+        |  public Test0 returnThis () {
+        |    return this;
+        |  }
+        |}
+      """.stripMargin
+
+    val file = makeIR(src)
+    val test0 = file.modules.head
+    val method = test0.procedures.head
+
+    val body = method.asInstanceOf[IRMethod].methodBody
+
+    val expected = IRMethodBody(IRBlock(List(IRReturnStatement(IRThisRef(test0.thisType.get)))))
+
+    body shouldBe Some(expected)
+  }
+
+  test ("this field access") {
+    val src =
+      """package test;
+        |public class Test0 {
+        |  public int returnField () {
+        |    return this.n;
+        |  }
+        |  private int n;
+        |}
+      """.stripMargin
+
+    val file = makeIR(src)
+    val test0 = file.modules.head
+    val method = test0.procedures.head
+
+    val body = method.asInstanceOf[IRMethod].methodBody
+
+    val thisType = test0.thisType.get
+    val expected = IRMethodBody(IRBlock(List(IRReturnStatement(IRInstanceFieldAccess(IRThisRef(thisType), thisType.findField("n", test0, true).get)))))
+
+    body shouldBe Some(expected)
+  }
+
+  test ("ローカル変数アクセス") {
+    val src =
+      """package test;
+        |public class Test0 {
+        |  public int id (int n) {
+        |    return n;
+        |  }
+        |  private int n;
+        |}
+      """.stripMargin
+
+    val file = makeIR(src)
+    val test0 = file.modules.head
+    val method = test0.procedures.head
+
+    val body = method.asInstanceOf[IRMethod].methodBody
+
+    val expected = IRMethodBody(IRBlock(List(IRReturnStatement(IRLocalVariableRef(compiler.typeLoader.int, "n")))))
+
+    body shouldBe Some(expected)
+  }
+
+  test ("代入") {
+    val src =
+      """package test;
+        |public class Test0 {
+        |  public void setField (int n) {
+        |    this.n = n;
+        |  }
+        |  private int n;
+        |}
+      """.stripMargin
+
+    val file = makeIR(src)
+    val test0 = file.modules.head
+    val method = test0.procedures.head
+
+    val body = method.asInstanceOf[IRMethod].methodBody
+
+    val thisType = test0.thisType.get
+    val expected = IRMethodBody(IRBlock(List(IRExpressionStatement(
+      IRSimpleAssignmentExpression(IRInstanceFieldAccess(IRThisRef(thisType), thisType.findField("n", test0, true).get),
+        IRLocalVariableRef(compiler.typeLoader.int, "n"))))))
+
+    body shouldBe Some(expected)
+  }
+
+  test ("静的関数呼び出し") {
     val src =
       """package test;
         |public class Test0 {
@@ -48,7 +139,7 @@ class BodyParsersTest extends FunSuite with Matchers {
     mainMethod.asInstanceOf[IRMethod].methodBody shouldBe Some(IRMethodBody(expected))
   }
 
-  test ("引数") {
+  test ("配列アクセス") {
     val src =
       """package test;
         |public class Test0 {
@@ -79,6 +170,53 @@ class BodyParsersTest extends FunSuite with Matchers {
     result shouldBe Some(expected)
   }
 
+  test ("ジェネリクス・ローカル変数アクセス") {
+    val src =
+      """package test;
+        |public class Test0 <T> {
+        |  public T id (T n) {
+        |    return n;
+        |  }
+        |  private T n;
+        |}
+      """.stripMargin
+
+    val file = makeIR(src)
+    val test0 = file.modules.head
+    val method = test0.procedures.head
+
+    val body = method.asInstanceOf[IRMethod].methodBody
+
+    val expected = IRMethodBody(IRBlock(List(IRReturnStatement(IRLocalVariableRef(JTypeVariable("T", Nil, compiler), "n")))))
+
+    body shouldBe Some(expected)
+  }
+
+  test ("ジェネリクス・代入") {
+    val src =
+      """package test;
+        |public class Test0 <T> {
+        |  public void setField (T n) {
+        |    this.n = n;
+        |  }
+        |  private T n;
+        |}
+      """.stripMargin
+
+    val file = makeIR(src)
+    val test0 = file.modules.head
+    val method = test0.procedures.head
+
+    val body = method.asInstanceOf[IRMethod].methodBody
+
+    val thisType = test0.thisType.get
+    val expected = IRMethodBody(IRBlock(List(IRExpressionStatement(
+      IRSimpleAssignmentExpression(IRInstanceFieldAccess(IRThisRef(thisType), thisType.findField("n", test0, true).get),
+        IRLocalVariableRef(JTypeVariable("T", Nil, compiler), "n"))))))
+
+    body shouldBe Some(expected)
+  }
+
   lazy val compiler = {
     val config = new JConfig
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes/"
@@ -88,5 +226,9 @@ class BodyParsersTest extends FunSuite with Matchers {
 
   lazy val parsers = new BodyParsers(compiler)
 
-  def makeIR (src: String): IRFile = compiler.declarationCompiler.compile(new StringReader(src), "testsrc.java").get
+  def makeIR (src: String): IRFile = {
+    val file = compiler.declarationCompiler.compile(new StringReader(src), "testsrc.java").get
+    compiler.registerIR(file)
+    file
+  }
 }

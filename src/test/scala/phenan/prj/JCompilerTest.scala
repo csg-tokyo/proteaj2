@@ -95,4 +95,45 @@ class JCompilerTest extends FunSuite with Matchers {
 
     JavaCodeGenerators.moduleDef(repr2) shouldBe expected2
   }
+
+  test ("LetDSL") {
+    val compiler = new JCompiler()
+
+    compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let/LetDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let/Main.pj"))
+
+    val clazz = compiler.findIR("let/LetDSL")
+    clazz shouldBe a [Some[_]]
+
+    val repr1 = JavaReprGenerator.moduleDef(clazz.get)
+
+    val expected1 =
+    """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={}) @proteaj/lang/DSL(priorities={}, constraints={}, with={})
+      |class LetDSL extends java.lang.Object {
+      |  @proteaj/lang/MethodSig(metaParameters={@proteaj/lang/MetaParameter(name="V", type="Lproteaj/lang/Type;", priority={}, bounds={}), @proteaj/lang/MetaParameter(name="R", type="Lproteaj/lang/Type;", priority={}, bounds={})}, throwsTypes={}, deactivates={}, returnType="TR;", requires={}, activates={}, parameters={"TV;","@Llet/LetDSL$Local<TV;>;TR;"}) @proteaj/lang/Operator(level=proteaj/lang/OpLevel.Expression, priority=@proteaj/lang/Priority(dsl="Llet/LetDSL;", name="ProteanOperatorPriority$2"), pattern={@proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="let"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="a"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="="), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole=""), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="in"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole="")})
+      |  static final<V, R> R ProteanOperator$3(V v, java.util.function.Function<let.LetDSL.Local<V>, R> r) {
+      |    return r.apply(new let.LetDSL.Local<V>(v));
+      |  }
+      |  @proteaj/lang/ClassSig(metaParameters={@proteaj/lang/MetaParameter(name="V", type="Lproteaj/lang/Type;", priority={}, bounds={})}, superType="Ljava/lang/Object;", interfaces={}) @proteaj/lang/Context
+      |  static class Local<V> extends java.lang.Object {
+      |    @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"TV;"})
+      |    Local(V v) {
+      |      let.LetDSL.Local.this.v=v;
+      |    }
+      |    @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="TV;", requires={}, activates={}, parameters={}) @proteaj/lang/Operator(level=proteaj/lang/OpLevel.Expression, priority=@proteaj/lang/Priority(dsl="Llet/LetDSL;", name="ProteanOperatorPriority$5"), pattern={@proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="a")})
+      |    V ProteanOperator$4() {
+      |      return let.LetDSL.Local.this.v;
+      |    }
+      |    @proteaj/lang/FieldSig(value="TV;")
+      |    private V v;
+      |  }
+      |}""".stripMargin
+
+    println(JavaCodeGenerators.moduleDef(repr1))
+
+    val main = compiler.findIR("let/Main")
+    main shouldBe a [Some[_]]
+
+    val repr2 = JavaReprGenerator.moduleDef(main.get)
+    println(JavaCodeGenerators.moduleDef(repr2))
+  }
 }

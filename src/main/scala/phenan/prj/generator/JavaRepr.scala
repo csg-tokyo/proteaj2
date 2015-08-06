@@ -137,9 +137,9 @@ object JavaRepr {
 
   case class ClassRef (name: String)
 
-  case class SuperRef (thisType: ClassSig)
+  case class SuperRef (thisClass: ClassRef)
 
-  case class ThisRef (thisType: ClassSig)
+  case class ThisRef (thisClass: ClassRef)
 
   type JavaLiteral = ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
 

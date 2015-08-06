@@ -1,0 +1,16 @@
+package let;
+
+dsl LetDSL {
+  <R> R "let" "a" "=" _ "in" _ (String v, Local<String> ~> R r) {
+    return r.apply(new Local<String>(v));
+  }
+  context Local <V> {
+    Local (V v) {
+      this.v = v;
+    }
+    V "a" () {
+      return v;
+    }
+    private V v;
+  }
+}

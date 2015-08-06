@@ -140,15 +140,15 @@ object JavaCodeGenerators extends Generators {
 
   lazy val localRef: Generator[LocalRef] = elem { _.name }
 
-  lazy val thisRef: Generator[ThisRef] = classSig <~ ".this" ^^ { _.thisType }
+  lazy val thisRef: Generator[ThisRef] = classRef <~ '.' <~ "this" ^^ { _.thisClass }
 
   lazy val classRef: Generator[ClassRef] = elem { _.name }
 
-  lazy val superRef: Generator[SuperRef] = classSig <~ ".super" ^^ { _.thisType }
+  lazy val superRef: Generator[SuperRef] = classRef <~ '.' <~ "super" ^^ { _.thisClass }
 
   lazy val javaLiteral: Generator[JavaLiteral] = classLiteral :|: stringLiteral :|: charLiteral :|: intLiteral :|: longLiteral :|: booleanLiteral :|: nil
 
-  lazy val classLiteral: Generator[ClassLiteral] = string ~ dimension <~ ".class" ^^ { lit =>
+  lazy val classLiteral: Generator[ClassLiteral] = string ~ dimension <~ '.' <~ "class" ^^ { lit =>
     lit.className -> lit.dim
   }
 

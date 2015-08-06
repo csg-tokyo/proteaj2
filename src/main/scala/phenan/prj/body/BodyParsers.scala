@@ -126,7 +126,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val hostExpression: HParser[IRExpression] = javaExpression | parenthesized | hostLiteral.^
 
-    lazy val javaExpression = JavaExpressionParsers(env).expression ^? { case e if e.staticType.exists(_ <:< expected) => e }
+    lazy val javaExpression = JavaExpressionParsers(env).expression ^? { case e if e.staticType.exists(_ <:< expected) || expected == compiler.typeLoader.void => e }
 
     lazy val hostLiteral: LParser[IRExpression] = JavaLiteralParsers.literal(expected)
 
@@ -150,9 +150,9 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val assignment: HParser[IRAssignmentExpression] = simpleAssignment   // | += | -= | ...
 
-    lazy val simpleAssignment: HParser[IRSimpleAssignmentExpression] = leftHandSide >> { left =>
+    lazy val simpleAssignment: HParser[IRSimpleAssignmentExpression] = leftHandSide <~ '=' >> { left =>
       left.staticType match {
-        case Some(t) => '=' ~> ExpressionParsers(t, env).expression ^^ { right => IRSimpleAssignmentExpression(left, right) }
+        case Some(t) => ExpressionParsers(t, env).expression ^^ { right => IRSimpleAssignmentExpression(left, right) }
         case None    => HParser.failure("type error")
       }
     }
@@ -173,7 +173,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       }
     }
 
-    lazy val primaryNoNewArray: HParser[IRExpression] = methodCall | fieldAccess | arrayAccess | newExpression | abbreviatedMethodCall | abbreviatedFieldAccess | classLiteral | variableRef | thisRef | parenthesized
+    lazy val primaryNoNewArray: HParser[IRExpression] = methodCall | fieldAccess | arrayAccess | newExpression | abbreviatedMethodCall | classLiteral | variableRef | thisRef | abbreviatedFieldAccess | parenthesized
 
     lazy val newExpression: HParser[IRNewExpression] = ( "new" ~> typeParsers.metaArguments ) ~ typeParsers.objectType >>? {
       case metaArgs ~ constructType => constructType.findConstructor(env.clazz).flatMap(constructorCall(metaArgs, _)).reduceOption(_ | _)
@@ -219,7 +219,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     lazy val abbreviatedFieldAccess: HParser[IRFieldAccess] =  thisClassFieldAccess | thisFieldAccess  // | staticImported
 
-    lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primary ~ ( '.' ~> identifier ) ^^? {
+    lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primaryNoNewArray ~ ( '.' ~> identifier ) ^^? {
       case instance ~ name => instance.staticType.flatMap { _.findField(name, env.clazz, isThisRef(instance)).map(IRInstanceFieldAccess(instance, _)) }
     }
 

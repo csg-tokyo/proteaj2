@@ -155,7 +155,7 @@ trait TwoLevelParsers {
 
       def map [R] (f: T => R): HParser[R] = HParserImpl(parser.map(f))
       def mapOption [R] (f: T => Option[R]): HParser[R] = HParserImpl(parser ^^ f ^? { case Some(r) => r })
-      def flatMap [R] (f: T => HParser[R]): HParser[R] = HParserImpl(parser.flatMap(f(_).parser))
+      def flatMap [R] (f: T => HParser[R]): HParser[R] = HParserImpl((parser <~ delimiter.parser).flatMap(f(_).parser))
 
       def ^? [R] (f: PartialFunction[T, R]): HParser[R] = HParserImpl(parser ^? f)
       def ^^^ [R] (f: => R): HParser[R] = HParserImpl(parser ^^^ f)

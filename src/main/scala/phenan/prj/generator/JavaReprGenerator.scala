@@ -301,7 +301,7 @@ object JavaReprGenerator {
     case e: IRArrayAccess          => Union[Expression](arrayAccess(e, contexts))
     case e: IRCastExpression       => Union[Expression](castExpression(e, contexts))
     case IRLocalVariableRef(_, n)  => Union[Expression](LocalRef(n))
-    case e: IRThisRef              => Union[Expression](ThisRef(objectType(e.thisType)))
+    case e: IRThisRef              => Union[Expression](ThisRef(ClassRef(e.thisType.erase.name)))
     case e: IRJavaLiteral          => Union[Expression](javaLiteral(e))
     case e: IRVariableArguments    => Union[Expression](variableArguments(e, contexts))
     case e: IRContextRef           => Union[Expression](contextRef(e, contexts))
@@ -316,7 +316,7 @@ object JavaReprGenerator {
   def fieldAccess (e: IRFieldAccess, contexts: List[IRContextRef]): FieldAccess = e match {
     case IRInstanceFieldAccess(expr, field)  => FieldAccess(Union[Receiver](expression(expr, contexts)), field.name)
     case IRStaticFieldAccess(field)          => FieldAccess(Union[Receiver](ClassRef(field.declaringClass.name)), field.name)
-    case IRSuperFieldAccess(thisType, field) => FieldAccess(Union[Receiver](SuperRef(objectType(thisType))), field.name)
+    case IRSuperFieldAccess(thisType, field) => FieldAccess(Union[Receiver](SuperRef(ClassRef(thisType.erase.name))), field.name)
   }
 
   def methodCall (e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = e match {
@@ -345,10 +345,10 @@ object JavaReprGenerator {
 
   def superMethodCall (e: IRSuperMethodCall, contexts: List[IRContextRef]): MethodCall = {
     if (e.requiredContexts.nonEmpty) {
-      val lam = superMethodWrapper(getStaticType(e), SuperRef(objectType(e.thisType)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
+      val lam = superMethodWrapper(getStaticType(e), SuperRef(ClassRef(e.thisType.erase.name)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
       MethodCall(Union[Receiver](lam), Nil, "apply", e.args.map(expression(_, contexts)))
     }
-    else MethodCall(Union[Receiver](SuperRef(objectType(e.thisType))), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
+    else MethodCall(Union[Receiver](SuperRef(ClassRef(e.thisType.erase.name))), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
   }
 
   def newExpression (e: IRNewExpression, contexts: List[IRContextRef]): Expression = {
@@ -498,7 +498,7 @@ object JavaReprGenerator {
 
   def objectClassSig: ClassSig = classSig(JTypeSignature.objectTypeSig)
 
-  def topLevelClassSig (signature: SimpleClassTypeSignature): TopLevelClassSig = TopLevelClassSig (signature.internalName.replace('/', '.'), signature.args.flatMap(typeArg))
+  def topLevelClassSig (signature: SimpleClassTypeSignature): TopLevelClassSig = TopLevelClassSig (signature.internalName.replace('/', '.').replace('$', '.'), signature.args.flatMap(typeArg))
 
   def memberClassSig (signature: MemberClassTypeSignature): MemberClassSig = MemberClassSig (classSig(signature.outer), signature.clazz, signature.args.flatMap(typeArg))
 

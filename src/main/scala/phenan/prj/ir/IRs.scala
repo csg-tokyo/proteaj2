@@ -318,7 +318,7 @@ case class IRContext (contextAST: ContextDeclaration, dsl: IRDSL) extends IRModu
   protected def superTypeAST: Option[TypeName] = None
   protected def interfacesAST: List[TypeName] = Nil
 
-  protected def implicitModifier = accSuper
+  protected def implicitModifier = accSuper | accStatic
 
   private def declaredMembers (membersAST: List[ContextMember], ms: List[IRContextMember]): List[IRContextMember] = membersAST match {
     case (c: ConstructorDeclaration) :: rest    => declaredMembers(rest, IRContextConstructor(c, this) :: ms)

@@ -72,7 +72,9 @@ sealed trait IRFieldAccess extends IRLeftHandSide {
   def deactivates: List[IRContextRef] = Nil
 }
 
-case class IRInstanceFieldAccess (instance: IRExpression, field: JField) extends IRFieldAccess
+case class IRInstanceFieldAccess (instance: IRExpression, field: JField) extends IRFieldAccess {
+  override def toString: String = instance.toString + '.' + field.name
+}
 
 case class IRSuperFieldAccess (thisType: JObjectType, field: JField) extends IRFieldAccess
 
@@ -148,6 +150,8 @@ case class IRThisRef (thisType: JObjectType) extends IRExpression {
   def staticType = Some(thisType)
   def activates: List[IRContextRef] = Nil
   def deactivates: List[IRContextRef] = Nil
+
+  override def toString: String = thisType.name + '.' + "this"
 }
 
 case class IRLocalVariableRef (localType: JType, name: String) extends IRLeftHandSide {
