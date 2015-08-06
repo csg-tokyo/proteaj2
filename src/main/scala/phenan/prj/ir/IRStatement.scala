@@ -12,11 +12,18 @@ sealed trait IRStatement
 
 case class IRBlock (statements: List[IRStatement]) extends IRStatement
 
-case class IRLocalDeclarationStatement (declaration: IRLocalDeclaration) extends IRStatement
+case class IRLocalDeclarationStatement (declaration: IRLocalDeclaration) extends IRStatement {
+  override def toString: String = declaration.toString + ';'
+}
 
-case class IRLocalDeclaration (localType: JType, declarators: List[IRVariableDeclarator])
+case class IRLocalDeclaration (localType: JType, declarators: List[IRVariableDeclarator]) {
+  override def toString: String = localType.name + ' ' + declarators.mkString(",")
+}
 
-case class IRVariableDeclarator (name: String, dim: Int, init: Option[IRExpression])
+case class IRVariableDeclarator (name: String, dim: Int, init: Option[IRExpression]) {
+  private def typeName = name + (0 until dim).map(_ => "[]").mkString
+  override def toString: String = typeName + init.map(e => " " + e.toString).getOrElse("")
+}
 
 case class IRIfStatement (condition: IRExpression, thenStatement: IRStatement, elseStatement: Option[IRStatement]) extends IRStatement
 

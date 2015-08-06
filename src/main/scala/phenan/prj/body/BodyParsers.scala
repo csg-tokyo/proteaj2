@@ -483,12 +483,8 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
 
     private def arguments_helper (parameters: List[JParameter], binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment, args: List[IRExpression]): HParser[(Map[String, MetaArgument], List[IRExpression])] = parameters match {
       case Nil           => HParser.success((binding, args))
-      case param :: Nil  => expressionParsers(param, binding, procedure, environment).map(_.expression ^^ { arg => (bind(param, arg, binding), args :+ arg) }).getOrElse {
-        HParser.failure("fail to parse argument")
-      }
-      case param :: rest => expressionParsers(param, binding, procedure, environment).map(_.expression >> { arg => ',' ~> arguments_helper(rest, bind(param, arg, binding), procedure, environment, args :+ arg) }).getOrElse {
-        HParser.failure("fail to parse argument")
-      }
+      case param :: Nil  => expressionParser(param, binding, procedure, environment.highestPriority, environment) ^^ { arg => (bind(param, arg, binding), args :+ arg) }
+      case param :: rest => expressionParser(param, binding, procedure, environment.highestPriority, environment) >> { arg => ',' ~> arguments_helper(rest, bind(param, arg, binding), procedure, environment, args :+ arg) }
     }
 
     def arguments (procedure: JProcedure, binding: Map[String, MetaArgument], environment: Environment): HParser[List[IRExpression]] = {
@@ -496,21 +492,17 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
 
     def argument (param: JParameter, binding: Map[String, MetaArgument], environment: Environment): HParser[IRExpression] = {
-      param.genericType.bind(binding).flatMap(expectedType => expressionParsers(param, binding, expectedType, environment)).map(_.expression).getOrElse {
+      param.genericType.bind(binding).map(expectedType => expressionParser(param, binding, expectedType, environment.highestPriority, environment)).getOrElse {
         HParser.failure("invalid expected type")
       }
     }
 
     def expression (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[IRExpression] = {
-      expressionParsers(param, binding, procedure, environment).map(_.expression(priority(param, procedure, environment))).getOrElse {
-        HParser.failure("fail to parse argument expression")
-      }
+      expressionParser(param, binding, procedure, priority(param, procedure, environment), environment)
     }
 
     def literal (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): LParser[IRExpression] = {
-      expressionParsers(param, binding, procedure, environment).map(_.literal(priority(param, procedure, environment))).getOrElse {
-        LParser.failure("fail to parse argument literal")
-      }
+      literalParser(param, binding, procedure, priority(param, procedure, environment), environment)
     }
 
     def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
@@ -520,12 +512,30 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       method <- procedure.declaringClass.classModule.findMethod(name, environment.clazz).find(_.erasedParameterTypes == Nil)
     } yield IRStaticMethodCall(Map.empty, method, Nil, Nil)
 
-    private def expressionParsers (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): Option[ExpressionParsers] = {
-      expected(param, binding, procedure).flatMap(expectedType => expressionParsers(param, binding, expectedType, environment))
+    private def expressionParser (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, priority: Option[JPriority], environment: Environment): HParser[IRExpression] = {
+      expected(param, binding, procedure).map(expectedType => expressionParser(param, binding, expectedType, priority, environment)).getOrElse {
+        HParser.failure("fail to parse argument expression")
+      }
     }
 
-    private def expressionParsers (param: JParameter, binding: Map[String, MetaArgument], expectedType: JType, environment: Environment): Option[ExpressionParsers] = {
-      IRContextRef.createRefs(param.contexts, binding).map(contexts => ExpressionParsers(expectedType, environment.withContexts(contexts)))
+    private def expressionParser (param: JParameter, binding: Map[String, MetaArgument], expectedType: JType, priority: Option[JPriority], environment: Environment): HParser[IRExpression] = {
+      IRContextRef.createRefs(param.contexts, binding).map(contexts => ExpressionParsers(expectedType, environment.withContexts(contexts)).expression(priority).map { arg =>
+        if (contexts.nonEmpty) IRContextualArgument(arg, contexts)
+        else arg
+      }).getOrElse {
+        HParser.failure("fail to parse argument expression")
+      }
+    }
+
+    private def literalParser (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, priority: Option[JPriority], environment: Environment): LParser[IRExpression] = {
+      expected(param, binding, procedure).flatMap { expectedType =>
+        IRContextRef.createRefs(param.contexts, binding).map(contexts => ExpressionParsers(expectedType, environment.withContexts(contexts)).literal(priority).map { arg =>
+          if (contexts.nonEmpty) IRContextualArgument(arg, contexts)
+          else arg
+        })
+      }.getOrElse {
+        LParser.failure("fail to parse argument expression")
+      }
     }
 
     private def expected (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure): Option[JType] = {

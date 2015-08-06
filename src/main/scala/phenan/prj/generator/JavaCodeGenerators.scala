@@ -12,29 +12,29 @@ object JavaCodeGenerators extends Generators {
 
   lazy val moduleDef: Generator[ModuleDef] = classDef :|: enumDef :|: interfaceDef :|: nil
 
-  lazy val classDef: Generator[ClassDef] = ( annotation.* <~ newLine ) ~ modifier ~ ( "class" ~> string ) ~ typeParam.*?('<', ',', '>') ~ ( "extends" ~> classSig ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { clazz =>
+  lazy val classDef: Generator[ClassDef] = annotations ~ modifier ~ ( "class" ~> string ) ~ typeParam.*?('<', ',', '>') ~ ( "extends" ~> classSig ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { clazz =>
     clazz.annotations -> clazz.modifiers -> clazz.name -> clazz.typeParameters -> clazz.superType -> clazz.interfaces -> clazz.members
   }
 
-  lazy val enumDef: Generator[EnumDef] = ( annotation.* <~ newLine ) ~ modifier ~ ( "enum" ~> string ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(enumConstantDef.*(',') ~ classMember.*?(';' ~> newLine, newLine, "")) <~ '}' ) ^^ { enum =>
+  lazy val enumDef: Generator[EnumDef] = annotations ~ modifier ~ ( "enum" ~> string ) ~ classSig.*?("implements", ',', "") ~ ( '{' ~> indent(enumConstantDef.*(',') ~ classMember.*?(';' ~> newLine, newLine, "")) <~ '}' ) ^^ { enum =>
     enum.annotations -> enum.modifiers -> enum.name -> enum.interfaces -> ( enum.constants -> enum.members )
   }
 
-  lazy val interfaceDef: Generator[InterfaceDef] = ( annotation.* <~ newLine ) ~ modifier ~ ( "interface" ~> string ) ~ typeParam.*?('<', ',', '>') ~ classSig.*?("extends", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { interface =>
+  lazy val interfaceDef: Generator[InterfaceDef] = annotations ~ modifier ~ ( "interface" ~> string ) ~ typeParam.*?('<', ',', '>') ~ classSig.*?("extends", ',', "") ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { interface =>
     interface.annotations -> interface.modifiers -> interface.name -> interface.typeParameters -> interface.superInterfaces -> interface.members
   }
 
   lazy val classMember: Generator[ClassMember] = fieldDef :|: methodDef :|: constructorDef :|: instanceInitializerDef :|: staticInitializerDef :|: moduleDef :|: nil
 
-  lazy val fieldDef: Generator[FieldDef] = ( annotation.* <~ newLine ) ~ modifier ~ typeSig ~ string ~ ( "=" ~> expression ).? <~ ';' ^^ { field =>
+  lazy val fieldDef: Generator[FieldDef] = annotations ~ modifier ~ typeSig ~ string ~ ( "=" ~> expression ).? <~ ';' ^^ { field =>
     field.annotations -> field.modifiers -> field.fieldType -> field.name -> field.initializer
   }
 
-  lazy val methodDef: Generator[MethodDef] = ( annotation.* <~ newLine ) ~ modifier ~ typeParam.*?('<', ',', '>') ~ typeSig ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block.?(';') ^^ { method =>
+  lazy val methodDef: Generator[MethodDef] = annotations ~ modifier ~ typeParam.*?('<', ',', '>') ~ typeSig ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block.?(';') ^^ { method =>
     method.annotations -> method.modifiers -> method.typeParameters -> method.returnType -> method.name -> method.parameters -> method.throws -> method.body
   }
 
-  lazy val constructorDef: Generator[ConstructorDef] = ( annotation.* <~ newLine ) ~ modifier ~ typeParam.*?('<', ',', '>') ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block ^^ { constructor =>
+  lazy val constructorDef: Generator[ConstructorDef] = annotations ~ modifier ~ typeParam.*?('<', ',', '>') ~ string ~ ( '(' ~> parameter.*(',') <~ ')' ) ~ typeSig.*?("throws", ',', "") ~ block ^^ { constructor =>
     constructor.annotations -> constructor.modifiers -> constructor.typeParameters -> constructor.className -> constructor.parameters -> constructor.throws -> constructor.body
   }
 
@@ -200,6 +200,8 @@ object JavaCodeGenerators extends Generators {
   lazy val lowerBoundWildcard: Generator[LowerBoundWildcard] = '?' ~> "super" ~> typeSig ^^ { _.bound }
 
   lazy val modifier: Generator[JModifier] = elem { _.toString }
+
+  lazy val annotations: Generator[List[JavaAnnotation]] = annotation.*?("", "", newLine)
 
   lazy val annotation: Generator[JavaAnnotation] = ( '@' ~> string ) ~ annotationArgument.*?('(', ',', ')') ^^ { ann =>
     ann.name -> ann.arguments.toList

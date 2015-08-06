@@ -304,6 +304,7 @@ object JavaReprGenerator {
     case e: IRThisRef              => Union[Expression](ThisRef(ClassRef(e.thisType.erase.name)))
     case e: IRJavaLiteral          => Union[Expression](javaLiteral(e))
     case e: IRVariableArguments    => Union[Expression](variableArguments(e, contexts))
+    case e: IRContextualArgument   => contextualArgument(e, contexts)
     case e: IRContextRef           => Union[Expression](contextRef(e, contexts))
   }
 
@@ -370,6 +371,18 @@ object JavaReprGenerator {
   def variableArguments (e: IRVariableArguments, contexts: List[IRContextRef]): ArrayInit =
     ArrayInit(typeToSig(e.componentType.getOrElse { throw InvalidASTException("invalid component type of variable argument") }), 1, e.args.map(expression(_, contexts)))
 
+  def contextualArgument (e: IRContextualArgument, contexts: List[IRContextRef]): Expression = {
+    contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), getStaticType(e.argument), Nil, contexts ++ e.contexts)
+  }
+
+  private def contextualArgument (cs: List[IRContextRef], e: Expression, t: JType, throws: List[TypeSig], contexts: List[IRContextRef]): Expression = cs match {
+    case c :: rest =>
+      val functionType = t.compiler.typeLoader.functionTypeOf(c.contextType, t).getOrElse(throw InvalidASTException("invalid context type"))
+      contextualArgument(rest, Union[Expression](lambda(objectType(functionType), typeToSig(t),
+        List(parameter(c.contextType, contextName(contexts.size - 1))), throws, Block(List(returnStatement(e))))), functionType, throws, contexts.tail)
+    case Nil       => e
+  }
+
   def contextRef (e: IRContextRef, contexts: List[IRContextRef]): LocalRef = {
     val index = contexts.indexOf(e)
     if (index >= 0) LocalRef(contextName(index))
@@ -403,7 +416,7 @@ object JavaReprGenerator {
       Union[Expression](NewExpression(typeArgs, objectType(returnType), argTypes.indices.map(i => localRefExpression("arg" + i)).toList)))
 
   private def functionWrapper (returnType: JType, params: List[Param], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef], application: Expression): Expression = Union[Expression](lambda (
-    typeToSig(returnType), params, throws.map(typeToSig), Block { sendRequiredContexts(required, contexts) :+ returnStatement(application) }
+    objectClassSig, typeToSig(returnType), params, throws.map(typeToSig), Block { sendRequiredContexts(required, contexts) :+ returnStatement(application) }
   ))
   
   private def returnStatement (e: Expression): Statement = Union[Statement](ReturnStatement(e))
@@ -418,8 +431,8 @@ object JavaReprGenerator {
     Union[Statement](activateContext(Union[Expression](contextRef(c, contexts)), i))
   }
 
-  private def lambda (retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): AnonymousClass =
-    AnonymousClass(objectClassSig, Nil, List(Union[ClassMember](lambdaMethodDef(retType, params, exceptions, block))))
+  private def lambda (baseClassSig: ClassSig, retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): AnonymousClass =
+    AnonymousClass(baseClassSig, Nil, List(Union[ClassMember](lambdaMethodDef(retType, params, exceptions, block))))
 
   private def lambdaMethodDef (retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): MethodDef = new MethodDef {
     def annotations: List[JavaAnnotation] = Nil

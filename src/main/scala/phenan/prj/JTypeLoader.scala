@@ -34,9 +34,17 @@ class JTypeLoader (compiler: JCompiler) {
   }
 
   def iterableOf (arg: JRefType) = compiler.classLoader.iterableClass.flatMap(_.objectType(List(arg)))
-  def classTypeOf (arg: JType) = arg match {
-    case ref: JRefType       => compiler.classLoader.classClass.flatMap(_.objectType(List(ref)))
-    case prm: JPrimitiveType => prm.boxed.flatMap(t => compiler.classLoader.classClass.flatMap(_.objectType(List(t))))
+  def classTypeOf (arg: JType) = boxing(arg).flatMap(t => compiler.classLoader.classClass.flatMap(_.objectType(List(t))))
+  def functionTypeOf (from: JType, to: JType) = for {
+    f <- boxing(from)
+    t <- boxing(to)
+    func <- compiler.classLoader.functionClass
+    r <- func.objectType(List(f, t))
+  } yield r
+
+  def boxing (t: JType): Option[JRefType] = t match {
+    case ref: JRefType       => Some(ref)
+    case prm: JPrimitiveType => prm.boxed
   }
 
   def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaArgument]): Option[JType] = sig match {

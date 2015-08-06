@@ -101,9 +101,21 @@ case class IRSuperMethodCall (thisType: JObjectType, metaArgs: Map[String, MetaA
 
 case class IRStaticMethodCall (metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 
-case class IRDSLOperation (method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
+case class IRDSLOperation (method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall {
+  override def toString: String = "#DSLOperation#" + method.name + args.mkString("(", ",", ")")
+}
 
-case class IRContextOperation (context: IRContextRef, method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
+case class IRContextOperation (context: IRContextRef, method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall {
+  override def toString: String = "#ContextOperation#" + context.contextType.name + '.' + method.name + args.mkString("(", ",", ")")
+}
+
+case class IRContextualArgument (argument: IRExpression, contexts: List[IRContextRef]) extends IRExpression {
+  def staticType: Option[JType] = contexts.foldRight(argument.staticType) { (c, t) =>
+    t.flatMap(c.contextType.compiler.typeLoader.functionTypeOf(c.contextType, _))
+  }
+  def activates: List[IRContextRef] = Nil
+  def deactivates: List[IRContextRef] = Nil
+}
 
 case class IRVariableArguments (args: List[IRExpression], componentType: Option[JType]) extends IRExpression {
   def staticType: Option[JType] = componentType.map(_.array)

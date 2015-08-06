@@ -43,6 +43,7 @@ trait JClassLoader {
   lazy val stringClass: Option[JClass] = loadClass_PE(CommonNames.stringClassName)
   lazy val classClass: Option[JClass] = loadClass_PE(CommonNames.classClassName)
   lazy val iterableClass: Option[JClass] = loadClass_PE(CommonNames.iterableClassName)
+  lazy val functionClass: Option[JClass] = loadClass_PE(CommonNames.functionClassName)
 
   lazy val typeClass: JClass = new JTypeClass(compiler)
 
