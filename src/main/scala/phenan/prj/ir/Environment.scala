@@ -25,9 +25,15 @@ trait Environment {
 
   def defineLocal (localType: JType, name: String): Environment = Environment_LocalVariables(List((localType, name)), this)
 
-  def modifyContext (statement: IRStatement): Environment = Environment_LocalContexts(statement.activates, statement.deactivates, this)
-  def modifyContext (expression: IRExpression): Environment = Environment_LocalContexts(expression.activates, expression.deactivates, this)
-  def withContexts (contexts: List[IRContextRef]): Environment = Environment_LocalContexts(contexts, Nil, this)
+  def modifyContext (statement: IRExpressionStatement): Environment = {
+    if (statement.activates.nonEmpty || statement.deactivates.nonEmpty) Environment_LocalContexts(statement.activates, statement.deactivates, this)
+    else this
+  }
+
+  def withContexts (contexts: List[IRContextRef]): Environment = {
+    if (contexts.nonEmpty) Environment_LocalContexts(contexts, Nil, this)
+    else this
+  }
 
   def defineLocals (locals: IRLocalDeclaration): Environment = Environment_LocalVariables(locals.declarators.map(local => (locals.localType.array(local.dim), local.name)), this)
 
@@ -90,7 +96,7 @@ trait Environment_Contexts extends ChildEnvironment {
         case (cs, e2) => ExpressionOperator(s, e2, m, { (ma, args) => IRDSLOperation(m, ma, args, cs) })
       }
     }
-    val fromContexts = contexts.flatMap(c => collectOperators(c, t, c.contextType.expressionOperators)).flatMap {
+    val fromContexts = contexts.flatMap { c => collectOperators(c, t, c.contextType.expressionOperators) }.flatMap {
       case (c, s, m, e) => inferencer.inferContexts(m, e).map {
         case (cs, e2) => ExpressionOperator(s, e2, m, { (ma, args) => IRContextOperation(c, m, ma, args, cs) })
       }

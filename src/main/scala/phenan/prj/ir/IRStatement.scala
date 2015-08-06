@@ -8,10 +8,7 @@ case class IRConstructorBody (constructorCall: Option[IRExplicitConstructorCall]
 
 case class IRInitializerBody (block: IRBlock)
 
-sealed trait IRStatement {
-  def activates: List[IRContextRef] = Nil
-  def deactivates: List[IRContextRef] = Nil
-}
+sealed trait IRStatement
 
 case class IRBlock (statements: List[IRStatement]) extends IRStatement
 
@@ -36,6 +33,6 @@ case class IRActivateStatement (expression: IRExpression) extends IRStatement
 case class IRReturnStatement (expression: IRExpression) extends IRStatement
 
 case class IRExpressionStatement (expression: IRExpression) extends IRStatement {
-  override def activates: List[IRContextRef] = expression.activates
-  override def deactivates: List[IRContextRef] = expression.deactivates
+  def activates: List[IRContextRef] = expression.activates
+  def deactivates: List[IRContextRef] = expression.deactivates
 }

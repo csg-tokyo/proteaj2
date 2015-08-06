@@ -179,7 +179,7 @@ trait IRModule extends JClass with IRMember {
   }
 
   private def collectMemberPriorities(members: List[IRMember], ps: Set[JPriority]): Set[JPriority] = members match {
-    case (o: IROperator) :: rest if o.priority.clazz.internalName == internalName => collectMemberPriorities(rest, ps + o.priority)
+    case (o: IROperator) :: rest => collectMemberPriorities(rest, ps + o.priority)
     case (m: IRModule) :: rest   => collectMemberPriorities(rest, m.memberPriorities ++ ps)
     case _ :: rest               => collectMemberPriorities(rest, ps)
     case Nil                     => ps

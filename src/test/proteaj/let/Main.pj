@@ -4,7 +4,7 @@ import dsl LetDSL;
 
 public class Main {
   public static void main (String[] args) {
-    String s = ( let a = "hello" in "hoge" );
+    String s = ( let a = "hello" in ( a ) );
 //    System.out.println(s);
   }
 }

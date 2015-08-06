@@ -20,8 +20,6 @@ class EnvironmentTest extends FunSuite with Matchers {
         |}
       """.stripMargin
 
-
-
     val module = compile(src, "test/Test0").get
     val method = module.procedures.head
     method.environment.localVariable("n") shouldBe a [Some[_]]
