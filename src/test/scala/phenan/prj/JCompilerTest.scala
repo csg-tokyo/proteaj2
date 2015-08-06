@@ -109,9 +109,9 @@ class JCompilerTest extends FunSuite with Matchers {
     val expected1 =
     """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={}) @proteaj/lang/DSL(priorities={}, constraints={}, with={})
       |class LetDSL extends java.lang.Object {
-      |  @proteaj/lang/MethodSig(metaParameters={@proteaj/lang/MetaParameter(name="V", type="Lproteaj/lang/Type;", priority={}, bounds={}), @proteaj/lang/MetaParameter(name="R", type="Lproteaj/lang/Type;", priority={}, bounds={})}, throwsTypes={}, deactivates={}, returnType="TR;", requires={}, activates={}, parameters={"TV;","@Llet/LetDSL$Local<TV;>;TR;"}) @proteaj/lang/Operator(level=proteaj/lang/OpLevel.Expression, priority=@proteaj/lang/Priority(dsl="Llet/LetDSL;", name="ProteanOperatorPriority$2"), pattern={@proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="let"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="a"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="="), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole=""), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="in"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole="")})
-      |  static final<V, R> R ProteanOperator$3(V v, java.util.function.Function<let.LetDSL.Local<V>, R> r) {
-      |    return r.apply(new let.LetDSL.Local<V>(v));
+      |  @proteaj/lang/MethodSig(metaParameters={@proteaj/lang/MetaParameter(name="R", type="Lproteaj/lang/Type;", priority={}, bounds={})}, throwsTypes={}, deactivates={}, returnType="TR;", requires={}, activates={}, parameters={"Ljava/lang/String;","@Llet/LetDSL$Local<Ljava/lang/String;>;TR;"}) @proteaj/lang/Operator(level=proteaj/lang/OpLevel.Expression, priority=@proteaj/lang/Priority(dsl="Llet/LetDSL;", name="ProteanOperatorPriority$2"), pattern={@proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="let"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="a"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="="), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole=""), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="in"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole="")})
+      |  static final<R> R ProteanOperator$3(java.lang.String v, java.util.function.Function<let.LetDSL.Local<java.lang.String>, R> r) {
+      |    return r.apply(new let.LetDSL.Local<java.lang.String>(v));
       |  }
       |  @proteaj/lang/ClassSig(metaParameters={@proteaj/lang/MetaParameter(name="V", type="Lproteaj/lang/Type;", priority={}, bounds={})}, superType="Ljava/lang/Object;", interfaces={}) @proteaj/lang/Context
       |  static class Local<V> extends java.lang.Object {
@@ -128,9 +128,41 @@ class JCompilerTest extends FunSuite with Matchers {
       |  }
       |}""".stripMargin
 
-    println(JavaCodeGenerators.moduleDef(repr1))
+    JavaCodeGenerators.moduleDef(repr1) shouldBe expected1
 
     val main = compiler.findIR("let/Main")
+    main shouldBe a [Some[_]]
+
+    val repr2 = JavaReprGenerator.moduleDef(main.get)
+
+    val expected2 =
+    """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={})
+      |public class Main extends java.lang.Object {
+      |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"[Ljava/lang/String;"})
+      |  public static void main(java.lang.String[] args) {
+      |    java.lang.String s=let.LetDSL.<java.util.function.Function<let.LetDSL.Local<java.lang.String>, java.lang.String>> ProteanOperator$3("hello", new java.util.function.Function<let.LetDSL.Local<java.lang.String>, java.lang.String>() {
+      |      public java.lang.String apply(let.LetDSL.Local<java.lang.String> ProteaJLocalContext$$0) {
+      |        return ProteaJLocalContext$$0.ProteanOperator$4();
+      |      }
+      |    });
+      |  }
+      |}""".stripMargin
+
+    JavaCodeGenerators.moduleDef(repr2) shouldBe expected2
+  }
+
+  test ("FileDSL") {
+    val compiler = new JCompiler()
+
+    compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/file/FileDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/file/Main.pj"))
+
+    val clazz = compiler.findIR("file/FileDSL")
+    clazz shouldBe a [Some[_]]
+
+    val repr1 = JavaReprGenerator.moduleDef(clazz.get)
+    println(JavaCodeGenerators.moduleDef(repr1))
+
+    val main = compiler.findIR("file/Main")
     main shouldBe a [Some[_]]
 
     val repr2 = JavaReprGenerator.moduleDef(main.get)

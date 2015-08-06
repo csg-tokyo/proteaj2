@@ -114,7 +114,14 @@ trait IRModule extends JClass with IRMember {
 
   lazy val annotations = file.annotationReader.read(modifiersAST.collect { case ann: Annotation => ann })
 
-  lazy val staticResolver = file.resolver.withInnerClasses(inners).withPriorities(declaredPriorities)
+  lazy val staticResolver = getInitialResolver.withInnerClasses(inners).withPriorities(declaredPriorities)
+
+  private def getInitialResolver: NameResolver = outer match {
+    case Some (m) =>
+      if (mod.check (JModifier.accStatic) ) m.staticResolver
+      else m.resolver
+    case None => file.resolver
+  }
 
   lazy val (signature: JClassSignature, resolver: NameResolver) = file.annotationReader.classSignature(annotations) match {
     case Some(sig) => (sig, sig.metaParams.foldLeft(staticResolver){ _.withMetaParameter(_) })

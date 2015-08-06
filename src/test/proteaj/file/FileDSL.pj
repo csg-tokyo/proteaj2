@@ -1,0 +1,21 @@
+package file;
+
+import java.io.*;
+
+dsl FileDSL {
+  void "open" _ (String fileName) activates Reading {
+    activate new Reading(fileName);
+  }
+  context Reading {
+    Reading (String file) {
+      reader = new BufferedReader(new FileReader(file));
+    }
+    String "read" "line" () {
+      return reader.readLine();
+    }
+    void "close" () deactivates Reading {
+      reader.close();
+    }
+    private BufferedReader reader;
+  }
+}
