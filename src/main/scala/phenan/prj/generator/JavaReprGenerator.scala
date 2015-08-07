@@ -556,7 +556,7 @@ object JavaReprGenerator {
 
   object Annotations {
     def classAnnotations (clazz: IRClass): List[JavaAnnotation] = {
-      if (clazz.isDSL) classLikeAnnotations(clazz) :+ dslAnnotation(clazz.declaredPriorities, clazz.priorityConstraints, clazz.withDSLs)
+      if (clazz.isDSL) classLikeAnnotations(clazz) :+ dslAnnotation(clazz.memberPriorities, clazz.priorityConstraints, clazz.withDSLs)
       else classLikeAnnotations(clazz)
     }
 
@@ -565,7 +565,7 @@ object JavaReprGenerator {
     def interfaceAnnotations (interface: IRInterface): List[JavaAnnotation] = classLikeAnnotations(interface)
 
     def dslAnnotations (dsl: IRDSL): List[JavaAnnotation] = {
-      classLikeAnnotations(dsl) :+ dslAnnotation(dsl.declaredPriorities, dsl.priorityConstraints, dsl.withDSLs)
+      classLikeAnnotations(dsl) :+ dslAnnotation(dsl.memberPriorities, dsl.priorityConstraints, dsl.withDSLs)
     }
 
     def contextAnnotations (context: IRContext): List[JavaAnnotation] = {
