@@ -110,9 +110,7 @@ case class IRContextOperation (context: IRContextRef, method: JMethod, metaArgs:
 }
 
 case class IRContextualArgument (argument: IRExpression, contexts: List[IRContextRef]) extends IRExpression {
-  def staticType: Option[JType] = contexts.foldRight(argument.staticType) { (c, t) =>
-    t.flatMap(c.contextType.compiler.typeLoader.functionTypeOf(c.contextType, _))
-  }
+  def staticType: Option[JType] = argument.staticType
   def activates: List[IRContextRef] = Nil
   def deactivates: List[IRContextRef] = Nil
 }

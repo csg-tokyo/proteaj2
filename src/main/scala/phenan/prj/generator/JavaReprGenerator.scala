@@ -393,11 +393,11 @@ object JavaReprGenerator {
     throw InvalidASTException("invalid expression : compiler cannot determine the static type of " + e)
   }
 
-  private def typeArgs (procedure: JProcedure, metaArgs: Map[String, MetaArgument]): List[TypeArg] = procedure.metaParameters.map { case (name, _) =>
-    metaArgs.get(name).flatMap(metaArgument).getOrElse {
-      throw InvalidASTException("invalid type argument for " + name)
-    }
-  }.toList
+  private def typeArgs (procedure: JProcedure, metaArgs: Map[String, MetaArgument]): List[TypeArg] = {
+    procedure.metaParameters.map { case (name, _) =>
+      metaArgs.getOrElse(name, throw InvalidASTException("invalid type argument for " + name + " : " + metaArgs.get(name)))
+    }.flatMap(metaArgument).toList
+  }
 
   private def instanceMethodWrapper (returnType: JType, receiverType: JType, typeArgs: List[TypeArg], name: String, argTypes: List[JType], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef]): Expression =
     functionWrapper(returnType, parameter(receiverType, "receiver") :: argTypes.zipWithIndex.map { case (t, i) => parameter(t, "arg" + i) }, throws, required, contexts,

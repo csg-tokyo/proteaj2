@@ -137,7 +137,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
     }
 
     private val literal_cached: JPriority => LParser[IRExpression] = mutableHashMapMemo { p =>
-      env.literalOperators(expected, p).map(LiteralOperatorParsers(_, env).operator).reduceOption(_ ||| _) match {
+      env.literalOperators(expected, p).map(LiteralOperatorParsers.getParser(_, env)).reduceOption(_ ||| _) match {
         case Some(parser) => parser | env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
         case None         => env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
       }
@@ -618,7 +618,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   object LiteralOperatorParsers {
-    def apply (literalOperator: LiteralOperator, env: Environment): LiteralOperatorParsers = cached((literalOperator, env))
+    def getParser (literalOperator: LiteralOperator, env: Environment): LParser[IRExpression] = cached((literalOperator, env)).operator
     private val cached : ((LiteralOperator, Environment)) => LiteralOperatorParsers = mutableHashMapMemo { pair => new LiteralOperatorParsers(pair._1, pair._2) }
   }
 

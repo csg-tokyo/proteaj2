@@ -140,7 +140,7 @@ class JCompilerTest extends FunSuite with Matchers {
       |public class Main extends java.lang.Object {
       |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"[Ljava/lang/String;"})
       |  public static void main(java.lang.String[] args) {
-      |    java.lang.String s=let.LetDSL.<java.util.function.Function<let.LetDSL.Local<java.lang.String>, java.lang.String>> ProteanOperator$3("hello", new java.util.function.Function<let.LetDSL.Local<java.lang.String>, java.lang.String>() {
+      |    java.lang.String s=let.LetDSL.<java.lang.String> ProteanOperator$3("hello", new java.util.function.Function<let.LetDSL.Local<java.lang.String>, java.lang.String>() {
       |      public java.lang.String apply(let.LetDSL.Local<java.lang.String> ProteaJLocalContext$$0) {
       |        return ProteaJLocalContext$$0.ProteanOperator$4();
       |      }
@@ -160,9 +160,27 @@ class JCompilerTest extends FunSuite with Matchers {
     clazz shouldBe a [Some[_]]
 
     val repr1 = JavaReprGenerator.moduleDef(clazz.get)
-    println(JavaCodeGenerators.moduleDef(repr1))
+    // println(JavaCodeGenerators.moduleDef(repr1))
 
     val main = compiler.findIR("file/Main")
+    main shouldBe a [Some[_]]
+
+    val repr2 = JavaReprGenerator.moduleDef(main.get)
+    // println(JavaCodeGenerators.moduleDef(repr2))
+  }
+
+  test ("LetDSL2") {
+    val compiler = new JCompiler()
+
+    compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let2/LetDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let2/Main.pj"))
+
+    val clazz = compiler.findIR("let2/LetDSL")
+    clazz shouldBe a [Some[_]]
+
+    val repr1 = JavaReprGenerator.moduleDef(clazz.get)
+    println(JavaCodeGenerators.moduleDef(repr1))
+
+    val main = compiler.findIR("let2/Main")
     main shouldBe a [Some[_]]
 
     val repr2 = JavaReprGenerator.moduleDef(main.get)
