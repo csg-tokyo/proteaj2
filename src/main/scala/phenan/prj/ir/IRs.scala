@@ -8,7 +8,7 @@ import scala.util._
 
 import JModifier._
 
-case class IRFile (ast: CompilationUnit, root: RootResolver) {
+case class IRFile (ast: CompilationUnit, filePath: String, root: RootResolver) {
   lazy val modules: List[IRModule] = collectModules(topLevelModules, Nil)
 
   lazy val topLevelModules = ast.modules.map {

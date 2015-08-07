@@ -15,8 +15,7 @@ class TypeParsersTest extends FunSuite with Matchers {
       """import java.io.Reader;
         |import java.util.*;
       """.stripMargin
-    implicit val state = JConfig().configure.get
-    val compiler = new JCompiler
+    val compiler = new JCompiler(JConfig().configure.get)
     val file = compiler.declarationCompiler.compile(new StringReader(program), "testsrc.java")
 
     file shouldBe a [Success[_]]
@@ -47,8 +46,7 @@ class TypeParsersTest extends FunSuite with Matchers {
       """import java.util.jar.*;
         |import java.util.Map;
       """.stripMargin
-    implicit val state = JConfig().configure.get
-    val compiler = new JCompiler
+    val compiler = new JCompiler(JConfig().configure.get)
     val file = compiler.declarationCompiler.compile(new StringReader(program), "testsrc.java")
 
     file shouldBe a [Success[_]]

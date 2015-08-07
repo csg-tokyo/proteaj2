@@ -4,7 +4,7 @@ import org.slf4j._
 
 import scala.util._
 
-class JState private[state] (val searchPath: JSearchPath) {
+class JState private (val searchPath: JSearchPath, val classPath: String, val destination: String) {
   def uniqueId: Int = {
     val uid = uniqueNum
     uniqueNum += 1
@@ -46,6 +46,10 @@ class JState private[state] (val searchPath: JSearchPath) {
     nWarns += 1
   }
 
+  def info (msg: => String): Unit = {
+    logger.info(msg)
+  }
+
   def clean(): Unit = {
     searchPath.close()
   }
@@ -57,4 +61,10 @@ class JState private[state] (val searchPath: JSearchPath) {
   private var nWarns: Int = 0
   private var uniqueNum: Int = 0
   private lazy val logger = LoggerFactory.getLogger("pjc")
+}
+
+object JState {
+  def apply (javaHome: String, classPath: String, destination: String, sourcePath: Option[String]): Try[JState] = for {
+    searchPath <- JSearchPath.configure(javaHome, classPath, sourcePath.getOrElse(classPath))
+  } yield new JState(searchPath, classPath, destination)
 }

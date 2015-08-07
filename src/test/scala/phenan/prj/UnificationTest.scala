@@ -5,8 +5,7 @@ import phenan.prj.state.JConfig
 
 
 class UnificationTest extends FunSuite with Matchers {
-  implicit val state = JConfig().configure.get
-  val compiler = new JCompiler()
+  val compiler = new JCompiler(JConfig().configure.get)
 
   test ("List<String> <=< List<T> ") {
     val stringType = compiler.classLoader.loadClass("java/lang/String").get.objectType(Nil).get

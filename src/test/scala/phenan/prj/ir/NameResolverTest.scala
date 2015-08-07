@@ -12,8 +12,7 @@ import scala.util._
 
 class NameResolverTest extends FunSuite with Matchers {
   test ("完全修飾名によるロード") {
-    implicit val state = JConfig().configure.get
-    val compiler = new JCompiler
+    val compiler = new JCompiler(JConfig().configure.get)
     val resolver: NameResolver = NameResolver.root(compiler)
 
     resolver.resolve(List("java", "util", "ArrayList")) shouldBe a [Success[_]]
@@ -24,8 +23,7 @@ class NameResolverTest extends FunSuite with Matchers {
   }
 
   test ("短縮名称によるロード") {
-    implicit val state = JConfig().configure.get
-    val compiler = new JCompiler
+    val compiler = new JCompiler(JConfig().configure.get)
     val resolver: NameResolver = NameResolver.root(compiler)
 
     resolver.resolve(List("System")) shouldBe a [Success[_]]
@@ -38,8 +36,8 @@ class NameResolverTest extends FunSuite with Matchers {
         |import java.io.File;
         |import java.util.*;
       """.stripMargin
-    implicit val state = JConfig().configure.get
-    val compiler = new JCompiler
+
+    val compiler = new JCompiler(JConfig().configure.get)
     val file = compiler.declarationCompiler.compile(new StringReader(program), "testsrc.java")
 
     file shouldBe a [Success[_]]
@@ -70,8 +68,7 @@ class NameResolverTest extends FunSuite with Matchers {
         |class Foo <T, U> {}
       """.stripMargin
 
-    implicit val state = JConfig().configure.get
-    val compiler = new JCompiler
+    val compiler = new JCompiler(JConfig().configure.get)
     val file = compiler.declarationCompiler.compile(new StringReader(program), "testsrc.java")
 
     file shouldBe a [Success[_]]

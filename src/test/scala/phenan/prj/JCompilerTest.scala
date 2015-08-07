@@ -6,12 +6,12 @@ import phenan.prj.ir._
 import phenan.prj.state._
 
 class JCompilerTest extends FunSuite with Matchers {
-  val config = new JConfig
+  val config = JConfig()
   config.sourcePath = "/Users/ichikawa/workspaces/Idea/prj/src/test/java"
-  implicit val state = config.configure.get
+  val state = config.configure.get
 
   test ("Hello をコンパイルしてみる") {
-    val compiler = new JCompiler()
+    val compiler = new JCompiler(state)
 
     compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/java/test/Hello.java"))
     val clazz = compiler.findIR("test/Hello")
@@ -39,7 +39,7 @@ class JCompilerTest extends FunSuite with Matchers {
   }
 
   test ("Foo をコンパイルしてみる") {
-    val compiler = new JCompiler()
+    val compiler = new JCompiler(state)
 
     compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/java/test/Hello.java", "/Users/ichikawa/workspaces/Idea/prj/src/test/java/test/Foo.java"))
     compiler.findIR("test/Hello") shouldBe a [Some[_]]
@@ -60,7 +60,7 @@ class JCompilerTest extends FunSuite with Matchers {
   }
 
   test ("PrintDSL") {
-    val compiler = new JCompiler()
+    val compiler = new JCompiler(state)
 
     compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/print/PrintDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/print/Main.pj"))
     val clazz = compiler.findIR("print/PrintDSL")
@@ -99,7 +99,7 @@ class JCompilerTest extends FunSuite with Matchers {
   }
 
   test ("LetDSL") {
-    val compiler = new JCompiler()
+    val compiler = new JCompiler(state)
 
     compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let/LetDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let/Main.pj"))
 
@@ -154,7 +154,7 @@ class JCompilerTest extends FunSuite with Matchers {
   }
 
   test ("FileDSL") {
-    val compiler = new JCompiler()
+    val compiler = new JCompiler(state)
 
     compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/file/FileDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/file/Main.pj"))
 
@@ -172,7 +172,7 @@ class JCompilerTest extends FunSuite with Matchers {
   }
 
   test ("LetDSL2") {
-    val compiler = new JCompiler()
+    val compiler = new JCompiler(state)
 
     compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let2/LetDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let2/Main.pj"))
 

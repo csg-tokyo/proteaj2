@@ -218,10 +218,9 @@ class BodyParsersTest extends FunSuite with Matchers {
   }
 
   lazy val compiler = {
-    val config = new JConfig
+    val config = JConfig()
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes/"
-    implicit val state = config.configure.get
-    new JCompiler
+    new JCompiler(config.configure.get)
   }
 
   lazy val parsers = new BodyParsers(compiler)

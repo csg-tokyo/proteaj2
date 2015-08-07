@@ -10,8 +10,7 @@ import scala.util._
 
 class JClassLoaderTest extends FunSuite with Matchers {
   test ("String 型をロード") {
-    implicit val state = JConfig().configure.get
-    val loader = (new JCompiler).classLoader
+    val loader = new JCompiler(JConfig().configure.get).classLoader
 
     val clazz = loader.load("java/lang/String")
     clazz shouldBe a [Success[_]]
@@ -19,10 +18,9 @@ class JClassLoaderTest extends FunSuite with Matchers {
   }
 
   test ("proteaj/lang/DSL をロード") {
-    val config = new JConfig
+    val config = JConfig()
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes/"
-    implicit val state = config.configure.get
-    val loader = (new JCompiler).classLoader
+    val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("proteaj/lang/DSL")
     clazz shouldBe a [Success[_]]
@@ -30,18 +28,16 @@ class JClassLoaderTest extends FunSuite with Matchers {
   }
 
   test ("proteaj/lang/Type はロードできない") {
-    val config = new JConfig
+    val config = JConfig()
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes/"
-    implicit val state = config.configure.get
-    val loader = (new JCompiler).classLoader
+    val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("proteaj/lang/Type")
     clazz shouldBe a [Failure[_]]
   }
 
   test ("配列型をロード") {
-    implicit val state  = JConfig().configure.get
-    val loader = (new JCompiler).classLoader
+    val loader = new JCompiler(JConfig().configure.get).classLoader
 
     val o = loader.load("java/lang/Object")
     val os = loader.load("[Ljava/lang/Object;")
@@ -56,10 +52,9 @@ class JClassLoaderTest extends FunSuite with Matchers {
   }
 
   test("ソースをJClassLoader経由でコンパイル") {
-    val config = new JConfig
+    val config = JConfig()
     config.sourcePath = "/Users/ichikawa/workspaces/Idea/prj/src/test/java"
-    implicit val state = config.configure.get
-    val loader = (new JCompiler).classLoader
+    val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("test/Hello")
     clazz shouldBe a [Success[_]]
@@ -68,10 +63,9 @@ class JClassLoaderTest extends FunSuite with Matchers {
   }
 
   test("ClassSigが読めるか") {
-    val config = new JConfig
+    val config = JConfig()
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
-    implicit val state = config.configure.get
-    val loader = (new JCompiler).classLoader
+    val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("test/Var")
     clazz shouldBe a [Success[_]]
@@ -86,10 +80,9 @@ class JClassLoaderTest extends FunSuite with Matchers {
   }
 
   test("Operatorが読めるか") {
-    val config = new JConfig
+    val config = JConfig()
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
-    implicit val state = config.configure.get
-    val loader = (new JCompiler).classLoader
+    val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("test/Var")
     clazz shouldBe a [Success[_]]

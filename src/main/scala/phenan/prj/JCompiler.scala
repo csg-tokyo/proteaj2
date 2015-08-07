@@ -4,18 +4,15 @@ import java.io._
 
 import phenan.prj.body.BodyCompiler
 import phenan.prj.declaration.DeclarationCompiler
-import phenan.prj.generator.JavaCodeGenerators
+import phenan.prj.generator.{JavaClassFileGenerator, JavaCodeGenerators}
 import phenan.prj.internal._
 import phenan.prj.ir._
-import phenan.prj.state.JState
+import phenan.prj.state._
 import phenan.prj.typing._
 
-class JCompiler (implicit val state: JState) {
+import scala.collection.mutable
 
-  def compile (files: List[String]): Unit = {
-    generateIR(files)
-    if (state.errors == 0) generateClassFile()
-  }
+class JCompiler (val state: JState) {
 
   def generateIR (files: List[String]): Unit = {
     for (file <- files) generateIR(file)
@@ -30,23 +27,11 @@ class JCompiler (implicit val state: JState) {
   }
 
   def registerIR (ir: IRFile): Unit = {
+    files += ir
     for (module <- ir.modules) modules += (module.internalName -> module)
   }
 
   def findIR (name: String): Option[IRModule] = compiled.get(name).orElse(modules.get(name))
-
-  def generateClassFile (): Unit = {
-    while (modules.nonEmpty) {
-      val (name, module) = modules.head
-      generateClassFile(module)
-      compiled += name -> module
-      modules -= name
-    }
-  }
-
-  private def generateClassFile (module: IRModule): Unit = {
-
-  }
 
   val unifier = new Unifier(this)
   val classLoader: JClassLoader = new JClassLoaderImpl(this)
@@ -54,6 +39,15 @@ class JCompiler (implicit val state: JState) {
   val declarationCompiler = new DeclarationCompiler(this)
   val bodyCompiler = new BodyCompiler(this)
 
+  private val files: mutable.MutableList[IRFile] = mutable.MutableList.empty
   private var modules: Map[String, IRModule] = Map.empty
   private var compiled: Map[String, IRModule] = Map.empty
+}
+
+object JCompiler {
+  def main (args: Array[String]): Unit = JConfig.parseCommandLineArgs(args).foreach { case (state, files) =>
+    val compiler = new JCompiler(state)
+    compiler.generateIR(files)
+    JavaClassFileGenerator.compile(compiler.files.toList, compiler.state)
+  }
 }
