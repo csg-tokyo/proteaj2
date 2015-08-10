@@ -23,13 +23,13 @@ class JCompilerTest extends FunSuite with Matchers {
     val repr = JavaReprGenerator.moduleDef(clazz.get)
 
     val expected =
-      """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={})
+      """@proteaj.lang.ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={})
         |public class Hello extends java.lang.Object {
-        |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={})
+        |  @proteaj.lang.MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={})
         |  public void greet() {
         |    java.lang.System.out.println("Hello, world!");
         |  }
-        |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"[Ljava/lang/String;"})
+        |  @proteaj.lang.MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"[Ljava/lang/String;"})
         |  public static void main(java.lang.String[] args) {
         |    new test.Hello().greet();
         |  }

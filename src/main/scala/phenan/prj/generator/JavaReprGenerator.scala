@@ -675,16 +675,16 @@ object JavaReprGenerator {
     }
 
     private def operatorElementAnnotation (name: String, value: String): JavaAnnotation = {
-      mkAnnotation(opElemClassName) ( "kind" -> enumConst(opElemTypeClassName, name), name -> strLit(value) )
+      mkAnnotation(opElemClassName) ( "kind" -> enumConst(opElemTypeClassName, name), "name" -> strLit(value) )
     }
 
-    private def mkAnnotation (annName: String)(args: (String, AnnotationElement)*): JavaAnnotation = JavaAnnotation(annName, args.toMap)
+    private def mkAnnotation (annName: String)(args: (String, AnnotationElement)*): JavaAnnotation = JavaAnnotation(annName.replace('/', '.'), args.toMap)
 
     private def elementAnnotation (ann: JavaAnnotation) = Union[AnnotationElement](ann)
 
     private def array (es: List[AnnotationElement]) = Union[AnnotationElement](ElementArray(es))
 
-    private def enumConst (enum: String, const: String) = Union[AnnotationElement](EnumConstRef(enum, const))
+    private def enumConst (enum: String, const: String) = Union[AnnotationElement](EnumConstRef(enum.replace('/', '.'), const))
 
     private def strLit (str: String) = Union[AnnotationElement](Union[JavaLiteral](Literal(str)))
 

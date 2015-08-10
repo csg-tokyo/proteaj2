@@ -49,20 +49,31 @@ object JConfig {
       case Right(_) if config.helpFlag =>
         parser.printUsage(System.out)
         None
-      case Right(_) if config.getArgs.isEmpty =>
-        parser.printSingleLineUsage(System.out)
-        None
-      case Right(_) => config.configure match {
-        case Success(state) => Some((state, config.getArgs))
-        case Failure(e)     =>
-          System.out.println(e.getMessage)
-          parser.printSingleLineUsage(System.out)
-          None
-      }
-      case Left(e) =>
-        System.out.println(e.getMessage)
-        parser.printSingleLineUsage(System.out)
-        None
+      case Right(_) if config.getArgs.isEmpty => printSimpleUsage(parser)
+      case Right(_) => configure(config, parser)
+      case Left(e)  => printError(parser, e)
     }
+  }
+
+  def configure (config: JConfig, parser: CmdLineParser) = {
+    config.classPath = config.classPath  + ':' + Thread.currentThread().getContextClassLoader.getResource("").getPath
+    config.configure match {
+      case Success(state) => Some((state, config.getArgs))
+      case Failure(e)     => printError(parser, e)
+
+    }
+  }
+
+  def printSimpleUsage (parser: CmdLineParser) = {
+    parser.printSingleLineUsage(System.out)
+    println()
+    None
+  }
+
+  def printError (parser: CmdLineParser, e: Throwable) = {
+    System.out.println(e.getMessage)
+    parser.printSingleLineUsage(System.out)
+    println()
+    None
   }
 }
