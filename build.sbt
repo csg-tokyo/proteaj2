@@ -15,3 +15,5 @@ libraryDependencies ++= Seq(
 unmanagedJars in Compile := (file(System.getProperty("java.home")) / ".." / "lib" * "tools.jar").classpath
 
 scalacOptions += "-deprecation"
+
+mainClass in (Compile, run) := Some("phenan.prj.JCompiler")

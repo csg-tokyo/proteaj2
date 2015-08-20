@@ -98,59 +98,13 @@ class JCompilerTest extends FunSuite with Matchers {
     println(JavaCodeGenerators.moduleDef(repr2))
   }
 
+  import scala.sys.process._
+
   test ("LetDSL") {
-    val compiler = new JCompiler(state)
-
-    compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let/LetDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/let/Main.pj"))
-
-    val clazz = compiler.findIR("let/LetDSL")
-    clazz shouldBe a [Some[_]]
-
-    val repr1 = JavaReprGenerator.moduleDef(clazz.get)
-
-    val expected1 =
-    """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={}) @proteaj/lang/DSL(priorities={}, constraints={}, with={})
-      |class LetDSL extends java.lang.Object {
-      |  @proteaj/lang/MethodSig(metaParameters={@proteaj/lang/MetaParameter(name="R", type="Lproteaj/lang/Type;", priority={}, bounds={})}, throwsTypes={}, deactivates={}, returnType="TR;", requires={}, activates={}, parameters={"Ljava/lang/String;","@Llet/LetDSL$Local<Ljava/lang/String;>;TR;"}) @proteaj/lang/Operator(level=proteaj/lang/OpLevel.Expression, priority=@proteaj/lang/Priority(dsl="Llet/LetDSL;", name="ProteanOperatorPriority$2"), pattern={@proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="let"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="a"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="="), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole=""), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="in"), @proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Hole, Hole="")})
-      |  static final<R> R ProteanOperator$3(java.lang.String v, java.util.function.Function<let.LetDSL.Local<java.lang.String>, R> r) {
-      |    return r.apply(new let.LetDSL.Local<java.lang.String>(v));
-      |  }
-      |  @proteaj/lang/ClassSig(metaParameters={@proteaj/lang/MetaParameter(name="V", type="Lproteaj/lang/Type;", priority={}, bounds={})}, superType="Ljava/lang/Object;", interfaces={}) @proteaj/lang/Context
-      |  static class Local<V> extends java.lang.Object {
-      |    @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"TV;"})
-      |    Local(V v) {
-      |      let.LetDSL.Local.this.v=v;
-      |    }
-      |    @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="TV;", requires={}, activates={}, parameters={}) @proteaj/lang/Operator(level=proteaj/lang/OpLevel.Expression, priority=@proteaj/lang/Priority(dsl="Llet/LetDSL;", name="ProteanOperatorPriority$5"), pattern={@proteaj/lang/OpElem(kind=proteaj/lang/OpElemType.Name, Name="a")})
-      |    V ProteanOperator$4() {
-      |      return let.LetDSL.Local.this.v;
-      |    }
-      |    @proteaj/lang/FieldSig(value="TV;")
-      |    private V v;
-      |  }
-      |}""".stripMargin
-
-    println(JavaCodeGenerators.moduleDef(repr1)) // shouldBe expected1
-
-    val main = compiler.findIR("let/Main")
-    main shouldBe a [Some[_]]
-
-    val repr2 = JavaReprGenerator.moduleDef(main.get)
-
-    val expected2 =
-    """@proteaj/lang/ClassSig(metaParameters={}, superType="Ljava/lang/Object;", interfaces={})
-      |public class Main extends java.lang.Object {
-      |  @proteaj/lang/MethodSig(metaParameters={}, throwsTypes={}, deactivates={}, returnType="V", requires={}, activates={}, parameters={"[Ljava/lang/String;"})
-      |  public static void main(java.lang.String[] args) {
-      |    java.lang.String s=let.LetDSL.<java.lang.String> ProteanOperator$3("hello", new java.util.function.Function<let.LetDSL.Local<java.lang.String>, java.lang.String>() {
-      |      public java.lang.String apply(let.LetDSL.Local<java.lang.String> ProteaJLocalContext$$0) {
-      |        return ProteaJLocalContext$$0.ProteanOperator$4();
-      |      }
-      |    });
-      |  }
-      |}""".stripMargin
-
-    println(JavaCodeGenerators.moduleDef(repr2)) // shouldBe expected2
+//    "rm -r bin/let".run()
+    Seq("sbt", "run -d bin src/test/proteaj/let/LetDSL.pj src/test/proteaj/let/Main.pj") ! ProcessLogger(_ => ())
+    val result = "java -cp bin let.Main".!!
+    result shouldBe "hello\n"
   }
 
   test ("FileDSL") {
