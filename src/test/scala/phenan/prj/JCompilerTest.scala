@@ -5,10 +5,12 @@ import phenan.prj.generator.{JavaCodeGenerators, JavaReprGenerator}
 import phenan.prj.ir._
 import phenan.prj.state._
 
-class JCompilerTest extends FunSuite with Matchers {
+class JCompilerTest extends FunSuite with Matchers with BeforeAndAfterAll {
   val config = JConfig()
   config.sourcePath = "/Users/ichikawa/workspaces/Idea/prj/src/test/java"
   val state = config.configure.get
+
+
 
   test ("Hello をコンパイルしてみる") {
     val compiler = new JCompiler(state)
@@ -101,28 +103,13 @@ class JCompilerTest extends FunSuite with Matchers {
   import scala.sys.process._
 
   test ("LetDSL") {
-//    "rm -r bin/let".run()
-    Seq("sbt", "run -d bin src/test/proteaj/let/LetDSL.pj src/test/proteaj/let/Main.pj") ! ProcessLogger(_ => ())
-    val result = "java -cp bin let.Main".!!
+    val result = compileAndRun("let.Main", List("src/test/proteaj/let/LetDSL.pj", "src/test/proteaj/let/Main.pj"))
     result shouldBe "hello\n"
   }
 
   test ("FileDSL") {
-    val compiler = new JCompiler(state)
-
-    compiler.generateIR(List("/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/file/FileDSL.pj", "/Users/ichikawa/workspaces/Idea/prj/src/test/proteaj/file/Main.pj"))
-
-    val clazz = compiler.findIR("file/FileDSL")
-    clazz shouldBe a [Some[_]]
-
-    val repr1 = JavaReprGenerator.moduleDef(clazz.get)
-    // println(JavaCodeGenerators.moduleDef(repr1))
-
-    val main = compiler.findIR("file/Main")
-    main shouldBe a [Some[_]]
-
-    val repr2 = JavaReprGenerator.moduleDef(main.get)
-    // println(JavaCodeGenerators.moduleDef(repr2))
+    val result = compileAndRun("file.Main", List("src/test/proteaj/file/FileDSL.pj", "src/test/proteaj/file/Main.pj"))
+    result shouldBe "The ProteaJ compiler\n"
   }
 
   test ("LetDSL2") {
@@ -141,5 +128,15 @@ class JCompilerTest extends FunSuite with Matchers {
 
     val repr2 = JavaReprGenerator.moduleDef(main.get)
     println(JavaCodeGenerators.moduleDef(repr2))
+  }
+
+  override protected def beforeAll(): Unit = {
+    if (new java.io.File("bin").isDirectory) "rm -r bin" ! ProcessLogger(_ => ())
+    "mkdir bin" ! ProcessLogger(_ => ())
+  }
+
+  def compileAndRun (mainClass: String, files: List[String]): String = {
+    Seq("sbt", "run -d bin " + files.mkString(" ")).!
+    ( "java -cp bin:target/scala-2.11/classes " + mainClass ).!!
   }
 }

@@ -10,6 +10,7 @@ trait Environment {
   def contexts: List[IRContextRef]
   def activateTypes: List[JRefType]
   def locals: Map[String, IRLocalVariableRef]
+  def exceptions: List[JRefType]
   def fileEnvironment: FileEnvironment
   def resolver: NameResolver
 
@@ -44,6 +45,9 @@ sealed trait ModuleEnvironment extends Environment {
   def procedureEnvironment (procedure: IRProcedure): Environment = Environment_Method(procedure, this)
 
   def contexts: List[IRContextRef] = Nil
+  def activateTypes = Nil
+  def locals: Map[String, IRLocalVariableRef] = Map.empty
+  def exceptions: List[JRefType] = Nil
   def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = fileEnvironment.expressionOperators(expected, priority)
   def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = fileEnvironment.literalOperators(expected, priority)
   def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
@@ -52,15 +56,11 @@ sealed trait ModuleEnvironment extends Environment {
 
 class Environment_Instance (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = clazz.thisType
-  def locals: Map[String, IRLocalVariableRef] = Map.empty
-  def activateTypes = Nil
   def resolver = clazz.resolver
 }
 
 class Environment_Static (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = None
-  def locals: Map[String, IRLocalVariableRef] = Map.empty
-  def activateTypes = Nil
   def resolver = clazz.staticResolver
 }
 
@@ -134,6 +134,7 @@ case class Environment_Method (procedure: IRProcedure, parent: Environment) exte
   def activated: List[IRContextRef] = procedure.requiresContexts
   def deactivated: List[IRContextRef] = Nil
   def activateTypes = procedure.activateTypes
+  def exceptions: List[JRefType] = procedure.exceptions
   def resolver: NameResolver = procedure.resolver
 }
 
@@ -143,12 +144,14 @@ case class Environment_LocalVariables (variables: List[(JType, String)], parent:
   def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = parent.literalOperators(expected, priority)
   def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = parent.inferContexts(procedure, bind)
   def activateTypes = parent.activateTypes
+  def exceptions: List[JRefType] = parent.exceptions
   def resolver: NameResolver = parent.resolver
 }
 
 case class Environment_LocalContexts (activated: List[IRContextRef], deactivated: List[IRContextRef], parent: Environment) extends Environment_Contexts {
   def locals: Map[String, IRLocalVariableRef] = parent.locals
   def activateTypes = parent.activateTypes
+  def exceptions: List[JRefType] = parent.exceptions
   def resolver: NameResolver = parent.resolver
 }
 

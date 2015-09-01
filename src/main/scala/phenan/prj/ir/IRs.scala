@@ -512,6 +512,8 @@ trait IRProcedure extends JMethodDef with IRMember {
     Nil
   }
 
+  lazy val exceptions: List[JRefType] = signature.throwTypes.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, metaParameters))
+
   def environment = {
     if (isStatic) declaringClass.staticEnvironment.procedureEnvironment(this)
     else declaringClass.instanceEnvironment.procedureEnvironment(this)

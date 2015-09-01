@@ -3,8 +3,8 @@ package file;
 import dsl FileDSL;
 
 public class Main {
-  public static void main (String[] args) {
-    open "~/Documents/test/memo.txt";
+  public static void main (String[] args) throws java.io.IOException {
+    open "README.md";
     System.out.println(read line);
     close;
   }

@@ -3,17 +3,17 @@ package file;
 import java.io.*;
 
 dsl FileDSL {
-  void "open" _ (String fileName) activates Reading {
+  void "open" _ (String fileName) activates Reading throws IOException {
     activate new Reading(fileName);
   }
   context Reading {
-    Reading (String file) {
+    Reading (String file) throws IOException {
       reader = new BufferedReader(new FileReader(file));
     }
-    String "read" "line" () {
+    String "read" "line" () throws IOException {
       return reader.readLine();
     }
-    void "close" () deactivates Reading {
+    void "close" () deactivates Reading throws IOException {
       reader.close();
     }
     private BufferedReader reader;
