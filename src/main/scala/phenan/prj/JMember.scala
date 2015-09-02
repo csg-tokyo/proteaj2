@@ -57,6 +57,7 @@ trait JProcedure extends JMember {
     case JOptionalOperandDef => JOptionalOperand(param)
     case JRepetition0Def     => JRepetition0(param)
     case JRepetition1Def     => JRepetition1(param)
+    case JRegexNameDef(name) => JRegexName(name)
   }
 
   private def translateMetaValueRef (mv: JMetaValueRefDef): Option[JSyntaxElement] = {

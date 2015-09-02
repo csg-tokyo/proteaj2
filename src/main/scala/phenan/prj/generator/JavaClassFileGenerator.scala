@@ -32,10 +32,14 @@ class JavaSourceObject private (uri: URI, src: String) extends SimpleJavaFileObj
 }
 
 object JavaSourceObject {
-  def apply (file: IRFile): JavaSourceObject = {
+  def apply (file: IRFile): JavaSourceObject = try {
     val uri = getURI(file.filePath)
     val src = JavaReprGenerator.javaFile(file)
     new JavaSourceObject(uri, JavaCodeGenerators.javaFile(src))
+  } catch {
+    case e: Exception  =>
+      e.printStackTrace()
+      throw e
   }
   private def getURI (path: String): URI = {
     val absolutePath = new File(path).getAbsolutePath

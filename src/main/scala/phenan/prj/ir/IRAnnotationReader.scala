@@ -82,6 +82,7 @@ class IRAnnotationReader (file: IRFile) {
 
   private lazy val operatorElementAnnotation: IRAnnotation =?> JSyntaxElementDef = enumSwitch("kind") {
     case "Name"         => required("name")(string).map(JOperatorNameDef)
+    case "Regex"        => required("name")(string).map(JRegexNameDef)
     case "Hole"         => unit(JOperandDef)
     case "Star"         => unit(JRepetition0Def)
     case "Plus"         => unit(JRepetition1Def)

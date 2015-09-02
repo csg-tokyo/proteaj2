@@ -101,6 +101,7 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
 
   private lazy val operatorElement: BAnnotation =?> JSyntaxElementDef = enumSwitch("kind", CommonNames.opElemTypeClassName) {
     case "Name"         => required("name")(string).map(JOperatorNameDef)
+    case "Regex"        => required("name")(string).map(JRegexNameDef)
     case "Hole"         => unit(JOperandDef)
     case "Star"         => unit(JRepetition0Def)
     case "Plus"         => unit(JRepetition1Def)

@@ -1,7 +1,8 @@
 package phenan.prj.combinator
 
 import scala.reflect.ClassTag
-import scala.util.parsing.combinator.PackratParsers
+import scala.util.matching.Regex
+import scala.util.parsing.combinator.{RegexParsers, PackratParsers}
 import scala.util.parsing.input.{Positional, Position, Reader}
 
 import scala.language.implicitConversions
@@ -207,5 +208,23 @@ trait TwoLevelParsers {
 
       def log (s: String): LParser[T] = LParserImpl(Impl.log(parser)(s))
     }
+  }
+}
+
+trait ScannerlessParsers extends TwoLevelParsers {
+  type Elem = Char
+
+  def regularExpression (r: Regex): LParser[String] = {
+    val parser = new Impl.Parser[String] {
+      def apply(in: Impl.Input): Impl.ParseResult[String] = {
+        val src = in.source
+        val offset = in.offset
+        r.findPrefixMatchOf(src.subSequence(offset, src.length())) match {
+          case Some(matched) => Impl.Success(src.subSequence(offset, offset + matched.end).toString, in.drop(matched.end))
+          case None          => Impl.Failure("fail to match regex '" + r + "'", in)
+        }
+      }
+    }
+    Impl.LParserImpl(parser)
   }
 }

@@ -18,6 +18,7 @@ case object JOperandDef extends JHoleDef
 case object JOptionalOperandDef extends JHoleDef
 case object JRepetition0Def extends JHoleDef
 case object JRepetition1Def extends JHoleDef
+case class JRegexNameDef (name: String) extends JHoleDef
 case class JOperatorNameDef (name: String) extends JSyntaxElementDef
 case class JMetaValueRefDef (name: String) extends JSyntaxElementDef
 case class JAndPredicateDef (sig: JParameterSignature) extends JPredicateDef

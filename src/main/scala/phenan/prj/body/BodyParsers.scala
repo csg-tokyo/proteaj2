@@ -12,9 +12,7 @@ import CharArrayReader.EofCh
 
 import scalaz.Memo._
 
-class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
-  type Elem = Char
-
+class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
   def parse [T] (parser: HParser[T], in: String): Try[T] = parser(new CharSequenceReader(in)) match {
     case ParseSuccess(result, _) => Success(result)
     case ParseFailure(msg, _)    => Failure(ParseException(msg))
@@ -400,6 +398,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       }
       case JMetaName(value) :: rest          => metaValue(value, binding) ~> constructParser(rest, binding, operands)
       case JOperatorName(name) :: rest       => word(name).^ ~> constructParser(rest, binding, operands)
+      case JRegexName(name) :: rest          => regex(name).^ >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
       case JAndPredicate(param) :: rest      => expression(param, binding, eop.method, env).& ~> constructParser(rest, binding, operands)
       case JNotPredicate(param) :: rest      => expression(param, binding, eop.method, env).! ~> constructParser(rest, binding, operands)
       case Nil                               => HParser.success(eop.semantics(binding, operands.reverse))
@@ -449,6 +448,7 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
       }
       case JMetaName(value) :: rest          => metaValue(value, binding) ~> constructParser(rest, binding, operands)
       case JOperatorName(name) :: rest       => word(name) ~> constructParser(rest, binding, operands)
+      case JRegexName(name) :: rest          => regex(name) >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
       case JAndPredicate(param) :: rest      => literal(param, binding, lop.method, env).& ~> constructParser(rest, binding, operands)
       case JNotPredicate(param) :: rest      => literal(param, binding, lop.method, env).! ~> constructParser(rest, binding, operands)
       case Nil                               => LParser.success(lop.semantics(binding, operands.reverse))
@@ -639,9 +639,11 @@ class BodyParsers (compiler: JCompiler) extends TwoLevelParsers {
   }
 
   private def word (cs: String): LParser[String] = word_cached(cs)
+  private def regex (r: String): LParser[String] = regex_cached(r)
 
   private implicit def keyword (kw: String): HParser[String] = (word(kw) <~ elem("identifier part", Character.isJavaIdentifierPart).!).^
   private implicit def symbol (ch: Char): HParser[Char] = elem(ch).^
 
   private lazy val word_cached: String => LParser[String] = mutableHashMapMemo { cs => cs.foldRight(LParser.success(cs)) { (ch, r) => elem(ch) ~> r } }
+  private lazy val regex_cached: String => LParser[String] = mutableHashMapMemo { s => regularExpression(s.r) }
 }

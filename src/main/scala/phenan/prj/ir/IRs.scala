@@ -754,6 +754,7 @@ trait IROperator extends IRProcedure {
 
   lazy val pattern = operatorAST.syntax map {
     case OperatorName(n) => JOperatorNameDef(n)
+    case RegexName(n)    => JRegexNameDef(n)
     case MetaValueRef(n) => JMetaValueRefDef(n)
     case Operand         => JOperandDef
     case Repetition0     => JRepetition0Def

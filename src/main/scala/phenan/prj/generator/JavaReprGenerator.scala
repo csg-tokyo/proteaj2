@@ -665,6 +665,7 @@ object JavaReprGenerator {
 
     private def operatorElementAnnotation (elem: JSyntaxElementDef): JavaAnnotation = elem match {
       case JOperatorNameDef(name) => operatorElementAnnotation("Name", name)
+      case JRegexNameDef(name)    => operatorElementAnnotation("Regex", name)
       case JOperandDef            => operatorElementAnnotation("Hole", "")
       case JRepetition0Def        => operatorElementAnnotation("Star", "")
       case JRepetition1Def        => operatorElementAnnotation("Plus", "")

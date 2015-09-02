@@ -64,6 +64,7 @@ case class BlockSnippet (snippet: String) extends Positional
 sealed trait SyntaxElement
 
 case class OperatorName (name: String) extends SyntaxElement
+case class RegexName (name: String) extends SyntaxElement
 case class MetaValueRef (name: String) extends SyntaxElement
 case object Operand extends SyntaxElement
 case object Repetition0 extends SyntaxElement

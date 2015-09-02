@@ -140,9 +140,10 @@ object DeclarationParsers extends TwoLevelParsers {
     case name ~ dim ~ init => VariableDeclarator(name, dim, init)
   }
 
-  lazy val syntaxElement = operatorName | optionalOperand | repetition0 | repetition1 | operand | metaValueRef | andPredicate | notPredicate
+  lazy val syntaxElement = operatorName | regexName | optionalOperand | repetition0 | repetition1 | operand | metaValueRef | andPredicate | notPredicate
 
   lazy val operatorName = elem[StrLiteral].^ ^^ { lit => OperatorName(lit.value) }
+  lazy val regexName = (underscore ~> elem('%')).^ ~> elem[StrLiteral].^ ^^ { lit => RegexName(lit.value) }
 
   lazy val optionalOperand = (underscore ~> elem('?')).^ ^^^ OptionalOperand
   lazy val repetition0 = (underscore ~> elem('*')).^ ^^^ Repetition0

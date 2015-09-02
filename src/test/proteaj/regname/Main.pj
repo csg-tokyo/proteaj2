@@ -1,0 +1,10 @@
+package regname;
+
+import dsl IdentifierDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    Identifier id = hello;
+    System.out.println(id.getName());
+  }
+}
