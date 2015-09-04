@@ -18,11 +18,9 @@ object JavaClassFileGenerator {
     }
     else {
       val compileOptions = List("-d", state.destination, "-cp", state.classPath)
-
-      (allCatch opt files.map(JavaSourceObject(_))).fold { state.error("compile failed") } { compilationUnits =>
-        val res = compiler.getTask(null, null, null, compileOptions, null, compilationUnits).call()
-        state.info("compile status : " + res)
-      }
+      val compilationUnits = files.flatMap(JavaSourceObject(_, state))
+      val res = compiler.getTask(null, null, null, compileOptions, null, compilationUnits).call()
+      state.info("compile status : " + res)
     }
   }
 }
@@ -32,14 +30,13 @@ class JavaSourceObject private (uri: URI, src: String) extends SimpleJavaFileObj
 }
 
 object JavaSourceObject {
-  def apply (file: IRFile): JavaSourceObject = try {
+  def apply (file: IRFile, state: JState): Option[JavaSourceObject] = try {
     val uri = getURI(file.filePath)
     val src = JavaReprGenerator.javaFile(file)
-    new JavaSourceObject(uri, JavaCodeGenerators.javaFile(src))
-  } catch {
-    case e: Exception  =>
-      e.printStackTrace()
-      throw e
+    Some(new JavaSourceObject(uri, JavaCodeGenerators.javaFile(src)))
+  } catch { case e: Exception  =>
+    state.error("compile failed : " + file.filePath, e)
+    None
   }
   private def getURI (path: String): URI = {
     val absolutePath = new File(path).getAbsolutePath

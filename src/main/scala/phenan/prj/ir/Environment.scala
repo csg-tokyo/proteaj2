@@ -134,7 +134,7 @@ case class Environment_Method (procedure: IRProcedure, parent: Environment) exte
   def activated: List[IRContextRef] = procedure.requiresContexts
   def deactivated: List[IRContextRef] = Nil
   def activateTypes = procedure.activateTypes
-  def exceptions: List[JRefType] = procedure.exceptions
+  def exceptions: List[JRefType] = procedure.exceptions ++ resolver.root.compiler.typeLoader.uncheckedExceptionTypes
   def resolver: NameResolver = procedure.resolver
 }
 

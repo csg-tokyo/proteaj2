@@ -77,7 +77,7 @@ object JavaRepr {
 
   case class Param (parameterType: TypeSig, name: String)
 
-  type Statement = Block :|: LocalDeclarationStatement :|: IfStatement :|: WhileStatement :|: ForStatement :|: ReturnStatement :|: ExpressionStatement :|: ExplicitConstructorCall :|: UNil
+  type Statement = Block :|: LocalDeclarationStatement :|: IfStatement :|: WhileStatement :|: ForStatement :|: ThrowStatement :|: ReturnStatement :|: ExpressionStatement :|: ExplicitConstructorCall :|: UNil
 
   case class LocalDeclarationStatement (declaration: LocalDeclaration)
   
@@ -96,6 +96,8 @@ object JavaRepr {
   case class NormalForStatement (forInit: ForInit, condition: Option[Expression], update: List[Expression], loopBody: Statement)
 
   case class EnhancedForStatement (elementType: TypeSig, name: String, dim: Int, iterable: Expression, loopBody: Statement)
+
+  case class ThrowStatement (exception: Expression)
 
   case class ReturnStatement (returnValue: Expression)
 

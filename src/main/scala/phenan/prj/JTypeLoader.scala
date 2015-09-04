@@ -33,6 +33,11 @@ class JTypeLoader (compiler: JCompiler) {
     compiler.classLoader.loadClass_PE(name).flatMap(_.objectType(Nil))
   }
 
+  lazy val runtimeExceptionType = compiler.classLoader.runtimeExceptionClass.flatMap(_.objectType(Nil))
+  lazy val errorType = compiler.classLoader.errorClass.flatMap(_.objectType(Nil))
+
+  lazy val uncheckedExceptionTypes = (runtimeExceptionType ++ errorType).toList
+
   def iterableOf (arg: JRefType) = compiler.classLoader.iterableClass.flatMap(_.objectType(List(arg)))
   def classTypeOf (arg: JType) = boxing(arg).flatMap(t => compiler.classLoader.classClass.flatMap(_.objectType(List(t))))
   def functionTypeOf (from: JType, to: JType) = for {

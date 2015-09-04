@@ -37,6 +37,8 @@ case class IREnhancedForStatement (elementType: JType, name: String, dim: Int, i
 
 case class IRActivateStatement (expression: IRExpression) extends IRStatement
 
+case class IRThrowStatement (expression: IRExpression) extends IRStatement
+
 case class IRReturnStatement (expression: IRExpression) extends IRStatement
 
 case class IRExpressionStatement (expression: IRExpression) extends IRStatement {

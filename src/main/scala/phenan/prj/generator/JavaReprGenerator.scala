@@ -210,6 +210,7 @@ object JavaReprGenerator {
     case i: IRIfStatement         => Union[Statement](ifStatement(i, contexts, activates))
     case w: IRWhileStatement      => Union[Statement](whileStatement(w, contexts, activates))
     case f: IRForStatement        => Union[Statement](forStatement(f, contexts, activates))
+    case t: IRThrowStatement      => Union[Statement](throwStatement(t, contexts))
     case r: IRReturnStatement     => Union[Statement](returnStatement(r, contexts))
     case e: IRExpressionStatement => Union[Statement](expressionStatement(e, contexts))
     case a: IRActivateStatement   => Union[Statement](activateStatement(a, contexts, activates))
@@ -252,6 +253,8 @@ object JavaReprGenerator {
 
   def enhancedForStatement (stmt: IREnhancedForStatement, contexts: List[IRContextRef], activates: List[JRefType]): EnhancedForStatement =
     EnhancedForStatement (typeToSig(stmt.elementType), stmt.name, stmt.dim, expression(stmt.iterable, contexts), singleStatement(stmt.statement, contexts, activates))
+
+  def throwStatement (stmt: IRThrowStatement, contexts: List[IRContextRef]): ThrowStatement = ThrowStatement(expression(stmt.expression, contexts))
 
   def returnStatement (stmt: IRReturnStatement, contexts: List[IRContextRef]): ReturnStatement = ReturnStatement(expression(stmt.expression, contexts))
 

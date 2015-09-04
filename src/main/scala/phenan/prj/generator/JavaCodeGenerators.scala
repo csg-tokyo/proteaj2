@@ -48,7 +48,7 @@ object JavaCodeGenerators extends Generators {
     param.parameterType -> param.name
   }
 
-  lazy val statement: Generator[Statement] = block :|: localDeclarationStatement :|: ifStatement :|: whileStatement :|: forStatement :|: returnStatement :|: expressionStatement :|: explicitConstructorCall :|: nil
+  lazy val statement: Generator[Statement] = block :|: localDeclarationStatement :|: ifStatement :|: whileStatement :|: forStatement :|: throwStatement :|: returnStatement :|: expressionStatement :|: explicitConstructorCall :|: nil
 
   lazy val block: Generator[Block] = '{' ~> indent(statement.*(newLine)) <~ '}' ^^ { _.statements }
 
@@ -81,6 +81,8 @@ object JavaCodeGenerators extends Generators {
   }
 
   lazy val forInit: Generator[ForInit] = localDeclaration :|: expression.*(',') :|: nil
+
+  lazy val throwStatement: Generator[ThrowStatement] = "throw" ~> expression <~ ';' ^^ { _.exception }
 
   lazy val returnStatement: Generator[ReturnStatement] = "return" ~> expression <~ ';' ^^ { _.returnValue }
 
