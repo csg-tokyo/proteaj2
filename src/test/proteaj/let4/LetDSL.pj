@@ -1,0 +1,28 @@
+package let4;
+
+dsl LetDSL {
+  priority p0, p1 {
+    p0 < p1
+  }
+  <T, R, name: Identifier[p0]> R[p1] "let" name ":" T "=" _ "in" _ (T v, Local<T, name> ~> R[p0] r) {
+    return r.apply(new Local<T, name>(v));
+  }
+  Identifier[p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+    return new Identifier(name);
+  }
+  context Local <V, name: Identifier> {
+    Local (V v) {
+      this.v = v;
+    }
+    V[p0] name () {
+      return v;
+    }
+    private V v;
+  }
+}
+
+class Identifier {
+  public Identifier (String name) { this.name = name; }
+  public String getName() { return name; }
+  private String name;
+}
