@@ -1,0 +1,10 @@
+package let3;
+
+import dsl LetDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    String s = ( let a : String = "hello" in a );
+    System.out.println(s);
+  }
+}

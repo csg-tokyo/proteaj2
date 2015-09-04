@@ -130,7 +130,7 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     lazy val hostLiteral: LParser[IRExpression] = JavaLiteralParsers.literal(expected)
 
     private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
-      env.expressionOperators(expected, p).map(ExpressionOperatorParsers(_, env).operator).reduceOption(_ ||| _) match {
+      env.expressionOperators(expected, p).map(op => ExpressionOperatorParsers(op, env).operator).reduceOption(_ ||| _) match {
         case Some(parser) => parser | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
         case None         => env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
       }
@@ -395,8 +395,8 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
       case JRepetition1(param) :: rest       => rep1(param, binding) >> {
         case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
-      case JMetaOperand(name, param) :: rest => expression(param, binding, eop.method, env) >> {
-        ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), operands)
+      case JMetaOperand(name, param) :: rest => metaExpression(param, binding, eop.method, env) >> {
+        ma => constructParser(rest, binding + (name -> ma), operands)
       }
       case JMetaName(value) :: rest          => metaValue(value, binding) ~> constructParser(rest, binding, operands)
       case JOperatorName(name) :: rest       => word(name).^ ~> constructParser(rest, binding, operands)
@@ -494,6 +494,15 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     def argument (param: JParameter, binding: Map[String, MetaArgument], environment: Environment): HParser[IRExpression] = {
       param.genericType.bind(binding).map(expectedType => expressionParser(param, binding, expectedType, environment.highestPriority, environment)).getOrElse {
         HParser.failure("invalid expected type")
+      }
+    }
+
+    def metaExpression (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[MetaArgument] = {
+      expected(param, binding, procedure).map { expectedType =>
+        if (compiler.typeLoader.typeType.contains(expectedType)) TypeParsers(environment.resolver).metaValue
+        else expressionParser(param, binding, expectedType, priority(param, procedure, environment), environment).map(ConcreteMetaValue(_, param))
+      }.getOrElse {
+        HParser.failure("fail to parse meta expression")
       }
     }
 
