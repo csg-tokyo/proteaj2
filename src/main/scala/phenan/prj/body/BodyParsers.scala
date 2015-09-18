@@ -324,7 +324,7 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
       case compiler.typeLoader.long    => longLiteral
       case compiler.typeLoader.boolean => booleanLiteral
       case _ if compiler.typeLoader.stringType.exists(_ <:< expected) => stringLiteral
-      case _ => LParser.failure("")
+      case _ => LParser.failure("type " + expected.name + " has no primitive literal syntax")
     }
 
     lazy val intLiteral: LParser[IRIntLiteral] = integerLiteral ^? { case n if Int.MinValue <= n && n <= Int.MaxValue => IRIntLiteral(n.toInt, compiler) }

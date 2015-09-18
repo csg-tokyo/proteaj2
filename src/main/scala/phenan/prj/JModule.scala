@@ -226,7 +226,10 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
     case _ if this == that   => true
     case that: JObjectType   => isSubtypeOf(that)
     case that: JCapturedWildcardType => that.lowerBound.exists(lb => isSubtypeOf(lb))
-    case _: JPrimitiveType | _: JArrayType | _: JTypeVariable | _: JUnboundTypeVariable => false
+    case that: JUnboundTypeVariable  =>
+      if (that.bounds.isEmpty) compiler.typeLoader.objectType.exists(b => isSubtypeOf(b))
+      else that.bounds.exists(b => isSubtypeOf(b))
+    case _: JPrimitiveType | _: JArrayType | _: JTypeVariable => false
   }
 
   def isSubtypeOf (that: JObjectType): Boolean = {

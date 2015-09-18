@@ -1,0 +1,19 @@
+package struct;
+
+import dsl StructDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    val tuple = struct {
+      String first = "hello"
+      String second = "world"
+    };
+    System.out.println(tuple.first);
+    System.out.println(tuple.second);
+    var tuple2 = struct {
+      "a": a
+      "b": b
+    };
+    System.out.println(tuple2.a);
+  }
+}
