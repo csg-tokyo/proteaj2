@@ -1,0 +1,22 @@
+package for1;
+
+import java.util.*;
+import dsl ForDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    List<String> ss = new ArrayList<String>();
+    ss.add("a");
+    ss.add("b");
+    ss.add("c");
+    List<String> list = for s <- ss yield func(s);
+
+    for (String str : list) {
+      System.out.println(str);
+    }
+  }
+
+  static String func (String s) {
+    return s.toUpperCase();
+  }
+}
