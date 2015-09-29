@@ -1,11 +1,37 @@
 package match;
 
+import java.util.*;
+import java.util.function.*;
+
 dsl MatchDSL {
   <T, R> R _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
+    for (Case<T, R> c : cases) {
+      Optional<R> result = c.apply(t);
+      if (result.isPresent()) return result.get();
+    }
     return null;
   }
 }
 
 interface Case <T, R> {
+  Optional<R> apply (T t);
+}
 
+class Case0 <T, R> implements Case<T, R> {
+  Case0 (Matcher0<T> m, Supplier<R> s) {
+    this.matcher = m;
+    this.supplier = s;
+  }
+  public Optional<R> apply (T t) {
+    if (matcher.match(t)) {
+      return Optional.<R>of(supplier.get());
+    }
+    else return Optional.<R>empty();
+  }
+  private Matcher0<T> matcher;
+  private Supplier<R> supplier;
+}
+
+interface Matcher0 <T> {
+  boolean match (T t);
 }

@@ -491,7 +491,13 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     }
 
     def arguments (procedure: JProcedure, binding: Map[String, MetaArgument], environment: Environment): HParser[List[IRExpression]] = {
-      '(' ~> HParser.sequence(procedure.parameterTypes.map(argument(_, binding, environment)), ',') <~ ')'
+      '(' ~> argumentList(procedure.parameterTypes, binding, environment, Nil) <~ ')'
+    }
+
+    def argumentList (paramTypes: List[JParameter], binding: Map[String, MetaArgument], environment: Environment, args: List[IRExpression]): HParser[List[IRExpression]] = paramTypes match {
+      case Nil       => HParser.success(Nil)
+      case p :: Nil  => argument(p, binding, environment) ^^ { arg => args :+ arg }
+      case p :: rest => argument(p, binding, environment) <~ ',' >> { arg => argumentList(rest, bind(p, arg, binding), environment, args :+ arg) }
     }
 
     def argument (param: JParameter, binding: Map[String, MetaArgument], environment: Environment): HParser[IRExpression] = {

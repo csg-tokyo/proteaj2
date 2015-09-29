@@ -39,10 +39,6 @@ trait TwoLevelParsers {
     def repeat0[T](z: T)(f: T => HParser[T]): HParser[T] = repeat_helper(success(z), f)
     def repeat1[T](z: T)(f: T => HParser[T]): HParser[T] = repeat_helper(f(z), f)
 
-    def sequence [T] (parsers: List[HParser[T]], sep: => HParser[_]): HParser[List[T]] = parsers.foldRight(success(List.empty[T])) { (parser, list) =>
-      parser ~ ( sep ~> list ) ^^ Impl.mkList
-    }
-
     private def repeat_helper[T](parser: HParser[T], f: T => HParser[T]): HParser[T] = parser >> f | parser
   }
 
