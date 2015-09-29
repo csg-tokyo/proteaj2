@@ -323,8 +323,8 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
       case compiler.typeLoader.int     => intLiteral
       case compiler.typeLoader.long    => longLiteral
       case compiler.typeLoader.boolean => booleanLiteral
-      case _ if compiler.typeLoader.stringType.exists(_ <:< expected) => stringLiteral
-      case _ => LParser.failure("type " + expected.name + " has no primitive literal syntax")
+      case _ if compiler.typeLoader.stringType.exists(_ <:< expected) => stringLiteral | nullLiteral(expected)
+      case _ => nullLiteral(expected)
     }
 
     lazy val intLiteral: LParser[IRIntLiteral] = integerLiteral ^? { case n if Int.MinValue <= n && n <= Int.MaxValue => IRIntLiteral(n.toInt, compiler) }
@@ -351,6 +351,8 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
 
     lazy val stringLiteral: LParser[IRStringLiteral] = dq ~> (escapeSequence | except('\"')).* <~ dq ^^ { cs => IRStringLiteral(cs.mkString, compiler) }
 
+    def nullLiteral (expected: JType): LParser[IRNullLiteral] = nul ^^^ IRNullLiteral(expected)
+
     lazy val escapeSequence = octalEscape | escape('b', '\b') | escape('f', '\f') | escape('n', '\n') | escape('r', '\r') | escape('t', '\t') | escape('\'', '\'') | escape('\"', '\"') | escape('\\', '\\')
 
     def escape (symbol: Char, character: Char) = backSlash ~> elem(symbol) ^^^ character
@@ -373,6 +375,7 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     private lazy val backSlash = elem('\\')
     private lazy val quote = elem('\'')
     private lazy val dq = elem('\"')
+    private lazy val nul = word("null")
 
     def except(cs: Char*) = elem("", c => ! cs.contains(c) && c != EofCh)
   }

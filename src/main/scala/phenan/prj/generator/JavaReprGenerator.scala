@@ -451,6 +451,7 @@ object JavaReprGenerator {
   /* literals */
 
   def javaLiteral (literal: IRJavaLiteral): JavaLiteral = literal match {
+    case n: IRNullLiteral    => Union[JavaLiteral](NullLiteral)
     case c: IRClassLiteral   => Union[JavaLiteral](classLiteral(c))
     case s: IRStringLiteral  => Union[JavaLiteral](Literal(s.value))
     case c: IRCharLiteral    => Union[JavaLiteral](Literal(c.value))

@@ -148,7 +148,9 @@ object JavaCodeGenerators extends Generators {
 
   lazy val superRef: Generator[SuperRef] = classRef <~ '.' <~ "super" ^^ { _.thisClass }
 
-  lazy val javaLiteral: Generator[JavaLiteral] = classLiteral :|: stringLiteral :|: charLiteral :|: intLiteral :|: longLiteral :|: booleanLiteral :|: nil
+  lazy val javaLiteral: Generator[JavaLiteral] = nullLiteral :|: classLiteral :|: stringLiteral :|: charLiteral :|: intLiteral :|: longLiteral :|: booleanLiteral :|: nil
+
+  lazy val nullLiteral: Generator[NullLiteral.type] = elem { _ => "null" }
 
   lazy val classLiteral: Generator[ClassLiteral] = string ~ dimension <~ '.' <~ "class" ^^ { lit =>
     lit.className -> lit.dim

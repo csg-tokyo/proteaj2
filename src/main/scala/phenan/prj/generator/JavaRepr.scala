@@ -143,7 +143,9 @@ object JavaRepr {
 
   case class ThisRef (thisClass: ClassRef)
 
-  type JavaLiteral = ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
+  type JavaLiteral = NullLiteral.type :|: ClassLiteral :|: Literal[String] :|: Literal[Char] :|: Literal[Int] :|: Literal[Long] :|: Literal[Boolean] :|: UNil
+
+  case object NullLiteral
 
   case class ClassLiteral (className: String, dim: Int)
 

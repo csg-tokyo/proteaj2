@@ -156,6 +156,10 @@ case class IRStringLiteral (value: String, compiler: JCompiler) extends IRJavaLi
   def staticType = compiler.typeLoader.stringType
 }
 
+case class IRNullLiteral (expected: JType) extends IRJavaLiteral {
+  def staticType = Some(expected)
+}
+
 case class IRThisRef (thisType: JObjectType) extends IRExpression {
   def staticType = Some(thisType)
   def activates: List[IRContextRef] = Nil

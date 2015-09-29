@@ -1,0 +1,11 @@
+package match;
+
+dsl MatchDSL {
+  <T, R> R _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
+    return null;
+  }
+}
+
+interface Case <T, R> {
+
+}
