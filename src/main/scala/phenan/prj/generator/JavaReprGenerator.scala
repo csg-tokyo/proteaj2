@@ -291,6 +291,7 @@ object JavaReprGenerator {
   private def contextName (index: Int): String = "ProteaJLocalContext$$" + index
 
   private def activatedContextRef = Union[Receiver](ClassRef("proteaj.lang.ActivatedContexts"))
+  private def arraysRef = Union[Receiver](ClassRef("proteaj.internal.Arrays"))
 
   /* expressions */
 
@@ -306,7 +307,7 @@ object JavaReprGenerator {
     case IRLocalVariableRef(_, n)  => Union[Expression](LocalRef(n))
     case e: IRThisRef              => Union[Expression](ThisRef(ClassRef(e.thisType.erase.name)))
     case e: IRJavaLiteral          => Union[Expression](javaLiteral(e))
-    case e: IRVariableArguments    => Union[Expression](variableArguments(e, contexts))
+    case e: IRVariableArguments    => variableArguments(e, contexts)
     case e: IRContextualArgument   => contextualArgument(e, contexts)
     case e: IRContextRef           => Union[Expression](contextRef(e, contexts))
   }
@@ -371,8 +372,11 @@ object JavaReprGenerator {
 
   def castExpression (e: IRCastExpression, contexts: List[IRContextRef]): CastExpression = CastExpression(typeToSig(e.destType), expression(e.expression, contexts))
 
-  def variableArguments (e: IRVariableArguments, contexts: List[IRContextRef]): ArrayInit =
-    ArrayInit(typeToSig(e.componentType.getOrElse { throw InvalidASTException("invalid component type of variable argument") }), 1, e.args.map(expression(_, contexts)))
+  def variableArguments (e: IRVariableArguments, contexts: List[IRContextRef]): Expression = e.componentType match {
+    case Some(p: JPrimitiveType) => Union[Expression](ArrayInit(typeToSig(p), 1, e.args.map(expression(_, contexts))))
+    case Some(r: JRefType)       => Union[Expression](MethodCall(arraysRef, List(Union[TypeArg](typeToSig(r))), "mkArray", e.args.map(expression(_, contexts))))
+    case None                    => throw InvalidASTException("invalid component type of variable arguments")
+  }
 
   def contextualArgument (e: IRContextualArgument, contexts: List[IRContextRef]): Expression = {
     contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), getStaticType(e.argument), Nil, contexts ++ e.contexts)

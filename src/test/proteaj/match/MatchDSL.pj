@@ -11,6 +11,13 @@ dsl MatchDSL {
     }
     return null;
   }
+  <T, R> Case0<T, R> "case" _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
+    return new Case0<T, R> (m, new DelayedApplication<Lazy, R>(f, new Lazy()));
+  }
+  <T, R> DefaultCase<T, R> "_" "=>" _ ( Lazy ~> R f ) {
+    return new DefaultCase<T, R> (new DelayedApplication<Lazy, R>(f, new Lazy()));
+  }
+  context Lazy {}
 }
 
 interface Case <T, R> {
@@ -32,6 +39,28 @@ class Case0 <T, R> implements Case<T, R> {
   private Supplier<R> supplier;
 }
 
+class DefaultCase <T, R> implements Case<T, R> {
+  DefaultCase (Supplier<R> s) {
+    this.supplier = s;
+  }
+  public Optional<R> apply (T t) {
+    return Optional.<R>of(supplier.get());
+  }
+  private Supplier<R> supplier;
+}
+
 interface Matcher0 <T> {
   boolean match (T t);
+}
+
+class DelayedApplication <T, R> implements Supplier<R> {
+  DelayedApplication (Function<T, R> f, T t) {
+    this.f = f;
+    this.t = t;
+  }
+  public R get () {
+    return f.apply(t);
+  }
+  private Function<T, R> f;
+  private T t;
 }
