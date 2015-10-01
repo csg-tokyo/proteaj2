@@ -17,12 +17,12 @@ class JClassLoaderTest extends FunSuite with Matchers {
     clazz.get shouldBe a [JLoadedClass]
   }
 
-  test ("proteaj/lang/DSL をロード") {
+  test ("proteaj/impl/DSL をロード") {
     val config = JConfig()
     config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes/"
     val loader = new JCompiler(config.configure.get).classLoader
 
-    val clazz = loader.load("proteaj/lang/DSL")
+    val clazz = loader.load("proteaj/impl/DSL")
     clazz shouldBe a [Success[_]]
     clazz.get shouldBe a [JLoadedClass]
   }

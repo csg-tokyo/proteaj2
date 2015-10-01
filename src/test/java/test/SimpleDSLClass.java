@@ -1,6 +1,6 @@
 package test;
 
-import proteaj.lang.*;
+import proteaj.impl.DSL;
 
 @DSL
 public class SimpleDSLClass {}

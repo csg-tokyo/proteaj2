@@ -1,7 +1,8 @@
 package test;
 
-import proteaj.lang.*;
-import static proteaj.lang.OpElemType.*;
+import proteaj.impl.*;
+
+import static proteaj.impl.OpElemType.*;
 
 @Context
 @DSL(priorities = { "getter", "setter" }, constraints = { @Constraint({ @Priority(dsl = "Ltest/Var;", name = "getter"), @Priority(dsl = "Ltest/Var;", name = "setter") }) })

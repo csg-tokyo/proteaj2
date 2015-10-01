@@ -1,4 +1,4 @@
-package proteaj.lang;
+package proteaj.impl;
 
 import java.lang.annotation.*;
 
