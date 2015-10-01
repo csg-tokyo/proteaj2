@@ -129,14 +129,18 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
 
     lazy val hostLiteral: LParser[IRExpression] = JavaLiteralParsers.literal(expected)
 
-    private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo { p =>
+    private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo(createExpressionParser)
+
+    private def createExpressionParser (p: JPriority): HParser[IRExpression] = HParser.ref {
       env.expressionOperators(expected, p).map(op => ExpressionOperatorParsers(op, env).operator).reduceOption(_ ||| _) match {
         case Some(parser) => parser | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
         case None         => env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
       }
     }
 
-    private val literal_cached: JPriority => LParser[IRExpression] = mutableHashMapMemo { p =>
+    private val literal_cached: JPriority => LParser[IRExpression] = mutableHashMapMemo(createLiteralParser)
+
+    private def createLiteralParser (p: JPriority): LParser[IRExpression] = LParser.ref {
       env.literalOperators(expected, p).map(LiteralOperatorParsers.getParser(_, env)).reduceOption(_ ||| _) match {
         case Some(parser) => parser | env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
         case None         => env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
@@ -591,7 +595,7 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     lazy val packageName: HParser[List[String]] = (identifier <~ '.').*! { names =>
       ! resolver.root.isKnownPackage(names) && resolver.resolve(names).isSuccess
     }
-    lazy val className: HParser[JClass] = ref(innerClassName | topLevelClassName)
+    lazy val className: HParser[JClass] = HParser.ref (innerClassName | topLevelClassName)
     lazy val topLevelClassName: HParser[JClass] = packageName ~ identifier ^^? {
       case pack ~ name => resolver.resolve(pack :+ name).toOption
     }

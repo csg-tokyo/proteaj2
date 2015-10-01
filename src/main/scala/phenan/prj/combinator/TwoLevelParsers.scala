@@ -2,8 +2,8 @@ package phenan.prj.combinator
 
 import scala.reflect.ClassTag
 import scala.util.matching.Regex
-import scala.util.parsing.combinator.{RegexParsers, PackratParsers}
-import scala.util.parsing.input.{Positional, Position, Reader}
+import scala.util.parsing.combinator.PackratParsers
+import scala.util.parsing.input.{Positional, Reader}
 
 import scala.language.implicitConversions
 
@@ -27,9 +27,6 @@ trait TwoLevelParsers {
   def elem (kind: String, f: Elem => Boolean): LParser[Elem] = Impl.LParserImpl(Impl.elem(kind, f))
   def elem [E <: Elem] (implicit Tag: ClassTag[E]): LParser[E] = Impl.LParserImpl(Impl.accept(Tag.toString(), { case Tag(x) => x }))
 
-  // workaround for avoiding infinite loop of lazy initialization
-  def ref [T] (parser: => HParser[T]): HParser[T] = new Impl.HParserRef[T](parser)
-
   def positioned [T <: Positional] (parser: HParser[T]): HParser[T] = Impl.HParserImpl(Impl.positioned(parser.parser))
 
   object HParser {
@@ -38,6 +35,9 @@ trait TwoLevelParsers {
 
     def repeat0[T](z: T)(f: T => HParser[T]): HParser[T] = repeat_helper(success(z), f)
     def repeat1[T](z: T)(f: T => HParser[T]): HParser[T] = repeat_helper(f(z), f)
+
+    // workaround for avoiding infinite loop of lazy initialization
+    def ref [T] (parser: => HParser[T]): HParser[T] = new Impl.HParserRef[T](parser)
 
     private def repeat_helper[T](parser: HParser[T], f: T => HParser[T]): HParser[T] = parser >> f | parser
   }
@@ -48,6 +48,9 @@ trait TwoLevelParsers {
 
     def repeat0[T](z: T)(f: T => LParser[T]): LParser[T] = repeat_helper(success(z), f)
     def repeat1[T](z: T)(f: T => LParser[T]): LParser[T] = repeat_helper(f(z), f)
+
+    // workaround for avoiding infinite loop of lazy initialization
+    def ref [T] (parser: => LParser[T]): LParser[T] = new Impl.LParserRef[T](parser)
 
     private def repeat_helper[T](parser: LParser[T], f: T => LParser[T]): LParser[T] = parser >> f | parser
   }
@@ -177,7 +180,7 @@ trait TwoLevelParsers {
       lazy val parser: PackratParser[T] = hp.parser
     }
 
-    case class LParserImpl[T] (parser: PackratParser[T]) extends LParser[T] {
+    trait LParserLike[T] extends LParser[T] {
       lazy val ^ : HParser[T] = HParserImpl(parser)
 
       def ~ [U] (that: => LParser[U]): LParser[T ~ U] = LParserImpl(this.parser ~ that.parser)
@@ -203,6 +206,12 @@ trait TwoLevelParsers {
       def ^^^ [R] (f: => R): LParser[R] = LParserImpl(parser ^^^ f)
 
       def log (s: String): LParser[T] = LParserImpl(Impl.log(parser)(s))
+    }
+
+    case class LParserImpl[T] (parser: PackratParser[T]) extends LParserLike[T]
+
+    class LParserRef[T] (lp: => LParser[T]) extends LParserLike[T] {
+      lazy val parser: PackratParser[T] = lp.parser
     }
   }
 }
