@@ -290,7 +290,7 @@ object JavaReprGenerator {
 
   private def contextName (index: Int): String = "ProteaJLocalContext$$" + index
 
-  private def activatedContextRef = Union[Receiver](ClassRef("proteaj.lang.ActivatedContexts"))
+  private def activatedContextRef = Union[Receiver](ClassRef("proteaj.internal.ActivatedContexts"))
   private def arraysRef = Union[Receiver](ClassRef("proteaj.internal.Arrays"))
 
   /* expressions */

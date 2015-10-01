@@ -6,9 +6,8 @@ import dsl ForDSL;
 public class Main {
   public static void main (String[] args) {
     List<String> ss = new ArrayList<String>();
-    ss.add("a");
-    ss.add("b");
-    ss.add("c");
+    ss.add("hello");
+    ss.add("world");
     List<String> list = for s <- ss yield func(s);
 
     for (String str : list) {

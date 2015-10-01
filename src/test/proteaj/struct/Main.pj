@@ -11,9 +11,10 @@ public class Main {
     System.out.println(tuple.first);
     System.out.println(tuple.second);
     var tuple2 = struct {
-      "a": a
-      "b": b
+      "goodbye": a
+      "world": b
     };
     System.out.println(tuple2.a);
+    System.out.println(tuple2.b);
   }
 }

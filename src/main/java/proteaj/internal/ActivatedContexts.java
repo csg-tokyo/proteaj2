@@ -1,6 +1,6 @@
-package proteaj.lang;
+package proteaj.internal;
 
-import java.util.*;
+import java.util.Arrays;
 
 public class ActivatedContexts {
   @SuppressWarnings("unchecked")
