@@ -10,7 +10,7 @@ case class FileEnvironment (file: IRFile) {
   def instanceEnvironment (clazz: IRModule): ModuleEnvironment = new Environment_Instance(clazz, this)
   def staticEnvironment (clazz: IRModule): ModuleEnvironment = new Environment_Static(clazz, this)
 
-  lazy val dsls: List[JClassModule] = collectCompanions(collectDSLs(file.importedDSLNames, Set.empty), Set.empty).toList
+  lazy val dsls: List[JClassModule] = collectCompanions(collectDSLs(file.importedDSLNames), Set.empty).toList
   lazy val userConstraints: List[List[JPriority]] = file.userConstraints.map(resolver.constraint)
   lazy val priorities: List[JPriority] = sortPriorities(collectPriorities(dsls, Set.empty), dsls.flatMap(_.constraints) ++ userConstraints)
 
@@ -56,6 +56,10 @@ case class FileEnvironment (file: IRFile) {
   private def collectCompanions (ds: Set[JClassModule], checked: Set[JClassModule]): Set[JClassModule] = {
     if (ds.isEmpty) checked
     else collectCompanions(ds.flatMap(_.withDSLs).intersect(checked), checked ++ ds)
+  }
+
+  private def collectDSLs (names: List[QualifiedName]): Set[JClassModule] = {
+    collectDSLs(names, resolver.root.compiler.classLoader.predefOperatorsClass.map(_.classModule).toSet)
   }
 
   private def collectDSLs (names: List[QualifiedName], ds: Set[JClassModule]): Set[JClassModule] = names match {

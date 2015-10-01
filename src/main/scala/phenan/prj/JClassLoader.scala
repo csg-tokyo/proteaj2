@@ -47,6 +47,7 @@ trait JClassLoader {
   lazy val runtimeExceptionClass: Option[JClass] = loadClass_PE(CommonNames.runtimeExceptionName)
   lazy val functionClass: Option[JClass] = loadClass_PE(CommonNames.functionClassName)
 
+  lazy val predefOperatorsClass: Option[JClass] = loadClass_PE(CommonNames.predefOperatorsName)
   lazy val typeClass: JClass = new JTypeClass(compiler)
 
   def erase (signature: JTypeSignature, metaParams: List[FormalMetaParameter]): Try[JErasedType] = signature match {
