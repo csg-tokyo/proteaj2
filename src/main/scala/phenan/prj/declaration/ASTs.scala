@@ -47,7 +47,7 @@ case class PrioritiesDeclaration (names: List[String], constraints: List[List[Qu
 
 case class ContextDeclaration (modifiers: List[Modifier], name: String, metaParameters: List[MetaParameter], members: List[ContextMember]) extends DSLMember
 
-case class FormalParameter (modifiers: List[Modifier], parameterType: ParameterType, priority: Option[QualifiedName], varArgs: Boolean, name: String, dim: Int, initializer: Option[ExpressionSnippet])
+case class FormalParameter (modifiers: List[Modifier], parameterType: ParameterType, varArgs: Boolean, name: String, dim: Int, initializer: Option[ExpressionSnippet])
 case class VariableDeclarator (name: String, dim: Int, initializer: Option[ExpressionSnippet])
 
 sealed trait MethodClause
@@ -65,11 +65,11 @@ sealed trait SyntaxElement
 
 case class OperatorName (name: String) extends SyntaxElement
 case class RegexName (name: String) extends SyntaxElement
-case class MetaValueRef (name: String) extends SyntaxElement
-case object Operand extends SyntaxElement
-case object Repetition0 extends SyntaxElement
-case object Repetition1 extends SyntaxElement
-case object OptionalOperand extends SyntaxElement
+case class MetaValueRef (name: String, priority: Option[QualifiedName]) extends SyntaxElement
+case class Operand (priority: Option[QualifiedName]) extends SyntaxElement
+case class Repetition0 (priority: Option[QualifiedName]) extends SyntaxElement
+case class Repetition1 (priority: Option[QualifiedName]) extends SyntaxElement
+case class OptionalOperand (priority: Option[QualifiedName]) extends SyntaxElement
 case class AndPredicate (prd: TypeName, priority: Option[QualifiedName]) extends SyntaxElement
 case class NotPredicate (prd: TypeName, priority: Option[QualifiedName]) extends SyntaxElement
 
@@ -155,7 +155,7 @@ sealed trait MetaParameter {
   def name: String
 }
 case class TypeParameter (name: String, bounds: List[TypeName]) extends MetaParameter
-case class MetaValueParameter (name: String, metaType: TypeName, priority: Option[QualifiedName]) extends MetaParameter
+case class MetaValueParameter (name: String, metaType: TypeName) extends MetaParameter
 
 sealed trait ParameterType
 case class ContextualType (context: TypeName, paramType: ParameterType) extends ParameterType

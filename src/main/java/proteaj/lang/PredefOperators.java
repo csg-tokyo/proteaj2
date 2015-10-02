@@ -10,14 +10,10 @@ import proteaj.impl.*;
     })
 )
 public class PredefOperators {
-  @MethodSig(
-      returnType = "I",
-      parameters = { "I#proteaj/lang/PredefOperators.add", "I#proteaj/lang/PredefOperators.mul" }
-  )
   @Operator(
       priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "add"),
       pattern = {
-          @OpElem(kind = OpElemType.Hole),
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "add")),
           @OpElem(kind = OpElemType.Name, name = "+"),
           @OpElem(kind = OpElemType.Hole)
       }

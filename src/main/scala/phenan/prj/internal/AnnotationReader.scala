@@ -95,22 +95,32 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
   private lazy val metaParameter: BAnnotation =?> FormalMetaParameter = for {
     name     <- required("name")(string)
     metaType <- optional("type")(typeSignature)
-    priority <- optArray("priority")(elementAnnotation(CommonNames.priorityClassName, priority))
     bounds   <- array("bounds")(typeSignature)
-  } yield FormalMetaParameter(name, metaType | JTypeSignature.typeTypeSig, priority, bounds)
+  } yield FormalMetaParameter(name, metaType | JTypeSignature.typeTypeSig, bounds)
 
   private lazy val operatorElement: BAnnotation =?> JSyntaxElementDef = enumSwitch("kind", CommonNames.opElemTypeClassName) {
     case "Name"         => required("name")(string).map(JOperatorNameDef)
     case "Regex"        => required("name")(string).map(JRegexNameDef)
-    case "Hole"         => unit(JOperandDef)
-    case "Star"         => unit(JRepetition0Def)
-    case "Plus"         => unit(JRepetition1Def)
-    case "Optional"     => unit(JOptionalOperandDef)
-    case "AndPredicate" => required("name")(parameterSignature).map(JAndPredicateDef)
-    case "NotPredicate" => required("name")(parameterSignature).map(JNotPredicateDef)
-    case "Reference"    => required("name")(string).map(JMetaValueRefDef)
-    case _              => state.errorAndReturn("invalid operator element type", unit(JOperandDef))
+    case "Hole"         => priorityOptArray.map(JOperandDef)
+    case "Star"         => priorityOptArray.map(JRepetition0Def)
+    case "Plus"         => priorityOptArray.map(JRepetition1Def)
+    case "Optional"     => priorityOptArray.map(JOptionalOperandDef)
+    case "AndPredicate" => for {
+      name     <- required("name")(typeSignature)
+      priority <- priorityOptArray
+    } yield JAndPredicateDef(name, priority)
+    case "NotPredicate" => for {
+      name     <- required("name")(typeSignature)
+      priority <- priorityOptArray
+    } yield JNotPredicateDef(name, priority)
+    case "Reference"    => for {
+      name     <- required("name")(string)
+      priority <- priorityOptArray
+    } yield JMetaValueRefDef(name, priority)
+    case _              => state.errorAndReturn("invalid operator element type", unit(JOperandDef(None)))
   }
+
+  private lazy val priorityOptArray = optArray("priority")(elementAnnotation(CommonNames.priorityClassName, priority))
 
   private def enumSwitch [T] (name: String, enumTypeName: String)(readers: String => BAnnotation =?> T): BAnnotation =?> T = opt(elem(name)) >=> collect {
     case Some(BAnnotationElement_Enum(e, c)) if annotationTypeName(e) == enumTypeName => readUTF(c)

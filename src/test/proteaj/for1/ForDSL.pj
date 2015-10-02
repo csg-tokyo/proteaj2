@@ -7,7 +7,7 @@ dsl ForDSL {
     p0 < p1
   }
 
-  <T, name: Identifier[p0], U> List<U>[p1] "for" name "<-" _ "yield" _ (List<T> list, Variable<T, name> ~> U f) {
+  <T, name: Identifier, U> List<U>[p1] "for" name "<-" _ "yield" _ (List<T> list, Variable<T, name> ~> U f) {
     List<U> result = new ArrayList<U>();
     for (T t : list) {
       result.add(f.apply(new Variable<T, name>(t)));
@@ -21,7 +21,7 @@ dsl ForDSL {
 
   context Variable <T, name: Identifier> {
     Variable (T v) { this.v = v; }
-    T name () { return v; }
+    T name[p0] () { return v; }
     private T v;
   }
 }

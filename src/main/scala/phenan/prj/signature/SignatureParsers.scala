@@ -31,12 +31,8 @@ object SignatureParsers extends PackratParsers {
     case typeParams ~ parameters ~ retType ~ throwsTypes => JMethodSignature(typeParams, parameters, retType, throwsTypes, Nil, Nil, Nil)
   }
 
-  private lazy val parameterSignature = ( '@' ~> typeSignature ).* ~ typeSignature ~ prioritySignature.? ~ ( '*'.? ^^ { _.nonEmpty } ) ~ ( '?' ~> identifier ).? ^^ {
-    case contexts ~ sig ~ pri ~ va ~ df => JParameterSignature(contexts, sig, pri, va, df)
-  }
-
-  private lazy val prioritySignature = '#' ~> topLevelClassType ~ ( '.' ~> identifier ) ^^ {
-    case sig ~ name => JPriority(sig, name)
+  private lazy val parameterSignature = ( '@' ~> typeSignature ).* ~ typeSignature ~ ( '*'.? ^^ { _.nonEmpty } ) ~ ( '?' ~> identifier ).? ^^ {
+    case contexts ~ sig ~ va ~ df => JParameterSignature(contexts, sig, va, df)
   }
 
   private lazy val typeSignature: PackratParser[JTypeSignature] = fieldType | baseType
@@ -74,7 +70,7 @@ object SignatureParsers extends PackratParsers {
 
   private lazy val formalTypeParameter = identifier ~ ( ':' ~> fieldType.? ) ~ ( ':' ~> fieldType ).* ^^ {
     case name ~ classBound ~ interfaceBounds =>
-      FormalMetaParameter(name, JTypeSignature.typeTypeSig, None, classBound.map(_ :: interfaceBounds).getOrElse(interfaceBounds))
+      FormalMetaParameter(name, JTypeSignature.typeTypeSig, classBound.map(_ :: interfaceBounds).getOrElse(interfaceBounds))
   }
 
   private lazy val typeArgList = '<' ~> typeArgument.+ <~ '>' | success(Nil)

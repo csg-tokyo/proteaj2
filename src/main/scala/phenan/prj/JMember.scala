@@ -53,25 +53,25 @@ trait JProcedure extends JMember {
   }
 
   private def translateHole (elem: JHoleDef, param: JParameter): JSyntaxElement = elem match {
-    case JOperandDef         => JOperand(param)
-    case JOptionalOperandDef => JOptionalOperand(param)
-    case JRepetition0Def     => JRepetition0(param)
-    case JRepetition1Def     => JRepetition1(param)
+    case JOperandDef(p)         => JOperand(param, p)
+    case JOptionalOperandDef(p) => JOptionalOperand(param, p)
+    case JRepetition0Def(p)     => JRepetition0(param, p)
+    case JRepetition1Def(p)     => JRepetition1(param, p)
     case JRegexNameDef(name) => JRegexName(name)
   }
 
   private def translateMetaValueRef (mv: JMetaValueRefDef): Option[JSyntaxElement] = {
-    if (env.contains(mv.name)) Some(JMetaName(env(mv.name)))
+    if (env.contains(mv.name)) Some(JMetaName(env(mv.name), mv.priority))
     else if (metaParameters.contains(mv.name)) {
       val mp = metaParameters(mv.name)
-      Some(JMetaOperand(mv.name, JParameter(JParameterSignature(Nil, mp.metaType, mp.priority, false, None), env, compiler)))
+      Some(JMetaOperand(mv.name, JParameter(mp.metaType, env, compiler), mv.priority))
     }
     else None
   }
 
   private def translatePredicate (elem: JPredicateDef): JSyntaxElement = elem match {
-    case JAndPredicateDef(sig) => JAndPredicate(JParameter(sig, env, compiler))
-    case JNotPredicateDef(sig) => JNotPredicate(JParameter(sig, env, compiler))
+    case JAndPredicateDef(sig, p) => JAndPredicate(JParameter(sig, env, compiler), p)
+    case JNotPredicateDef(sig, p) => JNotPredicate(JParameter(sig, env, compiler), p)
   }
 
   def compiler = declaring.compiler
@@ -93,7 +93,12 @@ class JConstructor (val methodDef: JMethodDef, val env: Map[String, MetaArgument
 case class JParameter (signature: JParameterSignature, env: Map[String, MetaArgument], compiler: JCompiler) {
   lazy val contexts: List[JGenericType] = signature.contexts.map(sig => JGenericType(sig, env, compiler))
   lazy val genericType: JGenericType = JGenericType(signature.typeSig, env, compiler)
-  def priority: Option[JPriority] = signature.priority
   def varArgs: Boolean = signature.varArgs
   def defaultArg: Option[String] = signature.defaultArg
+}
+
+object JParameter {
+  def apply (sig: JTypeSignature, env: Map[String, MetaArgument], compiler: JCompiler): JParameter = {
+    JParameter(JParameterSignature(Nil, sig, false, None), env, compiler)
+  }
 }

@@ -4,7 +4,7 @@ dsl LetDSL {
   priority p0, p1 {
     p0 < p1
   }
-  <T, R, name: Identifier[p0]> R[p1] "let" name ":" T "=" _ "in" _ (T v, Local<T, name> ~> R[p0] r) {
+  <T, R, name: Identifier> R[p1] "let" name ":" T "=" _ "in" _ (T v, Local<T, name> ~> R r) {
     return r.apply(new Local<T, name>(v));
   }
   Identifier[p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
@@ -14,7 +14,7 @@ dsl LetDSL {
     Local (V v) {
       this.v = v;
     }
-    V[p0] name () {
+    V[p0] name[p0] () {
       return v;
     }
     private V v;

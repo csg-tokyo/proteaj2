@@ -20,28 +20,24 @@ case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: 
   }
 }
 
-case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, priority: Option[JPriority], varArgs: Boolean, defaultArg: Option[String]) {
+case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, varArgs: Boolean, defaultArg: Option[String]) {
   def actualTypeSignature: JTypeSignature = {
     val target = if (varArgs) JArrayTypeSignature(typeSig) else typeSig
     contexts.foldRight(target)(JTypeSignature.functionTypeSig)
   }
   override def toString = {
     val cs = contexts.map('@' + _.toString).mkString
-    val pr = priority.map(p => '#' + p.clazz.signatureString + '.' + p.name).mkString
     val da = defaultArg.map('?' + _).mkString
-    if(varArgs) cs + typeSig.toString + pr + '*' + da
-    else cs + typeSig.toString + pr + da
+    if(varArgs) cs + typeSig.toString + '*' + da
+    else cs + typeSig.toString + da
   }
 }
 
-case class FormalMetaParameter (name: String, metaType: JTypeSignature, priority: Option[JPriority], bounds: List[JTypeSignature]) {
+case class FormalMetaParameter (name: String, metaType: JTypeSignature, bounds: List[JTypeSignature]) {
   override def toString = {
     if (bounds.nonEmpty) name + bounds.mkString(" extends ", " & ", "")
-    else priority match {
-      case None if metaType == JTypeSignature.typeTypeSig => name
-      case Some(p) => name + " : " + metaType + '[' + p + ']'
-      case None    => name + " : " + metaType
-    }
+    else if (metaType == JTypeSignature.typeTypeSig) name
+    else name + " : " + metaType
   }
 }
 

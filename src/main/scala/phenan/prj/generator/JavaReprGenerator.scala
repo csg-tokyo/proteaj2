@@ -659,7 +659,6 @@ object JavaReprGenerator {
       mkAnnotation(metaParamClassName)(
         "name" -> strLit(fmp.name),
         "type" -> strLit(fmp.metaType.toString),
-        "priority" -> array(fmp.priority.map(priorityAnnotation).map(elementAnnotation).toList),
         "bounds" -> array(fmp.bounds.map(sig => strLit(sig.toString))))
     }
 
@@ -672,19 +671,19 @@ object JavaReprGenerator {
     }
 
     private def operatorElementAnnotation (elem: JSyntaxElementDef): JavaAnnotation = elem match {
-      case JOperatorNameDef(name) => operatorElementAnnotation("Name", name)
-      case JRegexNameDef(name)    => operatorElementAnnotation("Regex", name)
-      case JOperandDef            => operatorElementAnnotation("Hole", "")
-      case JRepetition0Def        => operatorElementAnnotation("Star", "")
-      case JRepetition1Def        => operatorElementAnnotation("Plus", "")
-      case JOptionalOperandDef    => operatorElementAnnotation("Optional", "")
-      case JAndPredicateDef(sig)  => operatorElementAnnotation("AndPredicate", sig.toString)
-      case JNotPredicateDef(sig)  => operatorElementAnnotation("NotPredicate", sig.toString)
-      case JMetaValueRefDef(name) => operatorElementAnnotation("Reference", name)
+      case JOperatorNameDef(name)    => operatorElementAnnotation("Name", name, None)
+      case JRegexNameDef(name)       => operatorElementAnnotation("Regex", name, None)
+      case JOperandDef(p)            => operatorElementAnnotation("Hole", "", p)
+      case JRepetition0Def(p)        => operatorElementAnnotation("Star", "", p)
+      case JRepetition1Def(p)        => operatorElementAnnotation("Plus", "", p)
+      case JOptionalOperandDef(p)    => operatorElementAnnotation("Optional", "", p)
+      case JAndPredicateDef(sig, p)  => operatorElementAnnotation("AndPredicate", sig.toString, p)
+      case JNotPredicateDef(sig, p)  => operatorElementAnnotation("NotPredicate", sig.toString, p)
+      case JMetaValueRefDef(name, p) => operatorElementAnnotation("Reference", name, p)
     }
 
-    private def operatorElementAnnotation (name: String, value: String): JavaAnnotation = {
-      mkAnnotation(opElemClassName) ( "kind" -> enumConst(opElemTypeClassName, name), "name" -> strLit(value) )
+    private def operatorElementAnnotation (name: String, value: String, priority: Option[JPriority]): JavaAnnotation = {
+      mkAnnotation(opElemClassName) ( "kind" -> enumConst(opElemTypeClassName, name), "name" -> strLit(value), "priority" -> array(priority.map(priorityAnnotation).map(elementAnnotation).toList) )
     }
 
     private def mkAnnotation (annName: String)(args: (String, AnnotationElement)*): JavaAnnotation = JavaAnnotation(annName.replace('/', '.'), args.toMap)

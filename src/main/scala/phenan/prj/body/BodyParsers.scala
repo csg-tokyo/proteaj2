@@ -390,46 +390,46 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     lazy val operator: HParser[IRExpression] = constructParser(eop.syntax.pattern, eop.metaArgs, Nil)
 
     private def constructParser (pattern: List[JSyntaxElement], binding: Map[String, MetaArgument], operands: List[IRExpression]): HParser[IRExpression] = pattern match {
-      case JOperand(param) :: rest           => expression(param, binding, eop.method, env) >> { arg =>
+      case JOperand(param, p) :: rest           => expression(param, p, binding, eop.method, env) >> { arg =>
         constructParser(rest, bind(param, arg, binding), arg :: operands)
       }
-      case JOptionalOperand(param) :: rest   => expression(param, binding, eop.method, env).?.mapOption { _.orElse(defaultArgument(param, eop.method, env)) } >> { arg =>
+      case JOptionalOperand(param, p) :: rest   => expression(param, p, binding, eop.method, env).?.mapOption { _.orElse(defaultArgument(param, eop.method, env)) } >> { arg =>
         constructParser(rest, bind(param, arg, binding), arg :: operands)
       }
-      case JRepetition0(param) :: rest       => rep0(param, binding) >> {
+      case JRepetition0(param, p) :: rest       => rep0(param, p, binding) >> {
         case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
-      case JRepetition1(param) :: rest       => rep1(param, binding) >> {
+      case JRepetition1(param, p) :: rest       => rep1(param, p, binding) >> {
         case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
-      case JMetaOperand(name, param) :: rest => metaExpression(param, binding, eop.method, env) >> {
+      case JMetaOperand(name, param, p) :: rest => metaExpression(param, p, binding, eop.method, env) >> {
         ma => constructParser(rest, binding + (name -> ma), operands)
       }
-      case JMetaName(value) :: rest          => metaValue(value, binding) ~> constructParser(rest, binding, operands)
+      case JMetaName(value, p) :: rest          => metaValue(value, p, binding) ~> constructParser(rest, binding, operands)
       case JOperatorName(name) :: rest       => word(name).^ ~> constructParser(rest, binding, operands)
       case JRegexName(name) :: rest          => regex(name).^ >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
-      case JAndPredicate(param) :: rest      => expression(param, binding, eop.method, env).& ~> constructParser(rest, binding, operands)
-      case JNotPredicate(param) :: rest      => expression(param, binding, eop.method, env).! ~> constructParser(rest, binding, operands)
+      case JAndPredicate(param, p) :: rest      => expression(param, p, binding, eop.method, env).& ~> constructParser(rest, binding, operands)
+      case JNotPredicate(param, p) :: rest      => expression(param, p, binding, eop.method, env).! ~> constructParser(rest, binding, operands)
       case Nil                               => HParser.success(eop.semantics(binding, operands.reverse))
     }
 
-    private def metaValue (mv: MetaArgument, binding: Map[String, MetaArgument]): HParser[MetaArgument] = mv match {
+    private def metaValue (mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument]): HParser[MetaArgument] = mv match {
       case t: JRefType  => TypeParsers(env.resolver).refType ^? { case v if t == v => t }
       case w: JWildcard => TypeParsers(env.resolver).wildcard ^? { case v if w == v => w }
       case r: MetaVariableRef   => TypeParsers(env.resolver).metaVariable ^? { case v if r == v => r }
-      case c: ConcreteMetaValue => expression(c.parameter, binding, eop.method, env) ^? { case v if c.ast == v => c }
+      case c: ConcreteMetaValue => expression(c.parameter, pri, binding, eop.method, env) ^? { case v if c.ast == v => c }
       case _: MetaValueWildcard => HParser.failure("meta value wildcard cannot be placed in operator pattern")
     }
 
-    private def rep0 (param: JParameter, binding: Map[String, MetaArgument]) = {
+    private def rep0 (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument]) = {
       HParser.repeat0((binding, List.empty[IRExpression])) {
-        case ((b, l)) => expression(param, b, eop.method, env) ^^ { arg => (bind(param, arg, b), l :+ arg) }
+        case ((b, l)) => expression(param, pri, b, eop.method, env) ^^ { arg => (bind(param, arg, b), l :+ arg) }
       }
     }
 
-    private def rep1 (param: JParameter, binding: Map[String, MetaArgument]) = {
+    private def rep1 (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument]) = {
       HParser.repeat1((binding, List.empty[IRExpression])) {
-        case ((b, l)) => expression(param, b, eop.method, env) ^^ { arg => (bind(param, arg, b), l :+ arg) }
+        case ((b, l)) => expression(param, pri, b, eop.method, env) ^^ { arg => (bind(param, arg, b), l :+ arg) }
       }
     }
   }
@@ -440,44 +440,44 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     lazy val operator: LParser[IRExpression] = constructParser(lop.syntax.pattern, lop.metaArgs, Nil)
 
     private def constructParser (pattern: List[JSyntaxElement], binding: Map[String, MetaArgument], operands: List[IRExpression]): LParser[IRExpression] = pattern match {
-      case JOperand(param) :: rest           => literal(param, binding, lop.method, env) >> { arg =>
+      case JOperand(param, p) :: rest           => literal(param, p, binding, lop.method, env) >> { arg =>
         constructParser(rest, bind(param, arg, binding), arg :: operands)
       }
-      case JOptionalOperand(param) :: rest   => literal(param, binding, lop.method, env).?.mapOption { _.orElse(defaultArgument(param, lop.method, env)) } >> { arg =>
+      case JOptionalOperand(param, p) :: rest   => literal(param, p, binding, lop.method, env).?.mapOption { _.orElse(defaultArgument(param, lop.method, env)) } >> { arg =>
         constructParser(rest, bind(param, arg, binding), arg :: operands)
       }
-      case JRepetition0(param) :: rest       => rep0(param, binding) >> {
+      case JRepetition0(param, p) :: rest       => rep0(param, p, binding) >> {
         case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
-      case JRepetition1(param) :: rest       => rep1(param, binding) >> {
+      case JRepetition1(param, p) :: rest       => rep1(param, p, binding) >> {
         case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
-      case JMetaOperand(name, param) :: rest => literal(param, binding, lop.method, env) >> {
+      case JMetaOperand(name, param, p) :: rest => literal(param, p, binding, lop.method, env) >> {
         ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), operands)
       }
-      case JMetaName(value) :: rest          => metaValue(value, binding) ~> constructParser(rest, binding, operands)
+      case JMetaName(value, p) :: rest          => metaValue(value, p, binding) ~> constructParser(rest, binding, operands)
       case JOperatorName(name) :: rest       => word(name) ~> constructParser(rest, binding, operands)
       case JRegexName(name) :: rest          => regex(name) >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
-      case JAndPredicate(param) :: rest      => literal(param, binding, lop.method, env).& ~> constructParser(rest, binding, operands)
-      case JNotPredicate(param) :: rest      => literal(param, binding, lop.method, env).! ~> constructParser(rest, binding, operands)
+      case JAndPredicate(param, p) :: rest      => literal(param, p, binding, lop.method, env).& ~> constructParser(rest, binding, operands)
+      case JNotPredicate(param, p) :: rest      => literal(param, p, binding, lop.method, env).! ~> constructParser(rest, binding, operands)
       case Nil                               => LParser.success(lop.semantics(binding, operands.reverse))
     }
 
-    private def metaValue (mv: MetaArgument, binding: Map[String, MetaArgument]): LParser[MetaArgument] = mv match {
-      case c: ConcreteMetaValue                            => literal(c.parameter, binding, lop.method, env) ^? { case v if c.ast == v => c }
+    private def metaValue (mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument]): LParser[MetaArgument] = mv match {
+      case c: ConcreteMetaValue                            => literal(c.parameter, pri, binding, lop.method, env) ^? { case v if c.ast == v => c }
       case _: JRefType | _: JWildcard | _: MetaVariableRef => LParser.failure("type name cannot be used in a literal")
       case _: MetaValueWildcard                            => LParser.failure("meta value wildcard cannot be placed in operator pattern")
     }
 
-    private def rep0 (param: JParameter, binding: Map[String, MetaArgument]) = {
+    private def rep0 (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument]) = {
       LParser.repeat0((binding, List.empty[IRExpression])) {
-        case ((b, l)) => literal(param, b, lop.method, env) ^^ { arg => (bind(param, arg, b), l :+ arg) }
+        case ((b, l)) => literal(param, pri, b, lop.method, env) ^^ { arg => (bind(param, arg, b), l :+ arg) }
       }
     }
 
-    private def rep1 (param: JParameter, binding: Map[String, MetaArgument]) = {
+    private def rep1 (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument]) = {
       LParser.repeat1((binding, List.empty[IRExpression])) {
-        case ((b, l)) => literal(param, b, lop.method, env) ^^ { arg => (bind(param, arg, b), l :+ arg) }
+        case ((b, l)) => literal(param, pri, b, lop.method, env) ^^ { arg => (bind(param, arg, b), l :+ arg) }
       }
     }
   }
@@ -510,21 +510,21 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
       }
     }
 
-    def metaExpression (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[MetaArgument] = {
+    def metaExpression (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[MetaArgument] = {
       expected(param, binding, procedure).map { expectedType =>
         if (compiler.typeLoader.typeType.contains(expectedType)) TypeParsers(environment.resolver).metaValue
-        else expressionParser(param, binding, expectedType, priority(param, procedure, environment), environment).map(ConcreteMetaValue(_, param))
+        else expressionParser(param, binding, expectedType, priority(pri, procedure, environment), environment).map(ConcreteMetaValue(_, param))
       }.getOrElse {
         HParser.failure("fail to parse meta expression")
       }
     }
 
-    def expression (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[IRExpression] = {
-      expressionParser(param, binding, procedure, priority(param, procedure, environment), environment)
+    def expression (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[IRExpression] = {
+      expressionParser(param, binding, procedure, priority(pri, procedure, environment), environment)
     }
 
-    def literal (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): LParser[IRExpression] = {
-      literalParser(param, binding, procedure, priority(param, procedure, environment), environment)
+    def literal (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): LParser[IRExpression] = {
+      literalParser(param, binding, procedure, priority(pri, procedure, environment), environment)
     }
 
     def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
@@ -564,8 +564,8 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
       unbound(param.genericType.unbound(binding).toList, binding, procedure).flatMap(param.genericType.bind)
     }
 
-    private def priority (param: JParameter, procedure: JProcedure, environment: Environment): Option[JPriority] = {
-      param.priority.orElse(procedure.syntax.flatMap(syntax => environment.nextPriority(syntax.priority)))
+    private def priority (pri: Option[JPriority], procedure: JProcedure, environment: Environment): Option[JPriority] = {
+      pri.orElse(procedure.syntax.flatMap(syntax => environment.nextPriority(syntax.priority)))
     }
 
     private def unbound (names: List[String], binding: Map[String, MetaArgument], procedure: JProcedure): Option[Map[String, MetaArgument]] = names match {

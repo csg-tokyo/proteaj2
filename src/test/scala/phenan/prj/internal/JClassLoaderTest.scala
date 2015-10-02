@@ -74,7 +74,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
     val varClass = clazz.get.asInstanceOf[JLoadedClass]
 
     varClass.signature shouldBe
-      JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, None, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), None, Nil)), JTypeSignature.objectTypeSig, Nil)
+      JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), JTypeSignature.objectTypeSig, Nil)
 
     varClass.isContext shouldBe true
   }
@@ -99,6 +99,6 @@ class JClassLoaderTest extends FunSuite with Matchers {
     method.syntax.get.priority shouldBe JPriority(SimpleClassTypeSignature("test/Var", Nil), "setter")
 
     val pattern = method.syntax.get.syntax
-    pattern shouldBe List(JMetaValueRefDef("id"), JOperatorNameDef("="), JOperandDef)
+    pattern shouldBe List(JMetaValueRefDef("id", None), JOperatorNameDef("="), JOperandDef(None))
   }
 }

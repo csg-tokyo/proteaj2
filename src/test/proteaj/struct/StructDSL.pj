@@ -5,13 +5,13 @@ dsl StructDSL {
     p0 < p1
   }
 
-  <sName: Identifier[p0], T1, name1: Identifier[p0], T2, name2: Identifier[p0]>
+  <sName: Identifier, T1, name1: Identifier, T2, name2: Identifier>
     void[p1] "val" sName "=" "struct" "{" T1 name1 "=" _ T2 name2 "=" _ "}" (T1 v1, T2 v2) activates Struct2Context<sName, T1, name1, T2, name2>
   {
     activate new Struct2Context<sName, T1, name1, T2, name2>(v1, v2);
   }
 
-  <sName: Identifier[p0], T1, name1: Identifier[p0], T2, name2: Identifier[p0]>
+  <sName: Identifier, T1, name1: Identifier, T2, name2: Identifier>
       void[p1] "var" sName "=" "struct" "{" _ ":" name1 _ ":" name2 "}" (T1 v1, T2 v2) activates Struct2Context<sName, T1, name1, T2, name2>
     {
       activate new Struct2Context<sName, T1, name1, T2, name2>(v1, v2);

@@ -132,8 +132,8 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val formalParameters = '(' ~> formalParameter.*(',') <~ ')'
 
-  lazy val formalParameter = modifiers ~ parameterType ~ priority ~ dots ~ identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {
-    case mods ~ pt ~ pri ~ ds ~ name ~ dim ~ init => FormalParameter(mods, pt, pri, ds, name, dim, init)
+  lazy val formalParameter = modifiers ~ parameterType ~ dots ~ identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {
+    case mods ~ pt ~ ds ~ name ~ dim ~ init => FormalParameter(mods, pt, ds, name, dim, init)
   }
 
   lazy val declarator = identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {
@@ -145,12 +145,14 @@ object DeclarationParsers extends TwoLevelParsers {
   lazy val operatorName = elem[StrLiteral].^ ^^ { lit => OperatorName(lit.value) }
   lazy val regexName = (underscore ~> elem('%')).^ ~> elem[StrLiteral].^ ^^ { lit => RegexName(lit.value) }
 
-  lazy val optionalOperand = (underscore ~> elem('?')).^ ^^^ OptionalOperand
-  lazy val repetition0 = (underscore ~> elem('*')).^ ^^^ Repetition0
-  lazy val repetition1 = (underscore ~> elem('+')).^ ^^^ Repetition1
-  lazy val operand = underscore.^ ^^^ Operand
+  lazy val optionalOperand = (underscore ~> elem('?')).^ ~> priority ^^ OptionalOperand
+  lazy val repetition0 = (underscore ~> elem('*')).^ ~> priority ^^ Repetition0
+  lazy val repetition1 = (underscore ~> elem('+')).^ ~> priority ^^ Repetition1
+  lazy val operand = underscore.^ ~> priority ^^ Operand
 
-  lazy val metaValueRef = identifier ^^ { id => MetaValueRef(id) }
+  lazy val metaValueRef = identifier ~ priority ^^ {
+    case id ~ pri => MetaValueRef(id, pri)
+  }
 
   lazy val andPredicate = ('&' ~> typeName) ~ priority ^^ {
     case t ~ p => AndPredicate(t, p)
@@ -222,8 +224,8 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val metaParameter = metaValueParameter | typeParameter
 
-  lazy val metaValueParameter = identifier ~ ( ':' ~> typeName ) ~ priority ^^ {
-    case name ~ metaType ~ pri => MetaValueParameter(name, metaType, pri)
+  lazy val metaValueParameter = identifier ~ ( ':' ~> typeName ) ^^ {
+    case name ~ metaType => MetaValueParameter(name, metaType)
   }
 
   lazy val typeParameter = identifier ~ ( "extends" ~> typeName.+('&') ).? ^^ {

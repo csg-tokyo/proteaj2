@@ -753,15 +753,15 @@ trait IROperator extends IRProcedure {
   }
 
   lazy val pattern = operatorAST.syntax map {
-    case OperatorName(n) => JOperatorNameDef(n)
-    case RegexName(n)    => JRegexNameDef(n)
-    case MetaValueRef(n) => JMetaValueRefDef(n)
-    case Operand         => JOperandDef
-    case Repetition0     => JRepetition0Def
-    case Repetition1     => JRepetition1Def
-    case OptionalOperand => JOptionalOperandDef
-    case AndPredicate(t, p) => JAndPredicateDef(predicateSignature(t, p))
-    case NotPredicate(t, p) => JNotPredicateDef(predicateSignature(t, p))
+    case OperatorName(n)    => JOperatorNameDef(n)
+    case RegexName(n)       => JRegexNameDef(n)
+    case MetaValueRef(n, p) => JMetaValueRefDef(n, p.flatMap(resolver.priority))
+    case Operand(p)         => JOperandDef(p.flatMap(resolver.priority))
+    case Repetition0(p)     => JRepetition0Def(p.flatMap(resolver.priority))
+    case Repetition1(p)     => JRepetition1Def(p.flatMap(resolver.priority))
+    case OptionalOperand(p) => JOptionalOperandDef(p.flatMap(resolver.priority))
+    case AndPredicate(t, p) => JAndPredicateDef(predicateSignature(t), p.flatMap(resolver.priority))
+    case NotPredicate(t, p) => JNotPredicateDef(predicateSignature(t), p.flatMap(resolver.priority))
   }
 
   lazy val operatorBody = operatorAST.body.flatMap { src =>
@@ -773,9 +773,8 @@ trait IROperator extends IRProcedure {
     }
   }
 
-  private def predicateSignature (t: TypeName, p: Option[QualifiedName]): JParameterSignature = {
-    val sig = state.successOrError(resolver.typeSignature(t), "invalid predicate type : " + t, VoidTypeSignature)
-    JParameterSignature(Nil, sig, p.flatMap(resolver.priority), false, None)
+  private def predicateSignature (t: TypeName): JTypeSignature = {
+    state.successOrError(resolver.typeSignature(t), "invalid predicate type : " + t, VoidTypeSignature)
   }
 }
 

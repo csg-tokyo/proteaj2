@@ -7,6 +7,5 @@ import java.lang.annotation.*;
 public @interface MetaParameter {
   String name ();
   String type() default "Lproteaj/lang/Type;";
-  Priority[] priority () default {};
   String[] bounds() default {};
 }
