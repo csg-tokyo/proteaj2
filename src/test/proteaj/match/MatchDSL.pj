@@ -15,13 +15,13 @@ dsl MatchDSL {
     }
     return null;
   }
-  <T, R> Case0<T, R> [case] _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
+  <T, R> Case0<T, R> [case] "|" _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
     return new Case0<T, R> (m, new DelayedApplication<Lazy, R>(f, new Lazy()));
   }
-  <T, A, name: Identifier, R> Case1<T, A, name, R> [case] _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> ~> R f ) {
+  <T, A, name: Identifier, R> Case1<T, A, name, R> [case] "|" _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> ~> R f ) {
     return new Case1<T, A, name, R> (m, f);
   }
-  <T, R> DefaultCase<T, R> [case] "_" "=>" _ ( Lazy ~> R f ) {
+  <T, R> DefaultCase<T, R> [case] "|" "_" "=>" _ ( Lazy ~> R f ) {
     return new DefaultCase<T, R> (new DelayedApplication<Lazy, R>(f, new Lazy()));
   }
 

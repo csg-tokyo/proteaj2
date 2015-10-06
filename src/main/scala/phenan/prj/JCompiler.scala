@@ -4,7 +4,7 @@ import java.io._
 
 import phenan.prj.body.BodyCompiler
 import phenan.prj.declaration.DeclarationCompiler
-import phenan.prj.generator.{JavaClassFileGenerator, JavaCodeGenerators}
+import phenan.prj.generator.JavaClassFileGenerator
 import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.state._
@@ -31,7 +31,7 @@ class JCompiler (val state: JState) {
     for (module <- ir.modules) modules += (module.internalName -> module)
   }
 
-  def findIR (name: String): Option[IRModule] = compiled.get(name).orElse(modules.get(name))
+  def findIR (name: String): Option[IRModule] = modules.get(name)
 
   val unifier = new Unifier(this)
   val classLoader: JClassLoader = new JClassLoaderImpl(this)
@@ -41,7 +41,6 @@ class JCompiler (val state: JState) {
 
   private val files: mutable.MutableList[IRFile] = mutable.MutableList.empty
   private var modules: Map[String, IRModule] = Map.empty
-  private var compiled: Map[String, IRModule] = Map.empty
 }
 
 object JCompiler {

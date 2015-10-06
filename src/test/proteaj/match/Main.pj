@@ -6,9 +6,9 @@ import dsl StringMatcherDSL;
 public class Main {
   public static void main (String[] args) {
     String s = "bab" match {
-      "b" ~ name => name
-      starts with "a" => "starts with a"
-      x => x
+      | "b" ~ name => name
+      | starts with "a" => "starts with a"
+      | x => x
     };
     System.out.println(s);
   }

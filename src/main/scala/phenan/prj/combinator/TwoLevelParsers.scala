@@ -33,26 +33,16 @@ trait TwoLevelParsers {
     def success [T] (t: => T): HParser[T] = Impl.HParserImpl(Impl.success(t))
     def failure (msg: => String): HParser[Nothing] = Impl.HParserImpl(Impl.failure(msg))
 
-    def repeat0[T](z: T)(f: T => HParser[T]): HParser[T] = repeat_helper(success(z), f)
-    def repeat1[T](z: T)(f: T => HParser[T]): HParser[T] = repeat_helper(f(z), f)
-
     // workaround for avoiding infinite loop of lazy initialization
     def ref [T] (parser: => HParser[T]): HParser[T] = new Impl.HParserRef[T](parser)
-
-    private def repeat_helper[T](parser: HParser[T], f: T => HParser[T]): HParser[T] = parser >> f | parser
   }
 
   object LParser {
     def success [T] (t: => T): LParser[T] = Impl.LParserImpl(Impl.success(t))
     def failure (msg: => String): LParser[Nothing] = Impl.LParserImpl(Impl.failure(msg))
 
-    def repeat0[T](z: T)(f: T => LParser[T]): LParser[T] = repeat_helper(success(z), f)
-    def repeat1[T](z: T)(f: T => LParser[T]): LParser[T] = repeat_helper(f(z), f)
-
     // workaround for avoiding infinite loop of lazy initialization
     def ref [T] (parser: => LParser[T]): LParser[T] = new Impl.LParserRef[T](parser)
-
-    private def repeat_helper[T](parser: LParser[T], f: T => LParser[T]): LParser[T] = parser >> f | parser
   }
 
   trait HParser[+T] {
