@@ -162,7 +162,7 @@ class Unifier (compiler: JCompiler) {
     def check (unb: JUnboundTypeVariable, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = None
     def check (unb: JUnboundTypeVariable, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = unb.boundHead.flatMap(TypeUnifier.check(_, cts, args))
     def check (unb: JUnboundTypeVariable, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = unb.boundHead.flatMap(TypeUnifier.check(_, ats, args))
-    def check (unb: JUnboundTypeVariable, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = unb.boundHead.flatMap(TypeUnifier.check(_, tvs, args))
+    def check (unb: JUnboundTypeVariable, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(unb, tvs, args)
     def check (unb: JUnboundTypeVariable, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = unb.boundHead.flatMap(TypeUnifier.check(_, cws, args))
     def check (unb: JUnboundTypeVariable, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = wld match {
       case WildcardArgument(ub, None) => unb.boundHead.flatMap(TypeUnifier.check(_, ub.getOrElse(JTypeSignature.objectTypeSig), args))
@@ -203,7 +203,7 @@ class Unifier (compiler: JCompiler) {
 
     private def typeVariableSignature (mv: MetaArgument, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = {
       if (args.contains(tvs.name)) {
-        if (mv == args(tvs.name)) Some(args)
+        if (mv.matches(args(tvs.name))) Some(args)
         else None
       }
       else Some(args + (tvs.name -> mv))

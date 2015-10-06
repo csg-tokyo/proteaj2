@@ -4,20 +4,50 @@ import java.util.*;
 import java.util.function.*;
 
 dsl MatchDSL {
-  <T, R> R _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
+  priority match, case, matcher, var, id {
+    id < var < matcher < case < match
+  }
+
+  <T, R> R [match] _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
     for (Case<T, R> c : cases) {
       Optional<R> result = c.apply(t);
       if (result.isPresent()) return result.get();
     }
     return null;
   }
-  <T, R> Case0<T, R> "case" _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
+  <T, R> Case0<T, R> [case] _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
     return new Case0<T, R> (m, new DelayedApplication<Lazy, R>(f, new Lazy()));
   }
-  <T, R> DefaultCase<T, R> "_" "=>" _ ( Lazy ~> R f ) {
+  <T, A, name: Identifier, R> Case1<T, A, name, R> [case] _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> ~> R f ) {
+    return new Case1<T, A, name, R> (m, f);
+  }
+  <T, R> DefaultCase<T, R> [case] "_" "=>" _ ( Lazy ~> R f ) {
     return new DefaultCase<T, R> (new DelayedApplication<Lazy, R>(f, new Lazy()));
   }
+
+  <T, name: Identifier> Matcher1<T, T, name> [var] name () {
+    return new VariablePattern<T, name> ();
+  }
+
+  Identifier[id] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+    return new Identifier(name);
+  }
+
   context Lazy {}
+  context Var <A, name: Identifier> {
+    Var (A a) { this.a = a; }
+    A [var] name () { return a; }
+    private A a;
+  }
+}
+
+dsl StringMatcherDSL {
+  Matcher0<String> [MatchDSL.matcher] "starts" "with" _ ( String prefix ) {
+    return new PrefixMatcher(prefix);
+  }
+  <A, name: Identifier> Matcher1<String, A, name> [MatchDSL.matcher] _ "~" _ ( String prefix, Matcher1<String, A, name> m ) {
+    return new PrefixedStringMatcher1<A, name>(prefix, m);
+  }
 }
 
 interface Case <T, R> {
@@ -39,6 +69,20 @@ class Case0 <T, R> implements Case<T, R> {
   private Supplier<R> supplier;
 }
 
+class Case1 <T, A, name: Identifier, R> implements Case<T, R> {
+  Case1 (Matcher1<T, A, name> m, Function<MatchDSL.Var<A, name>, R> f) {
+    this.matcher = m;
+    this.function = f;
+  }
+  public Optional<R> apply (T t) {
+    Optional<A> a = matcher.match(t);
+    if (a.isPresent()) return Optional.<R>of(function.apply(new MatchDSL.Var<A, name>(a.get())));
+    else return Optional.<R>empty();
+  }
+  private Matcher1<T, A, name> matcher;
+  private Function<MatchDSL.Var<A, name>, R> function;
+}
+
 class DefaultCase <T, R> implements Case<T, R> {
   DefaultCase (Supplier<R> s) {
     this.supplier = s;
@@ -53,6 +97,37 @@ interface Matcher0 <T> {
   boolean match (T t);
 }
 
+class PrefixMatcher implements Matcher0 <String> {
+  PrefixMatcher (String prefix) { this.prefix = prefix; }
+  public boolean match (String t) {
+    return t.startsWith(prefix);
+  }
+  private String prefix;
+}
+
+interface Matcher1 <T, A, name: Identifier> {
+  Optional<A> match (T t);
+}
+
+class PrefixedStringMatcher1 <A, name: Identifier> implements Matcher1 <String, A, name> {
+  PrefixedStringMatcher1 (String prefix, Matcher1 <String, A, name> rest) {
+    this.prefix = prefix;
+    this.rest = rest;
+  }
+  public Optional<A> match (String t) {
+    if (t.startsWith(prefix)) return rest.match(t.substring(prefix.length()));
+    else return Optional.<A>empty();
+  }
+  private String prefix;
+  private Matcher1 <String, A, name> rest;
+}
+
+class VariablePattern <T, name: Identifier> implements Matcher1 <T, T, name> {
+  public Optional<T> match (T t) {
+    return Optional.<T>of(t);
+  }
+}
+
 class DelayedApplication <T, R> implements Supplier<R> {
   DelayedApplication (Function<T, R> f, T t) {
     this.f = f;
@@ -63,4 +138,10 @@ class DelayedApplication <T, R> implements Supplier<R> {
   }
   private Function<T, R> f;
   private T t;
+}
+
+class Identifier {
+  public Identifier (String name) { this.name = name; }
+  public String getName() { return name; }
+  private String name;
 }

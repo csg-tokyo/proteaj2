@@ -3,6 +3,7 @@ package phenan.prj
 import phenan.prj.ir.IRExpression
 
 sealed trait MetaArgument {
+  def name: String
   def matches (v: MetaArgument): Boolean
 }
 
@@ -15,11 +16,13 @@ case class MetaVariableRef (name: String, valueType: JType) extends MetaValue {
 }
 
 case class ConcreteMetaValue (ast: IRExpression, parameter: JParameter) extends MetaValue {
+  def name = ast.toString
   def valueType: JType = parameter.compiler.state.someOrError(ast.staticType, "invalid meta value type", parameter.compiler.typeLoader.void)
   override def matches(v: MetaArgument): Boolean = this == v
 }
 
 case class MetaValueWildcard (valueType: JType) extends MetaValue {
+  def name = "?:" + valueType.name
   def matches(v: MetaArgument): Boolean = v match {
     case m: MetaValue => m.valueType <:< valueType
     case _: JWildcard | _: JRefType => false
@@ -41,6 +44,8 @@ case class JGenericType (signature: JTypeSignature, env: Map[String, MetaArgumen
     compiler.typeLoader.fromTypeSignature(signature, env ++ args)
   }
   def unbound (args: Map[String, MetaArgument]): Set[String] = unbound(signature, args, Set.empty[String])
+
+  override def toString: String = signature.toString + env.map { case (s, m) => s + " = " + m.name }.mkString("<", ",", ">")
 
   private def unbound (sig: JTypeSignature, args: Map[String, MetaArgument], result: Set[String]): Set[String] = sig match {
     case JTypeVariableSignature(name) if args.contains(name) || env.contains(name) => result
@@ -162,7 +167,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
 
   def name: String = {
     if (env.isEmpty) erase.name
-    else erase.name + env.map(kv => kv._1 + "=" + kv._2).mkString("<", ",", ">")
+    else erase.name + env.map(kv => kv._1 + "=" + kv._2.name).mkString("<", ",", ">")
   }
 
   def superType: Option[JObjectType] = compiler.typeLoader.fromClassTypeSignature(erase.signature.superClass, env)

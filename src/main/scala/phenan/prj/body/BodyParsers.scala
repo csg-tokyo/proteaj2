@@ -406,11 +406,11 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
         ma => constructParser(rest, binding + (name -> ma), operands)
       }
       case JMetaName(value, p) :: rest          => metaValue(value, p, binding) ~> constructParser(rest, binding, operands)
-      case JOperatorName(name) :: rest       => word(name).^ ~> constructParser(rest, binding, operands)
-      case JRegexName(name) :: rest          => regex(name).^ >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
+      case JOperatorName(name) :: rest          => word(name).^ ~> constructParser(rest, binding, operands)
+      case JRegexName(name) :: rest             => regex(name).^ >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
       case JAndPredicate(param, p) :: rest      => expression(param, p, binding, eop.method, env).& ~> constructParser(rest, binding, operands)
       case JNotPredicate(param, p) :: rest      => expression(param, p, binding, eop.method, env).! ~> constructParser(rest, binding, operands)
-      case Nil                               => HParser.success(eop.semantics(binding, operands.reverse))
+      case Nil                                  => HParser.success(eop.semantics(binding, operands.reverse))
     }
 
     private def metaValue (mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument]): HParser[MetaArgument] = mv match {
@@ -456,11 +456,11 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
         ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), operands)
       }
       case JMetaName(value, p) :: rest          => metaValue(value, p, binding) ~> constructParser(rest, binding, operands)
-      case JOperatorName(name) :: rest       => word(name) ~> constructParser(rest, binding, operands)
-      case JRegexName(name) :: rest          => regex(name) >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
+      case JOperatorName(name) :: rest          => word(name) ~> constructParser(rest, binding, operands)
+      case JRegexName(name) :: rest             => regex(name) >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
       case JAndPredicate(param, p) :: rest      => literal(param, p, binding, lop.method, env).& ~> constructParser(rest, binding, operands)
       case JNotPredicate(param, p) :: rest      => literal(param, p, binding, lop.method, env).! ~> constructParser(rest, binding, operands)
-      case Nil                               => LParser.success(lop.semantics(binding, operands.reverse))
+      case Nil                                  => LParser.success(lop.semantics(binding, operands.reverse))
     }
 
     private def metaValue (mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument]): LParser[MetaArgument] = mv match {
@@ -527,7 +527,9 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
       literalParser(param, binding, procedure, priority(pri, procedure, environment), environment)
     }
 
-    def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
+    def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = {
+      binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
+    }
 
     def defaultArgument (param: JParameter, procedure: JProcedure, environment: Environment) = for {
       name   <- param.defaultArg

@@ -1,11 +1,14 @@
 package match;
 
 import dsl MatchDSL;
+import dsl StringMatcherDSL;
 
 public class Main {
   public static void main (String[] args) {
-    String s = "a" match {
-      _ => "hello, world"
+    String s = "bab" match {
+      "b" ~ name => name
+      starts with "a" => "starts with a"
+      x => x
     };
     System.out.println(s);
   }
