@@ -126,9 +126,13 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val constraint = ascendingConstraint | descendingConstraint
 
-  lazy val ascendingConstraint = qualifiedName.+('<')
+  lazy val ascendingConstraint = ( qualifiedName <~ '<' ) ~ qualifiedName.+('<') ^^ {
+    case head ~ tail => head :: tail
+  }
 
-  lazy val descendingConstraint = qualifiedName.+('>') ^^ { _.reverse }
+  lazy val descendingConstraint = ( qualifiedName <~ '>' ) ~ qualifiedName.+('>') ^^ {
+    case head ~ tail => ( head :: tail ).reverse
+  }
 
   lazy val formalParameters = '(' ~> formalParameter.*(',') <~ ')'
 

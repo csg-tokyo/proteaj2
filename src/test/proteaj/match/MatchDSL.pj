@@ -5,7 +5,7 @@ import java.util.function.*;
 
 dsl MatchDSL {
   priority match, case, matcher, var, id {
-    id < var < matcher < case < match
+    match > case > matcher > var > id
   }
 
   <T, R> R [match] _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
@@ -45,7 +45,7 @@ dsl StringMatcherDSL {
   Matcher0<String> [MatchDSL.matcher] "starts" "with" _ ( String prefix ) {
     return new PrefixMatcher(prefix);
   }
-  <A, name: Identifier> Matcher1<String, A, name> [MatchDSL.matcher] _ "~" _ ( String prefix, Matcher1<String, A, name> m ) {
+  <A, name: Identifier> Matcher1<String, A, name> [MatchDSL.matcher] _ "~" _[MatchDSL.matcher] ( String prefix, Matcher1<String, A, name> m ) {
     return new PrefixedStringMatcher1<A, name>(prefix, m);
   }
 }
