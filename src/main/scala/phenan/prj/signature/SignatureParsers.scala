@@ -28,7 +28,7 @@ object SignatureParsers extends PackratParsers {
   private lazy val fieldType: PackratParser[JTypeSignature] = classType | arrayType | typeVariable
 
   private lazy val methodSignature = formalTypeParamList ~ ( '(' ~> parameterSignature.* <~ ')' ) ~ returnType ~ throwsType.* ^^ {
-    case typeParams ~ parameters ~ retType ~ throwsTypes => JMethodSignature(typeParams, parameters, retType, throwsTypes, Nil, Nil, Nil)
+    case typeParams ~ parameters ~ retType ~ throwsTypes => JMethodSignature(typeParams, parameters, retType, Nil, throwsTypes, Nil, Nil, Nil)
   }
 
   private lazy val parameterSignature = ( '@' ~> typeSignature ).* ~ typeSignature ~ ( '*'.? ^^ { _.nonEmpty } ) ~ ( '?' ~> identifier ).? ^^ {

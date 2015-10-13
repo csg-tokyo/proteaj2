@@ -481,6 +481,7 @@ trait IRProcedure extends JMethodDef with IRMember {
 
   protected def modifiersAST: List[Modifier]
   protected def returnTypeAST: Option[TypeName]
+  protected def returnBoundsAST: List[TypeName]
   protected def metaParametersAST: List[MetaParameter]
   protected def formalParametersAST: List[FormalParameter]
   protected def clausesAST: List[MethodClause]
@@ -569,7 +570,7 @@ trait IRProcedure extends JMethodDef with IRMember {
   }
 
   private def constructSignature (metaParams: List[FormalMetaParameter], formalParameters: List[IRFormalParameter], resolver: NameResolver): JMethodSignature = {
-    JMethodSignature(metaParams, getFormalParameterSignatures(formalParameters, Nil), returnSignature(resolver),
+    JMethodSignature(metaParams, getFormalParameterSignatures(formalParameters, Nil), returnSignature(resolver), returnBoundSignatures(resolver),
       readClause("throws", { case ThrowsClause(es) => es }, resolver), readClause("activates", { case ActivatesClause(es) => es }, resolver),
       readClause("deactivates", { case DeactivatesClause(es) => es }, resolver), readClause("requires", { case RequiresClause(es) => es }, resolver))
   }
@@ -590,6 +591,18 @@ trait IRProcedure extends JMethodDef with IRMember {
       case Failure(e) => state.errorAndReturn("invalid return type : " + t, e, VoidTypeSignature)
     }
   }.getOrElse(VoidTypeSignature)
+
+  private def returnBoundSignatures (resolver: NameResolver): List[JTypeSignature] = returnBoundSignatures(resolver, returnBoundsAST, Nil)
+
+  private def returnBoundSignatures (resolver: NameResolver, asts: List[TypeName], result: List[JTypeSignature]): List[JTypeSignature] = asts match {
+    case bound :: rest => resolver.typeSignature(bound) match {
+      case Success(s) => returnBoundSignatures(resolver, rest, s :: result)
+      case Failure(e) =>
+        state.error("invalid return bound : " + bound, e)
+        returnBoundSignatures(resolver, rest, result)
+    }
+    case Nil => result.reverse
+  }
 
   private def readClause (name: String, reader: PartialFunction[MethodClause, List[TypeName]], resolver: NameResolver): List[JTypeSignature] = clausesAST.collectFirst(reader).map(readClause(name, _, Nil, resolver)).getOrElse(Nil)
 
@@ -623,6 +636,7 @@ trait IRMethod extends IRProcedure {
   protected def modifiersAST: List[Modifier] = methodAST.modifiers
   protected def metaParametersAST: List[MetaParameter] = methodAST.metaParameters
   protected def returnTypeAST: Option[TypeName] = Some(methodAST.returnType)
+  protected def returnBoundsAST: List[TypeName] = methodAST.returnBounds
   protected def formalParametersAST: List[FormalParameter] = methodAST.formalParameters
   protected def clausesAST: List[MethodClause] = methodAST.clauses
 
@@ -656,6 +670,7 @@ trait IRConstructor extends IRProcedure {
   protected def modifiersAST: List[Modifier] = constructorAST.modifiers
   protected def metaParametersAST: List[MetaParameter] = constructorAST.metaParameters
   protected def returnTypeAST: Option[TypeName] = None
+  protected def returnBoundsAST: List[TypeName] = Nil
   protected def formalParametersAST: List[FormalParameter] = constructorAST.formalParameters
   protected def clausesAST: List[MethodClause] = constructorAST.clauses
 
@@ -687,6 +702,7 @@ trait IRInstanceInitializer extends IRProcedure {
   protected def modifiersAST: List[Modifier] = Nil
   protected def metaParametersAST: List[MetaParameter] = Nil
   protected def returnTypeAST: Option[TypeName] = None
+  protected def returnBoundsAST: List[TypeName] = Nil
   protected def formalParametersAST: List[FormalParameter] = Nil
   protected def clausesAST: List[MethodClause] = Nil
 
@@ -712,6 +728,7 @@ trait IRStaticInitializer extends IRProcedure {
   protected def modifiersAST: List[Modifier] = Nil
   protected def metaParametersAST: List[MetaParameter] = Nil
   protected def returnTypeAST: Option[TypeName] = None
+  protected def returnBoundsAST: List[TypeName] = Nil
   protected def formalParametersAST: List[FormalParameter] = Nil
   protected def clausesAST: List[MethodClause] = Nil
 
@@ -738,6 +755,7 @@ trait IROperator extends IRProcedure {
   protected def modifiersAST: List[Modifier] = operatorAST.modifiers
   protected def metaParametersAST: List[MetaParameter] = operatorAST.metaParameters
   protected def returnTypeAST: Option[TypeName] = Some(operatorAST.returnType)
+  protected def returnBoundsAST: List[TypeName] = operatorAST.returnBounds
   protected def formalParametersAST: List[FormalParameter] = operatorAST.formalParameters
   protected def clausesAST: List[MethodClause] = operatorAST.clauses
 
@@ -798,7 +816,7 @@ case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: 
 sealed trait IRSyntheticMethod extends JMethodDef with IRMember {
   def mod: JModifier = JModifier(modifiers)
   def syntax: Option[JSyntaxDef] = None
-  def signature: JMethodSignature = JMethodSignature(metaParameters, parameterSignatures, returnTypeSignature, Nil, Nil, Nil, Nil)
+  def signature: JMethodSignature = JMethodSignature(metaParameters, parameterSignatures, returnTypeSignature, Nil, Nil, Nil, Nil, Nil)
   
   protected def modifiers: Int
   protected def metaParameters: List[FormalMetaParameter]

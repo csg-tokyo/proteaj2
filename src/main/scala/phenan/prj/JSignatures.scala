@@ -12,10 +12,11 @@ object JClassSignature {
   }
 }
 
-case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: List[JParameterSignature], returnType: JTypeSignature, throwTypes: List[JTypeSignature],
-                            activates: List[JTypeSignature], deactivates: List[JTypeSignature], requires: List[JTypeSignature]) {
+case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: List[JParameterSignature], returnType: JTypeSignature,
+                             returnBounds: List[JTypeSignature], throwTypes: List[JTypeSignature],
+                             activates: List[JTypeSignature], deactivates: List[JTypeSignature], requires: List[JTypeSignature]) {
   def throws (es: List[String]): JMethodSignature = {
-    if (es.nonEmpty) JMethodSignature(metaParams, parameters, returnType, throwTypes ++ es.map(name => SimpleClassTypeSignature(name, Nil)), activates, deactivates, requires)
+    if (es.nonEmpty) JMethodSignature(metaParams, parameters, returnType, returnBounds, throwTypes ++ es.map(name => SimpleClassTypeSignature(name, Nil)), activates, deactivates, requires)
     else this
   }
 }

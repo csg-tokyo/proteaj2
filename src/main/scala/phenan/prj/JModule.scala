@@ -189,7 +189,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
     def syntax: Option[JSyntaxDef] = None
     def declaringClass: JClass = erase
     def name: String = CommonNames.constructorName
-    def signature: JMethodSignature = JMethodSignature(Nil, Nil, VoidTypeSignature, Nil, Nil, Nil, Nil)
+    def signature: JMethodSignature = JMethodSignature(Nil, Nil, VoidTypeSignature, Nil, Nil, Nil, Nil, Nil)
     def mod: JModifier = JModifier(JModifier.accPublic)
   }, env, this)
 

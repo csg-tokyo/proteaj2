@@ -619,6 +619,7 @@ object JavaReprGenerator {
       mkAnnotation(methodSigClassName) (
         "metaParameters" -> array(sig.metaParams.map(metaParameterAnnotation).map(elementAnnotation)),
         "returnType" -> strLit(sig.returnType.toString),
+        "returnBounds" -> array(sig.returnBounds.map(s => strLit(s.toString))),
         "parameters" -> array(sig.parameters.map(p => strLit(p.toString))),
         "throwsTypes" -> array(sig.throwTypes.map(s => strLit(s.toString))),
         "activates" -> array(sig.activates.map(s => strLit(s.toString))),

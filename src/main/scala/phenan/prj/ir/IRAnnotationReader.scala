@@ -38,12 +38,13 @@ class IRAnnotationReader (file: IRFile) {
   private lazy val methodSignatureAnnotation: IRAnnotation =?> JMethodSignature = for {
     metaParams  <- array("metaParameters")(elementAnnotation(metaParamClassName, metaParameterAnnotation))
     retType     <- required("returnType")(typeSignature)
+    retBounds   <- array("returnBounds")(typeSignature)
     parameters  <- array("parameters")(parameterSignature)
     exceptions  <- array("throwsTypes")(typeSignature)
     activates   <- array("activates")(typeSignature)
     deactivates <- array("deactivates")(typeSignature)
     requires    <- array("requires")(typeSignature)
-  } yield JMethodSignature(metaParams, parameters, retType, exceptions, activates, deactivates, requires)
+  } yield JMethodSignature(metaParams, parameters, retType, retBounds, exceptions, activates, deactivates, requires)
 
   private lazy val fieldSignatureAnnotation: IRAnnotation =?> JTypeSignature = required("value")(typeSignature)
 

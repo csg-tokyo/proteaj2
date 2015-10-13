@@ -7,6 +7,7 @@ import java.lang.annotation.*;
 public @interface MethodSig {
   MetaParameter[] metaParameters() default {};
   String returnType();
+  String[] returnBounds() default {};
   String[] parameters();
   String[] throwsTypes() default {};
   String[] activates() default {};

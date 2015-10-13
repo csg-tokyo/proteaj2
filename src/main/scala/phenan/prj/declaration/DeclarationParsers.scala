@@ -104,8 +104,8 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val staticInitializer = "static" ~> block ^^ StaticInitializer
 
-  lazy val methodDeclaration = modifiers ~ metaParameters ~ typeName ~ identifier ~ formalParameters ~ clause.* ~ methodBody ^^ {
-    case mods ~ mps ~ ret ~ name ~ params ~ clauses ~ body => MethodDeclaration(mods, mps, ret, name, params, clauses, body)
+  lazy val methodDeclaration = modifiers ~ metaParameters ~ typeName ~ returnBound.* ~ identifier ~ formalParameters ~ clause.* ~ methodBody ^^ {
+    case mods ~ mps ~ ret ~ bounds ~ name ~ params ~ clauses ~ body => MethodDeclaration(mods, mps, ret, bounds, name, params, clauses, body)
   }
 
   lazy val fieldDeclaration = modifiers ~ typeName ~ declarator.+(',') <~ ';' ^^ {
@@ -116,8 +116,8 @@ object DeclarationParsers extends TwoLevelParsers {
     case mods ~ tn ~ name ~ dim ~ default => AnnotationElementDeclaration(mods, tn, name, dim, default)
   }
 
-  lazy val operatorDeclaration = ( identifier <~ ':' ).? ~ modifiers ~ metaParameters ~ typeName ~ priority ~ syntaxElement.+ ~ formalParameters ~ clause.* ~ methodBody ^^ {
-    case label ~ mods ~ mps ~ tn ~ pri ~ syn ~ params ~ clauses ~ body => OperatorDeclaration(label, mods, mps, tn, pri, syn, params, clauses, body)
+  lazy val operatorDeclaration = ( identifier <~ ':' ).? ~ modifiers ~ metaParameters ~ typeName ~ returnBound.* ~ priority ~ syntaxElement.+ ~ formalParameters ~ clause.* ~ methodBody ^^ {
+    case label ~ mods ~ mps ~ tn ~ bounds ~ pri ~ syn ~ params ~ clauses ~ body => OperatorDeclaration(label, mods, mps, tn, bounds, pri, syn, params, clauses, body)
   }
 
   lazy val prioritiesDeclaration = ("priority" | "priorities") ~> identifier.*(',') ~ ( '{' ~> constraint.*(';') <~ '}' ) ^^ {
@@ -217,6 +217,8 @@ object DeclarationParsers extends TwoLevelParsers {
   lazy val contextualType = ( typeName <~ ( elem('~') ~> elem('>') ).^ ) ~ parameterType ^^ {
     case ct ~ pt => ContextualType(ct, pt)
   }
+
+  lazy val returnBound: HParser[TypeName] = '^' ~> typeName
 
   lazy val typeName: HParser[TypeName] = className ~ typeArguments ~ emptyBrackets ^^ {
     case name ~ args ~ dim => TypeName(name, args, dim)
