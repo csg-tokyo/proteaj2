@@ -5,6 +5,12 @@ import phenan.prj._
 import scalaz.Memo._
 
 class DSLEnvironment (dsls: List[JClassModule], contexts: List[IRContextRef], compiler: JCompiler) {
+  def changeContext (activated: List[IRContextRef], deactivated: List[IRContextRef]): DSLEnvironment = {
+    val cs = activated ++ contexts.diff(deactivated)
+    if (cs == contexts) this
+    else new DSLEnvironment(dsls, cs, compiler)
+  }
+
   def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = expressionOperatorsMap(expected).getOrElse(priority, Nil)
   def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = literalOperatorsMap(expected).getOrElse(priority, Nil)
 

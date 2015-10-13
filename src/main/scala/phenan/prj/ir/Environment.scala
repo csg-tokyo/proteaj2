@@ -5,7 +5,6 @@ import phenan.prj._
 trait Environment {
   def clazz: IRModule
   def thisType: Option[JObjectType]
-  def contexts: List[IRContextRef]
   def activateTypes: List[JRefType]
   def locals: Map[String, IRLocalVariableRef]
   def exceptions: List[JRefType]
@@ -77,9 +76,7 @@ trait Environment_Contexts extends ChildEnvironment {
   def activated: List[IRContextRef]
   def deactivated: List[IRContextRef]
 
-  val contexts: List[IRContextRef] = activated ++ parent.contexts.diff(deactivated)
-
-  val dslEnvironment = new DSLEnvironment(fileEnvironment.dsls, contexts, clazz.compiler)
+  val dslEnvironment = parent.dslEnvironment.changeContext(activated, deactivated)
 }
 
 case class Environment_Method (procedure: IRProcedure, parent: Environment) extends Environment_Variables with Environment_Contexts {
@@ -92,7 +89,6 @@ case class Environment_Method (procedure: IRProcedure, parent: Environment) exte
 }
 
 case class Environment_LocalVariables (variables: List[(JType, String)], parent: Environment) extends Environment_Variables {
-  def contexts: List[IRContextRef] = parent.contexts
   def dslEnvironment = parent.dslEnvironment
   def activateTypes = parent.activateTypes
   def exceptions: List[JRefType] = parent.exceptions
