@@ -34,6 +34,7 @@ class JCompiler (val state: JState) {
   def findIR (name: String): Option[IRModule] = modules.get(name)
 
   val unifier = new Unifier(this)
+  val operatorPool = new OperatorPool(this)
   val classLoader: JClassLoader = new JClassLoaderImpl(this)
   val typeLoader: JTypeLoader = new JTypeLoader(this)
   val declarationCompiler = new DeclarationCompiler(this)

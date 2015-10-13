@@ -24,6 +24,7 @@ trait JProcedure extends JMember {
 
   lazy val metaParameters = methodDef.signature.metaParams.map(param => param.name -> param).toMap
   lazy val returnType: JGenericType = JGenericType(methodDef.signature.returnType, env, compiler)
+  lazy val returnBounds: List[JGenericType] = methodDef.signature.returnBounds.map(sig => JGenericType(sig, env, compiler))
   lazy val parameterTypes: List[JParameter] = methodDef.signature.parameters.map(sig => JParameter(sig, env, compiler))
   lazy val exceptionTypes: List[JGenericType] = methodDef.signature.throwTypes.map(sig => JGenericType(sig, env, compiler))
 

@@ -2,8 +2,6 @@ package phenan.prj.ir
 
 import phenan.prj._
 
-import scalaz.Memo._
-
 trait Environment {
   def clazz: IRModule
   def thisType: Option[JObjectType]
@@ -12,12 +10,12 @@ trait Environment {
   def locals: Map[String, IRLocalVariableRef]
   def exceptions: List[JRefType]
   def fileEnvironment: FileEnvironment
+  def dslEnvironment: DSLEnvironment
   def resolver: NameResolver
 
-  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator]
-  def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator]
-
-  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]]
+  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = dslEnvironment.expressionOperators(expected, priority)
+  def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = dslEnvironment.literalOperators(expected, priority)
+  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = dslEnvironment.inferContexts(procedure, bind)
 
   def highestPriority: Option[JPriority] = fileEnvironment.priorities.headOption
   def nextPriority (priority: JPriority): Option[JPriority] = nextPriorities.get(priority)
@@ -48,10 +46,8 @@ sealed trait ModuleEnvironment extends Environment {
   def activateTypes = Nil
   def locals: Map[String, IRLocalVariableRef] = Map.empty
   def exceptions: List[JRefType] = Nil
-  def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = fileEnvironment.expressionOperators(expected, priority)
-  def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = fileEnvironment.literalOperators(expected, priority)
-  def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
-  private val inferencer = new MethodContextInferencer(clazz.compiler.unifier, Nil)
+
+  val dslEnvironment = new DSLEnvironment(fileEnvironment.dsls, contexts, clazz.compiler)
 }
 
 class Environment_Instance (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
@@ -83,50 +79,7 @@ trait Environment_Contexts extends ChildEnvironment {
 
   val contexts: List[IRContextRef] = activated ++ parent.contexts.diff(deactivated)
 
-  def expressionOperators (expected: JType, priority: JPriority): List[ExpressionOperator] = expressionOperators_cached(expected).getOrElse(priority, Nil)
-  def literalOperators (expected: JType, priority: JPriority): List[LiteralOperator] = literalOperators_cached(expected).getOrElse(priority, Nil)
-
-  def inferContexts (procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferencer.inferContexts(procedure, bind).map(_._1)
-
-  private val inferencer = new MethodContextInferencer(resolver.root.compiler.unifier, contexts)
-
-  private val expressionOperators_cached: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { t =>
-    val fromDSL = fileEnvironment.dslExpressionOperators(t).flatMap {
-      case (s, m, e) => inferencer.inferContexts(m, e).map {
-        case (cs, e2) => ExpressionOperator(s, e2, m, { (ma, args) => IRDSLOperation(m, ma, args, cs) })
-      }
-    }
-    val fromContexts = contexts.flatMap { c => collectOperators(c, t, c.contextType.expressionOperators) }.flatMap {
-      case (c, s, m, e) => inferencer.inferContexts(m, e).map {
-        case (cs, e2) => ExpressionOperator(s, e2, m, { (ma, args) => IRContextOperation(c, m, ma, args, cs) })
-      }
-    }
-    (fromDSL ++ fromContexts).groupBy(_.syntax.priority)
-  }
-
-  private val literalOperators_cached: JType => Map[JPriority, List[LiteralOperator]] = mutableHashMapMemo { t =>
-    val fromDSL = fileEnvironment.dslLiteralOperators(t).flatMap {
-      case (s, m, e) => inferencer.inferContexts(m, e).map {
-        case (cs, e2) => LiteralOperator(s, e2, m, { (ma, args) => IRDSLOperation(m, ma, args, cs) })
-      }
-    }
-    val fromContexts = contexts.flatMap(c => collectOperators(c, t, c.contextType.literalOperators)).flatMap {
-      case (c, s, m, e) => inferencer.inferContexts(m, e).map {
-        case (cs, e2) => LiteralOperator(s, e2, m, { (ma, args) => IRContextOperation(c, m, ma, args, cs) })
-      }
-    }
-    (fromDSL ++ fromContexts).groupBy(_.syntax.priority)
-  }
-
-  private def collectOperators [S <: JSyntax] (context: IRContextRef, expected: JType, operators: List[(S, JMethod)]): List[(IRContextRef, S, JMethod, Map[String, MetaArgument])] = collectOperators_helper (context, expected, operators, Nil)
-
-  private def collectOperators_helper [S <: JSyntax] (context: IRContextRef, expected: JType, operators: List[(S, JMethod)], result: List[(IRContextRef, S, JMethod, Map[String, MetaArgument])]): List[(IRContextRef, S, JMethod, Map[String, MetaArgument])] = operators match {
-    case (syntax, method) :: rest => resolver.root.compiler.unifier.unify(expected, method.returnType) match {
-      case Some(ma) => collectOperators_helper (context, expected, rest, (context, syntax, method, ma) :: result)
-      case None     => collectOperators_helper (context, expected, rest, result)
-    }
-    case Nil => result
-  }
+  val dslEnvironment = new DSLEnvironment(fileEnvironment.dsls, contexts, clazz.compiler)
 }
 
 case class Environment_Method (procedure: IRProcedure, parent: Environment) extends Environment_Variables with Environment_Contexts {
@@ -140,9 +93,7 @@ case class Environment_Method (procedure: IRProcedure, parent: Environment) exte
 
 case class Environment_LocalVariables (variables: List[(JType, String)], parent: Environment) extends Environment_Variables {
   def contexts: List[IRContextRef] = parent.contexts
-  def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = parent.expressionOperators(expected, priority)
-  def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = parent.literalOperators(expected, priority)
-  def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = parent.inferContexts(procedure, bind)
+  def dslEnvironment = parent.dslEnvironment
   def activateTypes = parent.activateTypes
   def exceptions: List[JRefType] = parent.exceptions
   def resolver: NameResolver = parent.resolver
@@ -154,6 +105,3 @@ case class Environment_LocalContexts (activated: List[IRContextRef], deactivated
   def exceptions: List[JRefType] = parent.exceptions
   def resolver: NameResolver = parent.resolver
 }
-
-case class ExpressionOperator (syntax: JExpressionSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression)
-case class LiteralOperator (syntax: JLiteralSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression)
