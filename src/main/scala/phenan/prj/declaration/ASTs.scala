@@ -40,7 +40,7 @@ case class InstanceInitializer (block: BlockSnippet) extends ClassMember
 case class StaticInitializer (block: BlockSnippet) extends ClassMember
 case class ConstructorDeclaration (modifiers: List[Modifier], metaParameters: List[MetaParameter], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: BlockSnippet) extends ClassMember with ContextMember
 case class FieldDeclaration (modifiers: List[Modifier], fieldType: TypeName, declarators: List[VariableDeclarator]) extends ClassMember with InterfaceMember with AnnotationMember with DSLMember with ContextMember
-case class MethodDeclaration (modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, returnBounds: List[TypeName], name: String, formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends ClassMember with InterfaceMember
+case class MethodDeclaration (modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, name: String, formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends ClassMember with InterfaceMember
 case class AnnotationElementDeclaration (modifiers: List[Modifier], elementType: TypeName, name: String, dim: Int, defaultValue: Option[AnnotationElement]) extends AnnotationMember
 case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, returnBounds: List[TypeName], priority: Option[QualifiedName], syntax: List[SyntaxElement], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends DSLMember with ContextMember
 case class PrioritiesDeclaration (names: List[String], constraints: List[List[QualifiedName]]) extends DSLMember
@@ -88,6 +88,7 @@ case object AbstractModifier extends Modifier
 case object StrictFPModifier extends Modifier
 case object PureModifier extends Modifier
 case object LiteralModifier extends Modifier
+case object ExactModifier extends Modifier
 
 sealed trait AnnotationElement
 sealed trait Annotation extends Modifier with AnnotationElement {

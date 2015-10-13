@@ -592,7 +592,10 @@ trait IRProcedure extends JMethodDef with IRMember {
     }
   }.getOrElse(VoidTypeSignature)
 
-  private def returnBoundSignatures (resolver: NameResolver): List[JTypeSignature] = returnBoundSignatures(resolver, returnBoundsAST, Nil)
+  private def returnBoundSignatures (resolver: NameResolver): List[JTypeSignature] = {
+    if (modifiersAST.contains(ExactModifier)) List(returnSignature(resolver))
+    else returnBoundSignatures(resolver, returnBoundsAST, Nil)
+  }
 
   private def returnBoundSignatures (resolver: NameResolver, asts: List[TypeName], result: List[JTypeSignature]): List[JTypeSignature] = asts match {
     case bound :: rest => resolver.typeSignature(bound) match {
@@ -636,7 +639,7 @@ trait IRMethod extends IRProcedure {
   protected def modifiersAST: List[Modifier] = methodAST.modifiers
   protected def metaParametersAST: List[MetaParameter] = methodAST.metaParameters
   protected def returnTypeAST: Option[TypeName] = Some(methodAST.returnType)
-  protected def returnBoundsAST: List[TypeName] = methodAST.returnBounds
+  protected def returnBoundsAST: List[TypeName] = Nil
   protected def formalParametersAST: List[FormalParameter] = methodAST.formalParameters
   protected def clausesAST: List[MethodClause] = methodAST.clauses
 

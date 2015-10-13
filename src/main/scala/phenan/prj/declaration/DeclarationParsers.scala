@@ -104,8 +104,8 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val staticInitializer = "static" ~> block ^^ StaticInitializer
 
-  lazy val methodDeclaration = modifiers ~ metaParameters ~ typeName ~ returnBound.* ~ identifier ~ formalParameters ~ clause.* ~ methodBody ^^ {
-    case mods ~ mps ~ ret ~ bounds ~ name ~ params ~ clauses ~ body => MethodDeclaration(mods, mps, ret, bounds, name, params, clauses, body)
+  lazy val methodDeclaration = modifiers ~ metaParameters ~ typeName ~ identifier ~ formalParameters ~ clause.* ~ methodBody ^^ {
+    case mods ~ mps ~ ret ~ name ~ params ~ clauses ~ body => MethodDeclaration(mods, mps, ret, name, params, clauses, body)
   }
 
   lazy val fieldDeclaration = modifiers ~ typeName ~ declarator.+(',') <~ ';' ^^ {
@@ -259,7 +259,8 @@ object DeclarationParsers extends TwoLevelParsers {
     "public" ^^^ PublicModifier | "private" ^^^ PrivateModifier | "protected" ^^^ ProtectedModifier |
       "static" ^^^ StaticModifier | "final" ^^^ FinalModifier | "synchronized" ^^^ SynchronizedModifier |
       "volatile" ^^^ VolatileModifier | "transient" ^^^ TransientModifier | "native" ^^^ NativeModifier |
-      "abstract" ^^^ AbstractModifier | "strictfp" ^^^ StrictFPModifier | "pure" ^^^ PureModifier | "literal" ^^^ LiteralModifier
+      "abstract" ^^^ AbstractModifier | "strictfp" ^^^ StrictFPModifier | "pure" ^^^ PureModifier |
+      "literal" ^^^ LiteralModifier | "exact" ^^^ ExactModifier
 
   lazy val annotation = fullAnnotation | singleElementAnnotation | markerAnnotation
 
