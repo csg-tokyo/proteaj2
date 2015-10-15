@@ -174,7 +174,7 @@ case class IRLocalVariableRef (localType: JType, name: String) extends IRLeftHan
   def deactivates: List[IRContextRef] = Nil
 }
 
-case class IRContextRef (contextType: JObjectType) extends IRExpression {
+case class IRContextRef private (contextType: JObjectType) extends IRExpression {
   def staticType = Some(contextType)
   def activates: List[IRContextRef] = Nil
   def deactivates: List[IRContextRef] = Nil
@@ -183,19 +183,9 @@ case class IRContextRef (contextType: JObjectType) extends IRExpression {
 object IRContextRef {
   def createRefs (gts: List[JGenericType], bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = createRefs(gts, bind, Nil)
 
-  def createRefsFromSignatures (ss: List[JTypeSignature], bind: Map[String, MetaArgument], compiler: JCompiler): Option[List[IRContextRef]] = createRefsFromSignatures(ss, bind, Nil, compiler)
-
   private def createRefs (gts: List[JGenericType], bind: Map[String, MetaArgument], refs: List[IRContextRef]): Option[List[IRContextRef]] = gts match {
     case gt :: rest => gt.bind(bind).collect { case obj: JObjectType => IRContextRef(obj) } match {
       case Some(ref) => createRefs(rest, bind, ref :: refs)
-      case None      => None
-    }
-    case Nil => Some(refs.reverse)
-  }
-
-  private def createRefsFromSignatures (ss: List[JTypeSignature], bind: Map[String, MetaArgument], refs: List[IRContextRef], compiler: JCompiler): Option[List[IRContextRef]] = ss match {
-    case sig :: rest => compiler.typeLoader.fromTypeSignature_RefType(sig, bind).collect { case obj: JObjectType => IRContextRef(obj)} match {
-      case Some(ref) => createRefsFromSignatures(rest, bind, ref :: refs, compiler)
       case None      => None
     }
     case Nil => Some(refs.reverse)
