@@ -3,14 +3,88 @@ package proteaj.lang;
 import proteaj.impl.*;
 
 @DSL(
-    priorities = { "mul", "add", "shift" },
+    priorities = { "mul", "add", "shift", "cmp", "eq" },
     constraints = @Constraint({
         @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "mul"),
         @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "add"),
-        @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "shift")
+        @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "shift"),
+        @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp"),
+        @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq")
     })
 )
 public class PredefOperators {
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq")),
+          @OpElem(kind = OpElemType.Name, name = "=="),
+          @OpElem(kind = OpElemType.Hole)
+      }
+  )
+  public static boolean equalsToInt (int a, int b) { return a == b; }
+
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq")),
+          @OpElem(kind = OpElemType.Name, name = "!="),
+          @OpElem(kind = OpElemType.Hole)
+      }
+  )
+  public static boolean notEqualsToInt (int a, int b) { return a != b; }
+
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp")),
+          @OpElem(kind = OpElemType.Name, name = "<"),
+          @OpElem(kind = OpElemType.Hole)
+      }
+  )
+  public static boolean lessThanInt (int a, int b) { return a < b; }
+
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp")),
+          @OpElem(kind = OpElemType.Name, name = "<="),
+          @OpElem(kind = OpElemType.Hole)
+      }
+  )
+  public static boolean lessThanOrEqualToInt (int a, int b) { return a <= b; }
+
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp")),
+          @OpElem(kind = OpElemType.Name, name = ">"),
+          @OpElem(kind = OpElemType.Hole)
+      }
+  )
+  public static boolean greaterThanInt (int a, int b) { return a > b; }
+
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp")),
+          @OpElem(kind = OpElemType.Name, name = ">="),
+          @OpElem(kind = OpElemType.Hole)
+      }
+  )
+  public static boolean greaterThanOrEqualToInt (int a, int b) { return a >= b; }
+
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "cmp")),
+          @OpElem(kind = OpElemType.Name, name = "is"),
+          @OpElem(kind = OpElemType.Name, name = "instance"),
+          @OpElem(kind = OpElemType.Name, name = "of"),
+          @OpElem(kind = OpElemType.Hole)
+      }
+  )
+  public static boolean isInstanceOf (Object obj, Class<?> clazz) { return clazz.isInstance(obj); }
+
   @Operator(
       priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "shift"),
       pattern = {
