@@ -31,6 +31,8 @@ case class IRNewExpression (metaArgs: Map[String, MetaArgument], constructor: JC
   lazy val throws: List[JType] = constructor.exceptionTypes.flatMap(_.bind(metaArgs))
 }
 
+case class IRAnonymousClass (metaArgs: Map[String, MetaArgument], baseType: JObjectType, args: List[IRExpression], requiredContexts: List[IRContextRef], members: List[IRClassMember])
+
 sealed trait IRExplicitConstructorCall
 
 case class IRThisConstructorCall (metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExplicitConstructorCall

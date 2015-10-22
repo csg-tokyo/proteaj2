@@ -182,6 +182,30 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
       case metaArgs ~ constructType => constructType.findConstructor(env.clazz).flatMap(constructorCall(metaArgs, _)).reduceOption(_ | _)
     }
 
+    lazy val anonymousClass: HParser[IRAnonymousClass] = ( "new" ~> typeParsers.metaArguments ) ~ typeParsers.objectType >>? {
+      case metaArgs ~ baseType => anonymousClass_Constructors(metaArgs, baseType, baseType.findConstructor(env.clazz))
+    }
+
+    private def anonymousClass_Constructors (metaArgs: List[MetaArgument], baseType: JObjectType, constructors: List[JConstructor]): Option[HParser[IRAnonymousClass]] = constructors match {
+      case Nil if metaArgs.isEmpty => Some(anonymousClassBody ^^ { IRAnonymousClass(Map.empty, baseType, Nil, Nil, _) })
+      case cs                      => cs.flatMap { anonymousClass_Constructor(metaArgs, baseType, _) }.reduceOption(_ | _)
+    }
+
+    private def anonymousClass_Constructor (metaArgs: List[MetaArgument], baseType: JObjectType, constructor: JConstructor): Option[HParser[IRAnonymousClass]] = {
+      anonymousClass_Arguments(metaArgs, constructor).map { argParser =>
+        argParser ~ anonymousClassBody ^^ { case (ma, args, cs) ~ members => IRAnonymousClass(ma, baseType, args, cs, members) }
+      }
+    }
+
+    private def anonymousClass_Arguments (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[(Map[String, MetaArgument], List[IRExpression], List[IRContextRef])]] = {
+      if (constructor.parameterTypes.isEmpty && metaArgs.isEmpty) Some(( '(' ~> ')' ) .? ^^^ (Map.empty[String, MetaArgument], Nil, Nil))
+      else procedureArguments(constructor, metaArgs)
+    }
+
+    lazy val anonymousClassBody: HParser[List[IRClassMember]] = '{' ~> anonymousClassMember.* <~ '}'
+
+    lazy val anonymousClassMember: HParser[IRClassMember] = ???
+
     lazy val explicitConstructorCall: HParser[IRExplicitConstructorCall] = thisConstructorCall | superConstructorCall
 
     lazy val thisConstructorCall: HParser[IRThisConstructorCall] = typeParsers.metaArguments <~ "this" >>? { metaArgs =>
@@ -282,6 +306,14 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
         bind     <- binding(procedure, metaArgs)
         contexts <- env.inferContexts(procedure, bind)
       } yield ArgumentParsers.arguments(procedure, bind, env) ^^ { f(bind, _, contexts) }
+    }
+
+    private def procedureArguments (procedure: JProcedure, metaArgs: List[MetaArgument]): Option[HParser[(Map[String, MetaArgument], List[IRExpression], List[IRContextRef])]] = {
+      if (metaArgs.isEmpty) Some(ArgumentParsers.arguments(procedure, env) ^^? { case (bind, args) => env.inferContexts(procedure, bind).map((bind, args, _)) })
+      else for {
+        bind     <- binding(procedure, metaArgs)
+        contexts <- env.inferContexts(procedure, bind)
+      } yield ArgumentParsers.arguments(procedure, bind, env) ^^ { (bind, _, contexts) }
     }
 
     private def constructorCall (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[IRNewExpression]] =
