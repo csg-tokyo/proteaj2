@@ -22,7 +22,7 @@ class TypeParsersTest extends FunSuite with Matchers {
     val resolver = file.get.resolver
 
     val bp = new BodyParsers(compiler)
-    val parsers = bp.TypeParsers(resolver)
+    val parsers = bp.getTypeParsers(resolver)
 
     val r1 = parsers.className(src("Reader"))
     r1.successful shouldBe true
@@ -53,7 +53,7 @@ class TypeParsersTest extends FunSuite with Matchers {
     val resolver = file.get.resolver
 
     val bp = new BodyParsers(compiler)
-    val parsers = bp.TypeParsers(resolver)
+    val parsers = bp.getTypeParsers(resolver)
 
     val r1 = parsers.typeName(src("JarFile"))
     val ans1 = compiler.classLoader.loadClass("java/util/jar/JarFile").get.objectType(Nil).get

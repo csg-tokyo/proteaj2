@@ -1,7 +1,6 @@
 package phenan.prj.body
 
 import phenan.prj._
-import phenan.prj.combinator._
 import phenan.prj.exception.ParseException
 import phenan.prj.ir._
 
@@ -12,7 +11,7 @@ import CharArrayReader.EofCh
 
 import scalaz.Memo._
 
-class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
+class BodyParsers (val compiler: JCompiler) extends TypeParsers with CommonParsers {
   def parse [T] (parser: HParser[T], in: String): Try[T] = parser(new CharSequenceReader(in)) match {
     case ParseSuccess(result, _) => Success(result)
     case ParseFailure(msg, _)    => Failure(ParseException(msg))
@@ -95,7 +94,7 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
 
     def expression (expected: JType) = ExpressionParsers(expected, env).expression
 
-    lazy val typeName = TypeParsers(env.resolver).typeName
+    lazy val typeName = getTypeParsers(env.resolver).typeName
   }
 
   class ExpressionParsers private (expected: JType, env: Environment) {
@@ -340,7 +339,7 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     private def invokeStatic (metaArgs: List[MetaArgument], method: JMethod): Option[HParser[IRStaticMethodCall]] =
       procedureCall(method, metaArgs) { IRStaticMethodCall(_, method, _, _) }
 
-    private val typeParsers = TypeParsers(env.resolver)
+    private val typeParsers = getTypeParsers(env.resolver)
 
     private def thisObject = env.thisType.map(IRThisRef)
 
@@ -446,9 +445,9 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     }
 
     private def metaValue (mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument]): HParser[MetaArgument] = mv match {
-      case t: JRefType  => TypeParsers(env.resolver).refType ^? { case v if t == v => t }
-      case w: JWildcard => TypeParsers(env.resolver).wildcard ^? { case v if w == v => w }
-      case r: MetaVariableRef   => TypeParsers(env.resolver).metaVariable ^? { case v if r == v => r }
+      case t: JRefType  => getTypeParsers(env.resolver).refType ^? { case v if t == v => t }
+      case w: JWildcard => getTypeParsers(env.resolver).wildcard ^? { case v if w == v => w }
+      case r: MetaVariableRef   => getTypeParsers(env.resolver).metaVariable ^? { case v if r == v => r }
       case c: ConcreteMetaValue => expression(c.parameter, pri, binding, eop.method, env) ^? { case v if c.ast == v => c }
       case _: MetaValueWildcard => HParser.failure("meta value wildcard cannot be placed in operator pattern")
     }
@@ -536,7 +535,7 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
 
     def metaExpression (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): HParser[MetaArgument] = {
       expected(param, binding, procedure).map { expectedType =>
-        if (compiler.typeLoader.typeType.contains(expectedType)) TypeParsers(environment.resolver).metaValue
+        if (compiler.typeLoader.typeType.contains(expectedType)) getTypeParsers(environment.resolver).metaValue
         else expressionParser(param, binding, expectedType, priority(pri, procedure, environment), environment).map(ConcreteMetaValue(_, param))
       }.getOrElse {
         HParser.failure("fail to parse meta expression")
@@ -609,44 +608,6 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     }
   }
 
-  class TypeParsers private (resolver: NameResolver) {
-    lazy val metaArguments: HParser[List[MetaArgument]] = ( '<' ~> metaValue.+(',') <~ '>' ).? ^^ { _.getOrElse(Nil) }
-    lazy val metaValue: HParser[MetaArgument] = wildcard | metaVariable | refType
-    lazy val typeName: HParser[JType] = primitiveTypeName | refType
-    lazy val componentType: HParser[JType] = primitiveTypeName | objectType
-    lazy val refType: HParser[JRefType] = arrayType | typeVariable | objectType
-    lazy val objectType: HParser[JObjectType] = className ~ metaArguments ^^? {
-      case clazz ~ args => clazz.objectType(args)
-    }
-    lazy val packageName: HParser[List[String]] = (identifier <~ '.').*! { names =>
-      ! resolver.root.isKnownPackage(names) && resolver.resolve(names).isSuccess
-    }
-    lazy val className: HParser[JClass] = HParser.ref (innerClassName | topLevelClassName)
-    lazy val topLevelClassName: HParser[JClass] = packageName ~ identifier ^^? {
-      case pack ~ name => resolver.resolve(pack :+ name).toOption
-    }
-    lazy val innerClassName: HParser[JClass] = className ~ ('.' ~> identifier) ^^? {
-      case name ~ id => name.innerClasses.get(id).flatMap(compiler.classLoader.loadClass_PE)
-    }
-    lazy val typeVariable: HParser[JTypeVariable] = identifier ^^? resolver.typeVariable
-    lazy val metaVariable: HParser[MetaVariableRef] = identifier ^^? resolver.metaVariable
-    lazy val arrayType: HParser[JArrayType] = typeName <~ emptyBracket ^^ { _.array }
-    lazy val primitiveTypeName: HParser[JPrimitiveType] = identifier ^? {
-      case "byte"    => compiler.typeLoader.byte
-      case "char"    => compiler.typeLoader.char
-      case "double"  => compiler.typeLoader.double
-      case "float"   => compiler.typeLoader.float
-      case "int"     => compiler.typeLoader.int
-      case "long"    => compiler.typeLoader.long
-      case "short"   => compiler.typeLoader.short
-      case "boolean" => compiler.typeLoader.boolean
-      case "void"    => compiler.typeLoader.void
-    }
-    lazy val wildcard: HParser[JWildcard] = '?' ~> ( "extends" ~> refType ).? ~ ( "super" ~> refType ).? ^^ {
-      case ub ~ lb => JWildcard(ub, lb)
-    }
-  }
-
   object StatementParsers {
     def apply (expected: JType, env: Environment): StatementParsers = cached((expected, env))
     private val cached : ((JType, Environment)) => StatementParsers = mutableHashMapMemo { pair => new StatementParsers(pair._1, pair._2) }
@@ -671,29 +632,4 @@ class BodyParsers (compiler: JCompiler) extends ScannerlessParsers {
     def getParser (literalOperator: LiteralOperator, env: Environment): LParser[IRExpression] = cached((literalOperator, env)).operator
     private val cached : ((LiteralOperator, Environment)) => LiteralOperatorParsers = mutableHashMapMemo { pair => new LiteralOperatorParsers(pair._1, pair._2) }
   }
-
-  object TypeParsers {
-    def apply (resolver: NameResolver): TypeParsers = cached(resolver)
-    private val cached : NameResolver => TypeParsers = mutableHashMapMemo(new TypeParsers(_))
-  }
-
-  lazy val delimiter: LParser[Any] = elem("white space", Character.isWhitespace).*
-
-  lazy val emptyBrackets = emptyBracket.* ^^ { _.size }
-  lazy val emptyBracket = '[' ~> ']'
-
-  lazy val qualifiedName = identifier.+('.')
-
-  lazy val identifier = (elem("identifier start", Character.isJavaIdentifierStart) ~ elem("identifier part", Character.isJavaIdentifierPart).*).^ ^^ {
-    case s ~ ps => (s :: ps).mkString
-  }
-
-  private def word (cs: String): LParser[String] = word_cached(cs)
-  private def regex (r: String): LParser[String] = regex_cached(r)
-
-  private implicit def keyword (kw: String): HParser[String] = (word(kw) <~ elem("identifier part", Character.isJavaIdentifierPart).!).^
-  private implicit def symbol (ch: Char): HParser[Char] = elem(ch).^
-
-  private lazy val word_cached: String => LParser[String] = mutableHashMapMemo { cs => cs.foldRight(LParser.success(cs)) { (ch, r) => elem(ch) ~> r } }
-  private lazy val regex_cached: String => LParser[String] = mutableHashMapMemo { s => regularExpression(s.r) }
 }
