@@ -12,7 +12,7 @@ class BodyCompiler (compiler: JCompiler) {
 
   def initializerBody (code: String, env: Environment): Try[IRInitializerBody] = parsers.parse(parsers.StatementParsers(compiler.typeLoader.void, env).initializerBody, code)
 
-  def expression (code: String, expected: JType, env: Environment): Try[IRExpression] = parsers.parse(parsers.ExpressionParsers(expected, env).expression, code)
+  def expression (code: String, expected: JType, env: Environment): Try[IRExpression] = parsers.parse(parsers.getExpressionParser(expected, env), code)
 
   private val parsers = new BodyParsers(compiler)
 }

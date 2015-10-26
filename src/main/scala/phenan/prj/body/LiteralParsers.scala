@@ -31,7 +31,7 @@ trait LiteralParsers {
     private val literal_cached: JPriority => LParser[IRExpression] = mutableHashMapMemo(createLiteralParser)
 
     private def createLiteralParser (p: JPriority): LParser[IRExpression] = LParser.ref {
-      env.literalOperators(expected, p).map(literalOperator(_, env)).reduceOption(_ ||| _) match {
+      env.literalOperators(expected, p).map(getLiteralOperatorParser(_, env)).reduceOption(_ ||| _) match {
         case Some(parser) => parser | env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
         case None         => env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
       }

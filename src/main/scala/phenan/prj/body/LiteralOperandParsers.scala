@@ -7,7 +7,7 @@ import phenan.prj.ir._
 trait LiteralOperandParsers {
   this: LiteralParsers with TwoLevelParsers =>
 
-  def literalOperand (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): LParser[IRExpression] = {
+  def getLiteralOperandParser (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): LParser[IRExpression] = {
     literalOperandOpt(param, pri, binding, procedure, env).getOrElse(LParser.failure("fail to parse argument expression"))
   }
 
