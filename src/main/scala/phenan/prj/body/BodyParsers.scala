@@ -10,7 +10,7 @@ import scala.util.parsing.input._
 
 import scalaz.Memo._
 
-class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with TypeParsers with CommonParsers {
+class BodyParsers (val compiler: JCompiler) extends LiteralParsers with LiteralOperatorParsers with LiteralOperandParsers with JavaLiteralParsers with TypeParsers with CommonParsers {
   def parse [T] (parser: HParser[T], in: String): Try[T] = parser(new CharSequenceReader(in)) match {
     case ParseSuccess(result, _) => Success(result)
     case ParseFailure(msg, _)    => Failure(ParseException(msg))
@@ -110,22 +110,13 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
       case None    => hostExpression
     }
 
-    def literal: LParser[IRExpression] = env.highestPriority.map(literal_cached).getOrElse(hostLiteral)
-
-    def literal (priority: JPriority): LParser[IRExpression] = literal_cached(priority)
-
-    def literal (priority: Option[JPriority]): LParser[IRExpression] = priority match {
-      case Some(p) => literal(p)
-      case None    => hostLiteral
-    }
-
     lazy val parenthesized: HParser[IRExpression] = '(' ~> expression <~ ')'
 
-    lazy val hostExpression: HParser[IRExpression] = javaExpression | parenthesized | hostLiteral.^
+    lazy val hostExpression: HParser[IRExpression] = javaExpression | parenthesized | literal
 
     lazy val javaExpression = JavaExpressionParsers(env).expression ^? { case e if e.staticType.exists(_ <:< expected) || expected == compiler.typeLoader.void => e }
 
-    lazy val hostLiteral: LParser[IRExpression] = javaLiteral(expected)
+    lazy val literal = getLiteralParser(expected, env).^
 
     private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo(createExpressionParser)
 
@@ -133,15 +124,6 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
       env.expressionOperators(expected, p).map(op => ExpressionOperatorParsers(op, env).operator).reduceOption(_ ||| _) match {
         case Some(parser) => parser | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
         case None         => env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
-      }
-    }
-
-    private val literal_cached: JPriority => LParser[IRExpression] = mutableHashMapMemo(createLiteralParser)
-
-    private def createLiteralParser (p: JPriority): LParser[IRExpression] = LParser.ref {
-      env.literalOperators(expected, p).map(LiteralOperatorParsers.getParser(_, env)).reduceOption(_ ||| _) match {
-        case Some(parser) => parser | env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
-        case None         => env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
       }
     }
   }
@@ -397,50 +379,6 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
     }
   }
 
-  class LiteralOperatorParsers private (lop: LiteralOperator, env: Environment) {
-    import ArgumentParsers._
-
-    lazy val operator: LParser[IRExpression] = constructParser(lop.syntax.pattern, lop.metaArgs, Nil)
-
-    private def constructParser (pattern: List[JSyntaxElement], binding: Map[String, MetaArgument], operands: List[IRExpression]): LParser[IRExpression] = pattern match {
-      case JOperand(param, p) :: rest           => literal(param, p, binding, lop.method, env) >> { arg =>
-        constructParser(rest, bind(param, arg, binding), arg :: operands)
-      }
-      case JOptionalOperand(param, p) :: rest   => literal(param, p, binding, lop.method, env).?.mapOption { _.orElse(defaultArgument(param, lop.method, env)) } >> { arg =>
-        constructParser(rest, bind(param, arg, binding), arg :: operands)
-      }
-      case JRepetition0(param, p) :: rest       => rep0(param, p, binding, Nil) >> {
-        case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
-      }
-      case JRepetition1(param, p) :: rest       => rep1(param, p, binding, Nil) >> {
-        case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
-      }
-      case JMetaOperand(name, param, p) :: rest => literal(param, p, binding, lop.method, env) >> {
-        ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), operands)
-      }
-      case JMetaName(value, p) :: rest          => metaValue(value, p, binding) ~> constructParser(rest, binding, operands)
-      case JOperatorName(name) :: rest          => word(name) ~> constructParser(rest, binding, operands)
-      case JRegexName(name) :: rest             => regex(name) >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
-      case JAndPredicate(param, p) :: rest      => literal(param, p, binding, lop.method, env).& ~> constructParser(rest, binding, operands)
-      case JNotPredicate(param, p) :: rest      => literal(param, p, binding, lop.method, env).! ~> constructParser(rest, binding, operands)
-      case Nil                                  => LParser.success(lop.semantics(binding, operands.reverse))
-    }
-
-    private def metaValue (mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument]): LParser[MetaArgument] = mv match {
-      case c: ConcreteMetaValue                            => literal(c.parameter, pri, binding, lop.method, env) ^? { case v if c.ast == v => c }
-      case _: JRefType | _: JWildcard | _: MetaVariableRef => LParser.failure("type name cannot be used in a literal")
-      case _: MetaValueWildcard                            => LParser.failure("meta value wildcard cannot be placed in operator pattern")
-    }
-
-    private def rep0 (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], args: List[IRExpression]): LParser[(Map[String, MetaArgument], List[IRExpression])] = {
-      rep1(param, pri, binding, args) | LParser.success((binding, args))
-    }
-
-    private def rep1 (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], args: List[IRExpression]): LParser[(Map[String, MetaArgument], List[IRExpression])] = {
-      literal(param, pri, binding, lop.method, env) >> { arg => rep0(param, pri, bind(param, arg, binding), args :+ arg) }
-    }
-  }
-
   object ArgumentParsers {
 
     def arguments (procedure: JProcedure, environment: Environment): HParser[(Map[String, MetaArgument], List[IRExpression])] = {
@@ -482,10 +420,6 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
       expressionParser(param, binding, procedure, priority(pri, procedure, environment), environment)
     }
 
-    def literal (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, environment: Environment): LParser[IRExpression] = {
-      literalParser(param, binding, procedure, priority(pri, procedure, environment), environment)
-    }
-
     def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = {
       binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
     }
@@ -507,17 +441,6 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
         else arg
       }).getOrElse {
         HParser.failure("fail to parse argument expression")
-      }
-    }
-
-    private def literalParser (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, priority: Option[JPriority], environment: Environment): LParser[IRExpression] = {
-      expected(param, binding, procedure).flatMap { expectedType =>
-        IRContextRef.createRefs(param.contexts, binding).map(contexts => ExpressionParsers(expectedType, environment.withContexts(contexts)).literal(priority).map { arg =>
-          if (contexts.nonEmpty) IRContextualArgument(arg, contexts)
-          else arg
-        })
-      }.getOrElse {
-        LParser.failure("fail to parse argument expression")
       }
     }
 
@@ -562,10 +485,5 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
   object ExpressionOperatorParsers {
     def apply (expressionOperator: ExpressionOperator, env: Environment): ExpressionOperatorParsers = cached((expressionOperator, env))
     private val cached : ((ExpressionOperator, Environment)) => ExpressionOperatorParsers = mutableHashMapMemo { pair => new ExpressionOperatorParsers(pair._1, pair._2) }
-  }
-
-  object LiteralOperatorParsers {
-    def getParser (literalOperator: LiteralOperator, env: Environment): LParser[IRExpression] = cached((literalOperator, env)).operator
-    private val cached : ((LiteralOperator, Environment)) => LiteralOperatorParsers = mutableHashMapMemo { pair => new LiteralOperatorParsers(pair._1, pair._2) }
   }
 }

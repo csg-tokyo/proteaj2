@@ -9,8 +9,8 @@ import scalaz.Memo._
 trait LiteralParsers {
   this: LiteralOperatorParsers with JavaLiteralParsers with CommonParsers with TwoLevelParsers =>
 
-  def literal (expected: JType, env: Environment): LParser[IRExpression] = cached((expected, env)).literal
-  def literal (expected: JType, env: Environment, priority: Option[JPriority]): LParser[IRExpression] = cached((expected, env)).literal(priority)
+  def getLiteralParser (expected: JType, env: Environment): LParser[IRExpression] = cached((expected, env)).literal
+  def getLiteralParser (expected: JType, env: Environment, priority: Option[JPriority]): LParser[IRExpression] = cached((expected, env)).literal(priority)
 
   trait LiteralParsersInterface {
     def literal: LParser[IRExpression]
@@ -52,7 +52,7 @@ trait LiteralOperandParsers {
     for {
       expectedType <- ExpectedTypeInferencer.expected(param, binding, procedure)
       contexts     <- IRContextRef.createRefs(param.contexts, binding)
-    } yield literal(expectedType, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ { _.withContexts(contexts) }
+    } yield getLiteralParser(expectedType, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ { _.withContexts(contexts) }
   }
 }
 
