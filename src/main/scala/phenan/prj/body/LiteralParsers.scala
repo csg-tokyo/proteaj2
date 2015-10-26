@@ -115,11 +115,10 @@ trait LiteralOperatorParsers {
       case None    => binding
     }
 
-    @deprecated
-    def defaultArgument (param: JParameter, procedure: JProcedure, environment: Environment) = for {
+    private def defaultArgument (param: JParameter, procedure: JProcedure, environment: Environment) = for {
       name   <- param.defaultArg
       method <- procedure.declaringClass.classModule.findMethod(name, environment.clazz).find(_.erasedParameterTypes == Nil)
-    } yield IRStaticMethodCall(Map.empty, method, Nil, Nil)
+    } yield IRDefaultArgument(method)
   }
 }
 

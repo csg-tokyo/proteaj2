@@ -308,6 +308,7 @@ object JavaReprGenerator {
     case e: IRThisRef              => Union[Expression](ThisRef(ClassRef(e.thisType.erase.name)))
     case e: IRJavaLiteral          => Union[Expression](javaLiteral(e))
     case e: IRVariableArguments    => variableArguments(e, contexts)
+    case e: IRDefaultArgument      => Union[Expression](defaultArgument(e))
     case e: IRContextualArgument   => contextualArgument(e, contexts)
     case e: IRContextRef           => Union[Expression](contextRef(e, contexts))
   }
@@ -376,6 +377,10 @@ object JavaReprGenerator {
     case Some(p: JPrimitiveType) => Union[Expression](ArrayInit(typeToSig(p), 1, e.args.map(expression(_, contexts))))
     case Some(r: JRefType)       => Union[Expression](MethodCall(arraysRef, List(Union[TypeArg](typeToSig(r))), "mkArray", e.args.map(expression(_, contexts))))
     case None                    => throw InvalidASTException("invalid component type of variable arguments")
+  }
+
+  def defaultArgument (e: IRDefaultArgument): MethodCall = {
+    MethodCall(Union[Receiver](ClassRef(e.defaultMethod.declaringClass.name)), Nil, e.defaultMethod.name, Nil)
   }
 
   def contextualArgument (e: IRContextualArgument, contexts: List[IRContextRef]): Expression = {

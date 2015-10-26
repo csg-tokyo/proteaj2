@@ -116,6 +116,12 @@ case class IRContextOperation (context: IRContextRef, method: JMethod, metaArgs:
   override def toString: String = "#ContextOperation#" + context.contextType.name + '.' + method.name + args.mkString("(", ",", ")")
 }
 
+case class IRDefaultArgument (defaultMethod: JMethod) extends IRExpression {
+  def staticType: Option[JType] = defaultMethod.returnType.bind(Map.empty)
+  def activates: List[IRContextRef] = Nil
+  def deactivates: List[IRContextRef] = Nil
+}
+
 case class IRContextualArgument (argument: IRExpression, contexts: List[IRContextRef]) extends IRExpression {
   def staticType: Option[JType] = argument.staticType
   def activates: List[IRContextRef] = Nil

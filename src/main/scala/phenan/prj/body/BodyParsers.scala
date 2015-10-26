@@ -490,11 +490,10 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
       binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
     }
 
-    @deprecated
     def defaultArgument (param: JParameter, procedure: JProcedure, environment: Environment) = for {
       name   <- param.defaultArg
       method <- procedure.declaringClass.classModule.findMethod(name, environment.clazz).find(_.erasedParameterTypes == Nil)
-    } yield IRStaticMethodCall(Map.empty, method, Nil, Nil)
+    } yield IRDefaultArgument(method)
 
     private def expressionParser (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, priority: Option[JPriority], environment: Environment): HParser[IRExpression] = {
       expected(param, binding, procedure).map(expectedType => expressionParser(param, binding, expectedType, priority, environment)).getOrElse {
