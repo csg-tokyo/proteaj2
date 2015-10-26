@@ -1,9 +1,11 @@
 package phenan.prj.combinator
 
+import phenan.prj.exception.ParseException
+
 import scala.reflect.ClassTag
 import scala.util.matching.Regex
 import scala.util.parsing.combinator.PackratParsers
-import scala.util.parsing.input.{Positional, Reader}
+import scala.util.parsing.input.{CharSequenceReader, Positional, Reader}
 
 import scala.language.implicitConversions
 
@@ -221,5 +223,10 @@ trait ScannerlessParsers extends TwoLevelParsers {
       }
     }
     Impl.LParserImpl(parser)
+  }
+
+  def parse [T] (parser: HParser[T], in: String): scala.util.Try[T] = parser(new CharSequenceReader(in)) match {
+    case ParseSuccess(result, _) => scala.util.Success(result)
+    case ParseFailure(msg, _)    => scala.util.Failure(ParseException(msg))
   }
 }

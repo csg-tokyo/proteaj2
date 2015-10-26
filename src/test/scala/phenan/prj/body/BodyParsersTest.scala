@@ -121,7 +121,7 @@ class BodyParsersTest extends FunSuite with Matchers {
         |}
       """.stripMargin
 
-    val result = parsers.parse(parsers.StatementParsers(compiler.typeLoader.void, mainMethod.environment).block, body)
+    val result = parsers.parse(parsers.getStatementParsers(compiler.typeLoader.void, mainMethod.environment).block, body)
     result shouldBe a [Success[_]]
 
     val outField = compiler.classLoader.loadClass_PE("java/lang/System").flatMap(_.classModule.findField("out", test0))
