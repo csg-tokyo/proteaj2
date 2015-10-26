@@ -6,6 +6,11 @@ sealed trait IRExpression {
   def staticType: Option[JType]
   def activates: List[IRContextRef]
   def deactivates: List[IRContextRef]
+
+  def withContexts (contexts: List[IRContextRef]) = {
+    if (contexts.isEmpty) this
+    else IRContextualArgument(this, contexts)
+  }
 }
 
 sealed trait IRLeftHandSide extends IRExpression

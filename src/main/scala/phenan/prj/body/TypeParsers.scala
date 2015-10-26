@@ -12,8 +12,6 @@ trait TypeParsers {
 
   def getTypeParsers (resolver: NameResolver): TypeParsersInterface = cached(resolver)
 
-  private val cached : NameResolver => TypeParsersInterface = mutableHashMapMemo(new TypeParsersImpl(_))
-
   trait TypeParsersInterface {
     def metaArguments: HParser[List[MetaArgument]]
     def metaValue: HParser[MetaArgument]
@@ -26,6 +24,8 @@ trait TypeParsers {
     def metaVariable: HParser[MetaVariableRef]
     def wildcard: HParser[JWildcard]
   }
+
+  private val cached : NameResolver => TypeParsersInterface = mutableHashMapMemo(new TypeParsersImpl(_))
 
   private class TypeParsersImpl (resolver: NameResolver) extends TypeParsersInterface {
     lazy val metaArguments: HParser[List[MetaArgument]] = ( '<' ~> metaValue.+(',') <~ '>' ).? ^^ { _.getOrElse(Nil) }

@@ -19,6 +19,10 @@ trait Environment {
   def highestPriority: Option[JPriority] = fileEnvironment.priorities.headOption
   def nextPriority (priority: JPriority): Option[JPriority] = nextPriorities.get(priority)
 
+  def getPriority (pri: Option[JPriority], procedure: JProcedure): Option[JPriority] = {
+    pri.orElse(procedure.syntax.flatMap(syntax => nextPriority(syntax.priority)))
+  }
+
   def localVariable (name: String): Option[IRLocalVariableRef] = locals.get(name)
 
   def defineLocal (localType: JType, name: String): Environment = Environment_LocalVariables(List((localType, name)), this)

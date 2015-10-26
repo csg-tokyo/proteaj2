@@ -9,6 +9,8 @@ class Unifier (compiler: JCompiler) {
   def infer (t: JType, gt: JGenericType): Option[MetaArgs] = TypeInferencer.check(t, gt.signature, gt.env)
   def infer (t: JType, gt: JGenericType, e: MetaArgs): Option[MetaArgs] = TypeInferencer.check(t, gt.signature, gt.env ++ e)
 
+  def bind (param: JParameter, argType: JType, binding: Map[String, MetaArgument]) = binding ++ infer(argType, param.genericType).getOrElse(Map.empty)
+
   object TypeUnifier extends TypeChecker[Option[MetaArgs]] {
 
     // type >:> signature

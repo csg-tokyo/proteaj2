@@ -121,7 +121,7 @@ trait TwoLevelParsers {
     protected [TwoLevelParsers] def parser: Impl.PackratParser[T]
   }
 
-  object Impl extends PackratParsers {
+  private[combinator] object Impl extends PackratParsers {
     override type Elem = self.Elem
 
     trait HParserLike[T] extends HParser[T] {

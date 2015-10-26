@@ -350,7 +350,7 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
       else None
     }
   }
-  
+
   class ExpressionOperatorParsers private (eop: ExpressionOperator, env: Environment) {
     import ArgumentParsers._
 
@@ -490,6 +490,7 @@ class BodyParsers (val compiler: JCompiler) extends JavaLiteralParsers with Type
       binding ++ arg.staticType.flatMap(compiler.unifier.infer(_, param.genericType)).getOrElse(Map.empty)
     }
 
+    @deprecated
     def defaultArgument (param: JParameter, procedure: JProcedure, environment: Environment) = for {
       name   <- param.defaultArg
       method <- procedure.declaringClass.classModule.findMethod(name, environment.clazz).find(_.erasedParameterTypes == Nil)
