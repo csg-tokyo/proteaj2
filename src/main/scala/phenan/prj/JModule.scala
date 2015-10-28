@@ -170,6 +170,8 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
     else erase.name + env.map(kv => kv._1 + "=" + kv._2.name).mkString("<", ",", ">")
   }
 
+  override def toString = name
+
   def superType: Option[JObjectType] = compiler.typeLoader.fromClassTypeSignature(erase.signature.superClass, env)
 
   def interfaceTypes: List[JObjectType] = erase.signature.interfaces.flatMap(compiler.typeLoader.fromClassTypeSignature(_, env))

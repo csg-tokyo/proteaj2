@@ -37,11 +37,10 @@ trait ExpressionParsers {
 
     private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo(createExpressionParser)
 
-    private def createExpressionParser (p: JPriority): HParser[IRExpression] = HParser.ref {
-      env.expressionOperators(expected, p).map(getExpressionOperatorParser(_, env)).reduceOption(_ ||| _) match {
-        case Some(parser) => parser | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
-        case None         => env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
-      }
+    private def createExpressionParser (p: JPriority): HParser[IRExpression] = expressionOperatorsParser(p) | expression(env.nextPriority(p))
+
+    private def expressionOperatorsParser (p: JPriority): HParser[IRExpression] = {
+      env.expressionOperators(expected, p).map(getExpressionOperatorParser(_, env)).foldLeft[HParser[IRExpression]](HParser.failure("there is no operator for " + expected.name + " [" + p.name + "]"))(_ ||| _)
     }
 
     private def compiler = env.clazz.compiler

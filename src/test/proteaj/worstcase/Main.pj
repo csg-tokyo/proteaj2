@@ -1,0 +1,34 @@
+package worstcase;
+
+import dsl BadDSL;
+
+// exponential time
+public class Main {
+  public static void main (String[] args) {
+    String s =
+      let a: String = "h" in
+        let b: String = "e" in
+          let c: String = "l" in
+            let d: String = "l" in
+              let e: String = "o" in
+                let f: String = "," in
+                  let g: String = "w" in
+                    let h: String = "o" in
+                      let i: String = "r" in
+                        let j: String = "l" in
+                          let k: String = "d" in
+                            a + b + c + d + e + f + g + h + i + j + k
+                          tel
+                        end
+                      tel
+                    end
+                  tel
+                end
+              tel
+            end
+          tel
+        end
+      tel;
+    System.out.println(s);
+  }
+}

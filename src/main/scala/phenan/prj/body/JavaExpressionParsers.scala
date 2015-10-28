@@ -20,7 +20,7 @@ trait JavaExpressionParsers {
   private val cached: Environment => JavaExpressionParsersInterface = mutableHashMapMemo(new JavaExpressionParsersImpl(_))
 
   private class JavaExpressionParsersImpl (env: Environment) extends JavaExpressionParsersInterface {
-    lazy val expression: HParser[IRExpression] = assignment | primary | cast
+    lazy val expression: HParser[IRExpression] = assignment | arrayCreation | primary | cast
 
     lazy val assignment: HParser[IRAssignmentExpression] = simpleAssignment   // | += | -= | ...
 
@@ -32,8 +32,6 @@ trait JavaExpressionParsers {
     }
 
     lazy val leftHandSide: HParser[IRLeftHandSide] = primary ^? { case e: IRLeftHandSide => e }
-
-    lazy val primary: HParser[IRExpression] = arrayCreation | primaryNoNewArray
 
     lazy val arrayCreation: HParser[IRArrayCreation] = newArray | arrayInitializer
 
@@ -47,7 +45,7 @@ trait JavaExpressionParsers {
       }
     }
 
-    lazy val primaryNoNewArray: HParser[IRExpression] = methodCall | fieldAccess | arrayAccess | newExpression | abbreviatedMethodCall | classLiteral | variableRef | thisRef | abbreviatedFieldAccess | parenthesized
+    lazy val primary: HParser[IRExpression] = methodCall | fieldAccess | arrayAccess | newExpression | abbreviatedMethodCall | classLiteral | variableRef | thisRef | abbreviatedFieldAccess | parenthesized
 
     lazy val newExpression: HParser[IRNewExpression] = ( "new" ~> typeParsers.metaArguments ) ~ typeParsers.objectType >>? {
       case metaArgs ~ constructType => constructType.findConstructor(env.clazz).flatMap(constructorCall(metaArgs, _)).reduceOption(_ | _)
@@ -117,7 +115,7 @@ trait JavaExpressionParsers {
 
     lazy val abbreviatedFieldAccess: HParser[IRFieldAccess] =  thisClassFieldAccess | thisFieldAccess  // | staticImported
 
-    lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primaryNoNewArray ~ ( '.' ~> identifier ) ^^? {
+    lazy val instanceFieldAccess: HParser[IRInstanceFieldAccess] = primary ~ ( '.' ~> identifier ) ^^? {
       case instance ~ name => instance.staticType.flatMap { _.findField(name, env.clazz, isThisRef(instance)).map(IRInstanceFieldAccess(instance, _)) }
     }
 
@@ -137,7 +135,7 @@ trait JavaExpressionParsers {
       env.clazz.classModule.findField(name, env.clazz).map(IRStaticFieldAccess)
     }
 
-    lazy val arrayAccess: HParser[IRArrayAccess] = primaryNoNewArray ~ ( '[' ~> intExpression <~ ']' ) ^^ {
+    lazy val arrayAccess: HParser[IRArrayAccess] = primary ~ ( '[' ~> intExpression <~ ']' ) ^^ {
       case array ~ index => IRArrayAccess(array, index)
     }
 

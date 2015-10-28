@@ -18,7 +18,7 @@ trait ExpressionOperatorParsers {
   private val cached: ((ExpressionOperator, Environment)) => ExpressionOperatorParsersInterface = mutableHashMapMemo { pair => new ExpressionOperatorParsersImpl(pair._1, pair._2) }
 
   private class ExpressionOperatorParsersImpl (eop: ExpressionOperator, env: Environment) extends ExpressionOperatorParsersInterface {
-    lazy val operator: HParser[IRExpression] = constructParser(eop.syntax.pattern, eop.metaArgs, Nil)
+    lazy val operator: HParser[IRExpression] = HParser.ref (constructParser(eop.syntax.pattern, eop.metaArgs, Nil))
 
     private def constructParser (pattern: List[JSyntaxElement], binding: Map[String, MetaArgument], operands: List[IRExpression]): HParser[IRExpression] = pattern match {
       case JOperand(param, p) :: rest           => getExpressionOperandParser(param, p, binding, eop.method, env) >> { arg =>

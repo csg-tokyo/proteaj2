@@ -1,0 +1,40 @@
+package worstcase;
+
+dsl BadDSL {
+  priority p0, p1 {
+    p0 < PredefOperators.add < p1
+  }
+  <T, R, name: Identifier> R[p1] "let" name ":" T "=" _[p1] "in" _[p1] "tel" (T v, Local1<T, name> ~> R r) {
+    return r.apply(new Local1<T, name>(v));
+  }
+  <T, R, name: Identifier> R[p1] "let" name ":" T "=" _[p1] "in" _[p1] "end" (T v, Local2<T, name> ~> R r) {
+    return r.apply(new Local2<T, name>(v));
+  }
+  Identifier[p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+    return new Identifier(name);
+  }
+  context Local1 <V, name: Identifier> {
+    Local1 (V v) {
+      this.v = v;
+    }
+    V[p0] name[p0] () {
+      return v;
+    }
+    private V v;
+  }
+  context Local2 <V, name: Identifier> {
+    Local2 (V v) {
+      this.v = v;
+    }
+    V[p0] name[p0] () {
+      return v;
+    }
+    private V v;
+  }
+}
+
+class Identifier {
+  public Identifier (String name) { this.name = name; }
+  public String getName() { return name; }
+  private String name;
+}

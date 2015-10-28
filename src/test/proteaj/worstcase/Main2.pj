@@ -1,0 +1,55 @@
+package worstcase;
+
+import dsl BadDSL;
+
+// (nearly) linear time
+public class Main2 {
+  public static void main (String[] args) {
+    String s1 =
+      let a: String = "h" in
+        a
+      tel;
+    String s2 =
+      let b: String = "e" in
+        b
+      end;
+    String s3 =
+      let c: String = "l" in
+        c
+      tel;
+    String s4 =
+      let d: String = "l" in
+        d
+      end;
+    String s5 =
+      let e: String = "o" in
+        e
+      tel;
+    String s6 =
+      let f: String = "," in
+        f
+      end;
+    String s7 =
+      let g: String = "w" in
+        g
+      tel;
+    String s8 =
+      let h: String = "o" in
+        h
+      end;
+    String s9 =
+      let i: String = "r" in
+        i
+      tel;
+    String sa =
+      let j: String = "l" in
+        j
+      end;
+    String sb =
+      let k: String = "d" in
+        k
+      tel;
+    String s = s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + sa + sb;
+    System.out.println(s);
+  }
+}
