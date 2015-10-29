@@ -33,10 +33,10 @@ trait ExpressionOperatorParsers {
       case JRepetition1(param, p) :: rest       => rep1(param, p, binding, Nil) >> {
         case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
-      case JMetaOperand(name, param, p) :: rest => getMetaOperandParser(param, p, binding, eop.method, env) >> {
-        ma => constructParser(rest, binding + (name -> ma), operands)
-      }
-      case JMetaName(value, p) :: rest          => getMetaValueParser(value, p, binding, eop.method, env) ~> constructParser(rest, binding, operands)
+      case JMetaOperand(name, param, p) :: rest =>
+        if (binding.contains(name)) getMetaValueExpressionParser(name, binding(name), p, binding, eop.method, env) >> { bind => constructParser(rest, bind, operands) }
+        else getMetaExpressionOperandParser(param, p, binding, eop.method, env) >> { ma => constructParser(rest, binding + (name -> ma), operands) }
+      case JMetaName(name, value, p) :: rest    => getMetaValueExpressionParser(name, value, p, binding, eop.method, env) >> { bind => constructParser(rest, bind, operands) }
       case JOperatorName(name) :: rest          => word(name).^ ~> constructParser(rest, binding, operands)
       case JRegexName(name) :: rest             => regex(name).^ >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
       case JAndPredicate(param, p) :: rest      => getExpressionOperandParser(param, p, binding, eop.method, env).& ~> constructParser(rest, binding, operands)

@@ -33,21 +33,15 @@ trait LiteralOperatorParsers {
       case JRepetition1(param, p) :: rest       => rep1(param, p, binding, Nil) >> {
         case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
       }
-      case JMetaOperand(name, param, p) :: rest => getLiteralOperandParser(param, p, binding, lop.method, env) >> {
-        ast => constructParser(rest, binding + (name -> ConcreteMetaValue(ast, param)), operands)
-      }
-      case JMetaName(value, p) :: rest          => metaValue(value, p, binding) ~> constructParser(rest, binding, operands)
+      case JMetaOperand(name, param, p) :: rest =>
+        if (binding.contains(name)) getMetaValueLiteralParser(name, binding(name), p, binding, lop.method, env) >> { bind => constructParser(rest, bind, operands) }
+        else getMetaLiteralOperandParser(param, p, binding, lop.method, env) >> { ma => constructParser(rest, binding + (name -> ma), operands) }
+      case JMetaName(name, value, p) :: rest    => getMetaValueLiteralParser(name, value, p, binding, lop.method, env) >> { bind => constructParser(rest, bind, operands) }
       case JOperatorName(name) :: rest          => word(name) ~> constructParser(rest, binding, operands)
       case JRegexName(name) :: rest             => regex(name) >> { s => constructParser(rest, binding, IRStringLiteral(s, compiler) :: operands) }
       case JAndPredicate(param, p) :: rest      => getLiteralOperandParser(param, p, binding, lop.method, env).& ~> constructParser(rest, binding, operands)
       case JNotPredicate(param, p) :: rest      => getLiteralOperandParser(param, p, binding, lop.method, env).! ~> constructParser(rest, binding, operands)
       case Nil                                  => LParser.success(lop.semantics(binding, operands.reverse))
-    }
-
-    private def metaValue (mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument]): LParser[MetaArgument] = mv match {
-      case c: ConcreteMetaValue                            => getLiteralOperandParser(c.parameter, pri, binding, lop.method, env) ^? { case v if c.ast == v => c }
-      case _: JRefType | _: JWildcard | _: MetaVariableRef => LParser.failure("type name cannot be used in a literal")
-      case _: MetaValueWildcard                            => LParser.failure("meta value wildcard cannot be placed in operator pattern")
     }
 
     private def rep0 (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], args: List[IRExpression]): LParser[(Map[String, MetaArgument], List[IRExpression])] = {

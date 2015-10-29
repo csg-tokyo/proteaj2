@@ -15,13 +15,12 @@ case class MetaVariableRef (name: String, valueType: JType) extends MetaValue {
   def matches (v: MetaArgument): Boolean = this == v
 }
 
-case class ConcreteMetaValue (ast: IRExpression, parameter: JParameter) extends MetaValue {
+case class ConcreteMetaValue (ast: IRExpression, valueType: JType) extends MetaValue {
   def name = ast.toString
-  def valueType: JType = parameter.compiler.state.someOrError(ast.staticType, "invalid meta value type", parameter.compiler.typeLoader.void)
   override def matches(v: MetaArgument): Boolean = this == v
 }
 
-case class MetaValueWildcard (valueType: JType) extends MetaValue {
+case class JUnboundMetaVariable (valueType: JType) extends MetaValue {
   def name = "?:" + valueType.name
   def matches(v: MetaArgument): Boolean = v match {
     case m: MetaValue => m.valueType <:< valueType

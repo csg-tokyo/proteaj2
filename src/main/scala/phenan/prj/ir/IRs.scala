@@ -1,12 +1,15 @@
 package phenan.prj.ir
 
 import phenan.prj._
-import phenan.prj.JCompiler
 import phenan.prj.declaration._
 
 import scala.util._
 
 import JModifier._
+
+import scalaz.syntax.traverse._
+import scalaz.std.list._
+import scalaz.std.option._
 
 case class IRFile (ast: CompilationUnit, filePath: String, root: RootResolver) {
   lazy val modules: List[IRModule] = collectModules(topLevelModules, Nil)
@@ -508,9 +511,8 @@ trait IRProcedure extends JMethodDef with IRMember {
 
   lazy val activateTypes = signature.activates.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, metaParameters))
 
-  lazy val requiresContexts: List[IRContextRef] = IRContextRef.createRefs(signature.requires.map(JGenericType(_, metaParameters, compiler)), Map.empty).getOrElse {
-    state.error("invalid required context type")
-    Nil
+  lazy val requiresContexts: List[IRContextRef] = {
+    state.someOrError(signature.requires.traverse(compiler.typeLoader.fromTypeSignature(_, metaParameters).collect { case obj: JObjectType => IRContextRef(obj) }), "invalid required context type", Nil)
   }
 
   lazy val exceptions: List[JRefType] = signature.throwTypes.flatMap(compiler.typeLoader.fromTypeSignature_RefType(_, metaParameters))

@@ -1,0 +1,11 @@
+package where;
+
+import dsl WhereDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    String s = a + "!" where
+      a = "hello, world";
+    System.out.println(s);
+  }
+}

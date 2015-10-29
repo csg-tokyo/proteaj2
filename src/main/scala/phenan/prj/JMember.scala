@@ -58,11 +58,11 @@ trait JProcedure extends JMember {
     case JOptionalOperandDef(p) => JOptionalOperand(param, p)
     case JRepetition0Def(p)     => JRepetition0(param, p)
     case JRepetition1Def(p)     => JRepetition1(param, p)
-    case JRegexNameDef(name) => JRegexName(name)
+    case JRegexNameDef(name)    => JRegexName(name)
   }
 
   private def translateMetaValueRef (mv: JMetaValueRefDef): Option[JSyntaxElement] = {
-    if (env.contains(mv.name)) Some(JMetaName(env(mv.name), mv.priority))
+    if (env.contains(mv.name)) Some(JMetaName(mv.name, env(mv.name), mv.priority))
     else if (metaParameters.contains(mv.name)) {
       val mp = metaParameters(mv.name)
       Some(JMetaOperand(mv.name, JParameter(mp.metaType, env, compiler), mv.priority))

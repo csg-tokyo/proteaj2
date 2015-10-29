@@ -2,6 +2,10 @@ package phenan.prj.ir
 
 import phenan.prj._
 
+import scalaz.syntax.traverse._
+import scalaz.std.list._
+import scalaz.std.option._
+
 sealed trait IRExpression {
   def staticType: Option[JType]
   def activates: List[IRContextRef]
@@ -27,10 +31,10 @@ case class IRSimpleAssignmentExpression (left: IRLeftHandSide, right: IRExpressi
 
 case class IRNewExpression (metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExpression {
   def staticType = Some(constructor.declaring)
-  lazy val activates: List[IRContextRef] = IRContextRef.createRefs(constructor.activates, metaArgs).getOrElse {
+  lazy val activates: List[IRContextRef] = constructor.activates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
     constructor.compiler.state.errorAndReturn("invalid context type", Nil)
   }
-  lazy val deactivates: List[IRContextRef] = IRContextRef.createRefs(constructor.deactivates, metaArgs).getOrElse {
+  lazy val deactivates: List[IRContextRef] = constructor.deactivates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
     constructor.compiler.state.errorAndReturn("invalid context type", Nil)
   }
   lazy val throws: List[JType] = constructor.exceptionTypes.flatMap(_.bind(metaArgs))
@@ -93,10 +97,11 @@ sealed trait IRMethodCall extends IRExpression {
   def args: List[IRExpression]
   def requiredContexts: List[IRContextRef]
   lazy val staticType: Option[JType] = method.returnType.bind(metaArgs)
-  lazy val activates: List[IRContextRef] = IRContextRef.createRefs(method.activates, metaArgs).getOrElse {
+
+  lazy val activates: List[IRContextRef] = method.activates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
     method.compiler.state.errorAndReturn("invalid context type", Nil)
   }
-  lazy val deactivates: List[IRContextRef] = IRContextRef.createRefs(method.deactivates, metaArgs).getOrElse {
+  lazy val deactivates: List[IRContextRef] = method.deactivates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
     method.compiler.state.errorAndReturn("invalid context type", Nil)
   }
   lazy val throws: List[JType] = method.exceptionTypes.flatMap(_.bind(metaArgs))
@@ -187,24 +192,11 @@ case class IRLocalVariableRef (localType: JType, name: String) extends IRLeftHan
   def deactivates: List[IRContextRef] = Nil
 }
 
-case class IRContextRef private (contextType: JObjectType) extends IRExpression {
+case class IRContextRef (contextType: JObjectType) extends IRExpression {
   def staticType = Some(contextType)
   def activates: List[IRContextRef] = Nil
   def deactivates: List[IRContextRef] = Nil
 }
-
-object IRContextRef {
-  def createRefs (gts: List[JGenericType], bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = createRefs(gts, bind, Nil)
-
-  private def createRefs (gts: List[JGenericType], bind: Map[String, MetaArgument], refs: List[IRContextRef]): Option[List[IRContextRef]] = gts match {
-    case gt :: rest => gt.bind(bind).collect { case obj: JObjectType => IRContextRef(obj) } match {
-      case Some(ref) => createRefs(rest, bind, ref :: refs)
-      case None      => None
-    }
-    case Nil => Some(refs.reverse)
-  }
-}
-
 
 sealed trait IRAnnotationElement
 

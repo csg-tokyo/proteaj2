@@ -94,4 +94,14 @@ class UnificationTest extends FunSuite with Matchers {
 
     map shouldBe Some(Map("T" -> unbound2))
   }
+
+  test ("String <=< T (T = A = unbound) ") {
+    val string = compiler.classLoader.loadClass("java/lang/String").get.objectType(Nil).get
+    val unbound = JUnboundTypeVariable("A", compiler.typeLoader.objectType.toList, compiler)
+    val tv = JTypeVariableSignature("T")
+
+    val map = string <=< JGenericType(tv, Map("T" -> unbound), compiler)
+
+    map shouldBe Some(Map("T" -> string))
+  }
 }

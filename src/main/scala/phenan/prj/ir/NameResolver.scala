@@ -8,6 +8,11 @@ import phenan.util.TryUtil._
 import scala.util._
 
 import scalaz.Memo._
+import scalaz.syntax.monoid._
+import scalaz.syntax.traverse._
+import scalaz.std.list._
+import scalaz.std.option._
+import scalaz.std.string._
 
 trait NameResolver {
 
@@ -39,8 +44,6 @@ trait NameResolver {
   }
 
   def constraint (names: List[QualifiedName]): List[JPriority] = resolveConstraint (names, Nil)
-
-  import scalaz.Scalaz._
 
   def metaParameter (mp: MetaParameter): Try[FormalMetaParameter] = mp match {
     case TypeParameter(name, bounds)  => bounds.traverse(typeSignature).map(FormalMetaParameter(name, JTypeSignature.typeTypeSig, _))
@@ -234,7 +237,6 @@ class NameResolver_MetaParameter (metaParameter: FormalMetaParameter, parent: Na
 
   def root: RootResolver = parent.root
 
-  import scalaz.Scalaz._
   private def metaValue: MetaArgument = if (metaParameter.metaType == JTypeSignature.typeTypeSig) {
     compiler.state.someOrError(metaParameter.bounds.traverse(compiler.typeLoader.fromTypeSignature_RefType(_, parent.environment)).map(JTypeVariable(metaParameter.name, _, compiler)),
       "invalid type bounds : " + metaParameter.bounds, JTypeVariable(metaParameter.name, Nil, compiler))

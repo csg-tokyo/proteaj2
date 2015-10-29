@@ -1,6 +1,9 @@
 package phenan.prj
 
 import scalaz.Memo._
+import scalaz.syntax.traverse._
+import scalaz.std.list._
+import scalaz.std.option._
 
 class JTypeLoader (compiler: JCompiler) {
   val arrayOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
@@ -92,13 +95,10 @@ class JTypeLoader (compiler: JCompiler) {
 
   def fromPrimitiveSignature (p: JPrimitiveTypeSignature): JPrimitiveType = compiler.classLoader.erase(p).primitiveType
 
-  def fromTypeArguments (args: List[JTypeArgument], env: Map[String, MetaArgument]): Option[List[MetaArgument]] = {
-    import scalaz.Scalaz._
-    args.traverse {
-      case sig: JTypeSignature            => fromTypeSignature_RefType(sig, env)
-      case WildcardArgument(upper, lower) => Some(JWildcard(upper.flatMap(fromTypeSignature_RefType(_, env)).filterNot(objectType.contains), lower.flatMap(fromTypeSignature_RefType(_, env))))
-      case MetaVariableSignature(name)    => env.get(name)
-    }
+  def fromTypeArguments (args: List[JTypeArgument], env: Map[String, MetaArgument]): Option[List[MetaArgument]] = args.traverse {
+    case sig: JTypeSignature            => fromTypeSignature_RefType(sig, env)
+    case WildcardArgument(upper, lower) => Some(JWildcard(upper.flatMap(fromTypeSignature_RefType(_, env)).filterNot(objectType.contains), lower.flatMap(fromTypeSignature_RefType(_, env))))
+    case MetaVariableSignature(name)    => env.get(name)
   }
 
   def validTypeArgs (params: List[FormalMetaParameter], args: List[MetaArgument], env: Map[String, MetaArgument]): Boolean = {

@@ -11,26 +11,28 @@ trait ExpressionOperandParsers {
     getExpressionOperandParserOpt(param, pri, binding, procedure, env).getOrElse(HParser.failure("fail to parse argument expression"))
   }
 
-  def getMetaOperandParser (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): HParser[MetaArgument] = {
+  def getMetaExpressionOperandParser (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): HParser[MetaArgument] = {
     ExpectedTypeInferencer.expected(param, binding, procedure) match {
-      case Some(e) if env.clazz.compiler.typeLoader.typeType.contains(e) => getTypeParsers(env.resolver).metaValue
-      case Some(e) => getExpressionOperandParser(param, pri, binding, procedure, env) ^^  { ConcreteMetaValue(_, param) }
+      case Some(e) => getMetaArgumentParser(e, pri, binding, procedure, env)
       case None    => HParser.failure("fail to parse meta expression")
     }
   }
 
-  def getMetaValueParser (mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): HParser[MetaArgument] = mv match {
-    case t: JRefType  => getTypeParsers(env.resolver).refType ^? { case v if t == v => t }
-    case w: JWildcard => getTypeParsers(env.resolver).wildcard ^? { case v if w == v => w }
-    case r: MetaVariableRef   => getTypeParsers(env.resolver).metaVariable ^? { case v if r == v => r }
-    case c: ConcreteMetaValue => getExpressionOperandParser(c.parameter, pri, binding, procedure, env) ^? { case v if c.ast == v => c }
-    case _: MetaValueWildcard => HParser.failure("meta value wildcard cannot be placed in operator pattern")
+  def getMetaValueExpressionParser (name: String, mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): HParser[Map[String, MetaArgument]] = mv match {
+    case t: JRefType  => getTypeParsers(env.resolver).refType ^? { case v if t == v => t } ^^^ binding
+    case w: JWildcard => getTypeParsers(env.resolver).wildcard ^? { case v if w == v => w } ^^^ binding
+    case r: MetaVariableRef   => getTypeParsers(env.resolver).metaVariable ^? { case v if r == v => r } ^^^ binding
+    case c: ConcreteMetaValue => getMetaArgumentParser(c.valueType, pri, binding, procedure, env) ^? { case v if c == v => v } ^^^ binding
+    case u: JUnboundMetaVariable => getMetaArgumentParser(u.valueType, pri, binding, procedure, env) ^^ { arg => binding + (name -> arg) }
   }
 
-  private def getExpressionOperandParserOpt (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): Option[HParser[IRExpression]] = {
-    for {
-      expectedType <- ExpectedTypeInferencer.expected(param, binding, procedure)
-      contexts     <- IRContextRef.createRefs(param.contexts, binding)
-    } yield getExpressionParser(expectedType, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ { _.withContexts(contexts) }
+  private def getMetaArgumentParser (metaType: JType, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): HParser[MetaArgument] = {
+    if (env.clazz.compiler.typeLoader.typeType.contains(metaType)) getTypeParsers(env.resolver).metaValue
+    else getExpressionParser(metaType, env, env.getPriority(pri, procedure)) ^^ { arg => ConcreteMetaValue(arg, metaType) }
   }
+
+  private def getExpressionOperandParserOpt (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): Option[HParser[IRExpression]] = for {
+    expectedType <- ExpectedTypeInferencer.expected(param, binding, procedure)
+    contexts     <- ExpectedTypeInferencer.contexts(param.contexts, binding, procedure)
+  } yield getExpressionParser(expectedType, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ { _.withContexts(contexts) }
 }

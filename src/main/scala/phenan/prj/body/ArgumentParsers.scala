@@ -4,6 +4,10 @@ import phenan.prj._
 import phenan.prj.combinator._
 import phenan.prj.ir._
 
+import scalaz.syntax.traverse._
+import scalaz.std.list._
+import scalaz.std.option._
+
 trait ArgumentParsers {
   this: ExpressionParsers with CommonParsers with TwoLevelParsers =>
 
@@ -34,7 +38,7 @@ trait ArgumentParsers {
   private def argument_abbrev_opt (param: JParameter, binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment) = {
     for {
       expectedType <- ExpectedTypeInferencer.expected(param, binding, procedure)
-      contexts     <- IRContextRef.createRefs(param.contexts, binding)
+      contexts     <- ExpectedTypeInferencer.contexts(param.contexts, binding, procedure)
     } yield getExpressionParser(expectedType, env.withContexts(contexts), env.highestPriority) ^^ { _.withContexts(contexts) }
   }
 
@@ -42,12 +46,10 @@ trait ArgumentParsers {
     argument_canonical_opt(param, binding, env).getOrElse(HParser.failure("fail to parse argument expression"))
   }
 
-  private def argument_canonical_opt (param: JParameter, binding: Map[String, MetaArgument], env: Environment) = {
-    for {
-      expectedType <- param.genericType.bind(binding)
-      contexts     <- IRContextRef.createRefs(param.contexts, binding)
-    } yield getExpressionParser(expectedType, env.withContexts(contexts), env.highestPriority) ^^ { _.withContexts(contexts) }
-  }
+  private def argument_canonical_opt (param: JParameter, binding: Map[String, MetaArgument], env: Environment) = for {
+    expectedType <- param.genericType.bind(binding)
+    contexts     <- param.contexts.traverse(_.bind(binding).collect { case obj: JObjectType => IRContextRef(obj) })
+  } yield getExpressionParser(expectedType, env.withContexts(contexts), env.highestPriority) ^^ { _.withContexts(contexts) }
 
   private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument], env: Environment) = arg.staticType match {
     case Some(t) => env.clazz.compiler.unifier.bind(param, t, binding)

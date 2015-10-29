@@ -67,6 +67,7 @@ class Unifier (compiler: JCompiler) {
 
     private def typeVariableSignature (rt: JRefType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = {
       if (args.contains(tvs.name)) args(tvs.name) match {
+        case JUnboundTypeVariable(name, bounds, _) if bounds.forall(_ >:> rt) => Some(args + (tvs.name -> rt))
         case ref: JRefType if rt >:> ref             => Some(args)
         case JWildcard(ub, _) if ub.forall(rt >:> _) => Some(args)
         case _ => None

@@ -18,6 +18,6 @@ case class JOperatorName (name: String) extends JSyntaxElement
 case class JRegexName (name: String) extends JSyntaxElement
 
 case class JMetaOperand (name: String, parameter: JParameter, priority: Option[JPriority]) extends JSyntaxElement
-case class JMetaName (mv: MetaArgument, priority: Option[JPriority]) extends JSyntaxElement
+case class JMetaName (name: String, mv: MetaArgument, priority: Option[JPriority]) extends JSyntaxElement
 case class JAndPredicate (parameter: JParameter, priority: Option[JPriority]) extends JSyntaxElement
 case class JNotPredicate (parameter: JParameter, priority: Option[JPriority]) extends JSyntaxElement
