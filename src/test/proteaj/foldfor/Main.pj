@@ -1,0 +1,21 @@
+package foldfor;
+
+import dsl FoldFor;
+
+import java.util.*;
+
+public class Main {
+  public static void main (String[] args) {
+    List<String> list = new ArrayList<String>();
+    list.add("foo");
+    list.add("bar");
+    list.add("baz");
+
+    String s = fold-for (res = ""; str : list) res + str;
+    //String s = for (res = ""; str : list) res = res + str;
+
+    System.out.println(s);
+  }
+}
+
+

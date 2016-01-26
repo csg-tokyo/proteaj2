@@ -1,0 +1,54 @@
+package foldfor;
+
+import java.util.*;
+
+dsl FoldFor {
+  priority p0, p1 {
+    p0 < PredefOperators.add < p1
+  }
+
+  <E, R, acc: Identifier, elem: Identifier> R[p1]
+    "for" "(" acc "=" _ ";" elem ":" _ ")" acc "=" _
+    (R ini, List<E> es, Env2<E, R, elem, acc> ~> R body)
+  {
+    R a = ini;
+    for (E e : es) {
+      a = body.apply(new Env2<E, R, elem, acc>(e, a));
+    }
+    return a;
+  }
+
+  <E, R, acc: Identifier, elem: Identifier> R[p1]
+    "fold-for" "(" acc "=" _ ";" elem ":" _ ")" _
+    (R ini, List<E> es, Env2<E, R, elem, acc> ~> R body)
+  {
+    R a = ini;
+    for (E e : es) {
+      a = body.apply(new Env2<E, R, elem, acc>(e, a));
+    }
+    return a;
+  }
+
+  Identifier[p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+    return new Identifier(name);
+  }
+
+  context Env2 <A, B, aName: Identifier, bName: Identifier> {
+    public Env2 (A a, B b) {
+      this.a = a;
+      this.b = b;
+    }
+
+    A[p0] aName[p0] () { return a; }
+    B[p0] bName[p0] () { return b; }
+
+    private A a;
+    private B b;
+  }
+}
+
+class Identifier {
+  public Identifier (String name) { this.name = name; }
+  public String getName() { return name; }
+  private String name;
+}
