@@ -77,12 +77,8 @@ object DeclarationParsers extends TwoLevelParsers {
     case mods ~ name ~ body => AnnotationDeclaration(mods, name, body)
   }
 
-  lazy val dslDeclaration = modifiers ~ ( "dsl" ~> identifier ) ~ mixinDSLs ~ ( '{' ~> dslMember.* <~ '}' ) ^^ {
-    case mods ~ name ~ mixins ~ body => DSLDeclaration(mods, name, mixins, body)
-  }
-
-  lazy val contextDeclaration = modifiers ~ ( "context" ~> identifier ) ~ metaParameters >> {
-    case mods ~ name ~ mps => ClassMemberParsers(name).contextBody ^^ { body => ContextDeclaration(mods, name, mps, body) }
+  lazy val dslDeclaration = modifiers ~ ( "dsl" ~> identifier ) ~ metaParameters ~ mixinDSLs >> {
+    case mods ~ name ~ mps ~ mixins => ClassMemberParsers(name).dslBody ^^ { DSLDeclaration(mods, name, mps, mixins, _) }
   }
 
   lazy val implementsInterfaces = ( "implements" ~> typeName.+(',')).? ^^ { _.getOrElse(Nil) }
@@ -97,8 +93,6 @@ object DeclarationParsers extends TwoLevelParsers {
   lazy val interfaceMember: HParser[InterfaceMember] = methodDeclaration | fieldDeclaration | moduleDeclaration
 
   lazy val annotationMember: HParser[AnnotationMember] = annotationElementDeclaration | fieldDeclaration | moduleDeclaration
-
-  lazy val dslMember: HParser[DSLMember] = prioritiesDeclaration | fieldDeclaration | operatorDeclaration | contextDeclaration
 
   lazy val instanceInitializer = block ^^ InstanceInitializer
 
@@ -190,7 +184,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
     lazy val enumBody = '{' ~> ( enumConstants ~ enumMembers ) <~ '}'
 
-    lazy val contextBody = '{' ~> contextMember.* <~ '}'
+    lazy val dslBody = '{' ~> dslMember.* <~ '}'
 
     lazy val classMember: HParser[ClassMember] =
       instanceInitializer | staticInitializer | constructorDeclaration | methodDeclaration | fieldDeclaration | moduleDeclaration
@@ -203,7 +197,7 @@ object DeclarationParsers extends TwoLevelParsers {
       case as ~ name ~ args ~ body => EnumConstant(as, name, args.getOrElse(Nil), body.getOrElse(Nil))
     }
 
-    lazy val contextMember = constructorDeclaration | operatorDeclaration | fieldDeclaration
+    lazy val dslMember = prioritiesDeclaration | constructorDeclaration | operatorDeclaration | fieldDeclaration
 
     lazy val constructorDeclaration = modifiers ~ metaParameters ~ className ~ formalParameters ~ clause.* ~ block ^^ {
       case mods ~ mps ~ _ ~ params ~ clauses ~ body => ConstructorDeclaration(mods, mps, params, clauses, body)

@@ -86,13 +86,6 @@ class DeclarationParsersTest extends FunSuite with Matchers with ASTUtil {
     assert(r.successful)
     r.get shouldBe List(TypeParameter("T", Nil))
   }
-
-  test ("context declaration") {
-    val src = "context Var <T> {}"
-    val r = parse(contextDeclaration, src)
-    assert(r.successful)
-    r.get shouldBe ContextDeclaration(Nil, "Var", List(TypeParameter("T", Nil)), Nil)
-  }
 }
 
 trait ASTUtil {

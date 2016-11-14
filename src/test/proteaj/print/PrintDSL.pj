@@ -1,7 +1,7 @@
 package print;
 
 dsl PrintDSL {
-  void "p" _ (String msg) {
+  static void "p" _ (String msg) {
     System.out.println(msg);
   }
 }

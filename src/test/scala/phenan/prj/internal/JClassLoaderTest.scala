@@ -75,8 +75,6 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
     varClass.signature shouldBe
       JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), JTypeSignature.objectTypeSig, Nil)
-
-    varClass.isContext shouldBe true
   }
 
   test("Operatorが読めるか") {

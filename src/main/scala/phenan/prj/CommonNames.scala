@@ -12,7 +12,6 @@ object CommonNames {
   val opLevelClassName        = "proteaj/impl/OpLevel"
   val opElemTypeClassName     = "proteaj/impl/OpElemType"
   val constraintClassName     = "proteaj/impl/Constraint"
-  val contextClassName        = "proteaj/impl/Context"
   val pureClassName           = "proteaj/impl/Pure"
   val finalizerClassName      = "proteaj/impl/Finalizer"
   val typeClassName           = "proteaj/lang/Type"

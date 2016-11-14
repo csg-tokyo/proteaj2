@@ -52,20 +52,10 @@ object JavaReprGenerator {
     def annotations = Annotations.dslAnnotations(dsl)
     def modifiers = dsl.mod ^ JModifier.accSuper
     def name = dsl.simpleName
-    def typeParameters = Nil
+    def typeParameters = typeParams(dsl.signature.metaParams)
     def superType = objectClassSig
     def interfaces = Nil
     def members = dsl.declaredMembers.flatMap(dslMember) ++ dsl.syntheticMethods.map(syntheticMember)
-  }
-
-  def contextDef (context: IRContext): ClassDef = new ClassDef {
-    def annotations = Annotations.contextAnnotations(context)
-    def modifiers = context.mod ^ JModifier.accSuper
-    def name = context.simpleName
-    def typeParameters = typeParams(context.signature.metaParams)
-    def superType = objectClassSig
-    def interfaces = Nil
-    def members = context.declaredMembers.map(contextMember) ++ context.syntheticMethods.map(syntheticMember)
   }
 
   def classMember (member: IRClassMember): ClassMember = member match {
@@ -94,16 +84,10 @@ object JavaReprGenerator {
   }
 
   def dslMember (member: IRDSLMember): Option[ClassMember] = member match {
-    case field: IRDSLField       => Some(Union[ClassMember](fieldDef(field)))
-    case operator: IRDSLOperator => Some(Union[ClassMember](operatorDef(operator)))
-    case context: IRContext      => Some(Union[ClassMember](Union[ModuleDef](contextDef(context))))
-    case _: IRDSLPriorities      => None
-  }
-
-  def contextMember (member: IRContextMember): ClassMember = member match {
-    case field: IRContextField             => Union[ClassMember](fieldDef(field))
-    case operator: IRContextOperator       => Union[ClassMember](operatorDef(operator))
-    case constructor: IRContextConstructor => Union[ClassMember](constructorDef(constructor))
+    case field: IRDSLField             => Some(Union[ClassMember](fieldDef(field)))
+    case operator: IROperator          => Some(Union[ClassMember](operatorDef(operator)))
+    case constructor: IRDSLConstructor => Some(Union[ClassMember](constructorDef(constructor)))
+    case _: IRPriorities               => None
   }
 
   def syntheticMember (synthetic: IRSyntheticMethod): ClassMember = synthetic match {
@@ -581,10 +565,6 @@ object JavaReprGenerator {
       classLikeAnnotations(dsl) :+ dslAnnotation(dsl.memberPriorities, dsl.priorityConstraints, dsl.withDSLs)
     }
 
-    def contextAnnotations (context: IRContext): List[JavaAnnotation] = {
-      classLikeAnnotations(context) :+ contextAnnotation
-    }
-
     def fieldAnnotations (field: IRField): List[JavaAnnotation] = {
       except(fieldSigClassName)(field.annotations) :+ fieldSignatureAnnotation(field.signature)
     }
@@ -603,7 +583,7 @@ object JavaReprGenerator {
     def paramInitializerAnnotations (initializer: IRParameterInitializer): List[JavaAnnotation] = List(methodSignatureAnnotation(initializer.signature))
 
     private def classLikeAnnotations (clazz: IRModule): List[JavaAnnotation] = {
-      except(classSigClassName, dslClassName, contextClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature)
+      except(classSigClassName, dslClassName)(clazz.annotations) :+ classSignatureAnnotation(clazz.signature)
     }
 
     private def methodLikeAnnotations (method: IRProcedure): List[JavaAnnotation] = {
@@ -644,8 +624,6 @@ object JavaReprGenerator {
         "with" -> array(withDSLs.map(classLit))
       )
     }
-
-    private def contextAnnotation: JavaAnnotation = mkAnnotation(contextClassName)()
 
     private def operatorAnnotation (syntax: JSyntaxDef): JavaAnnotation = syntax match {
       case JExpressionSyntaxDef(priority, pattern) => operatorAnnotation("Expression", priority, pattern)

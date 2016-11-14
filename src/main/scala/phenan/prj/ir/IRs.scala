@@ -283,7 +283,7 @@ trait IRDSL extends IRModule {
   lazy val declaredMembers: List[IRDSLMember] = declaredMembers(dslAST.members, Nil)
 
   protected def modifiersAST: List[Modifier] = dslAST.modifiers
-  protected def metaParametersAST: List[MetaParameter] = Nil
+  protected def metaParametersAST: List[MetaParameter] = dslAST.metaParameters
   protected def superTypeAST: Option[TypeName] = None
   protected def interfacesAST: List[TypeName] = Nil
 
@@ -296,14 +296,14 @@ trait IRDSL extends IRModule {
   override def isDSL: Boolean = true
 
   private def declaredMembers (membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
-    case (c: ContextDeclaration) :: rest        => declaredMembers(rest, IRContext(c, this) :: ms)
-    case (p: PrioritiesDeclaration) :: rest     => declaredMembers(rest, IRDSLPriorities(p, this) :: ms)
-    case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, IRDSLOperator(o, this) :: ms)
+    case (p: PrioritiesDeclaration) :: rest     => declaredMembers(rest, IRPriorities(p, this) :: ms)
+    case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, IROperator(o, this) :: ms)
+    case (c: ConstructorDeclaration) :: rest    => declaredMembers(rest, IRDSLConstructor(c, this) :: ms)
     case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRDSLField(mods, ft, _, this)) ++ ms)
     case Nil => ms.reverse
   }
 
-  private lazy val priorityDeclarations = declaredMembers.collect { case p: IRDSLPriorities => p }
+  private lazy val priorityDeclarations = declaredMembers.collect { case p: IRPriorities => p }
 
   private def withDSLs (ast: List[QualifiedName], result: List[JClass]): List[JClass] = ast match {
     case qualifiedName :: rest => staticResolver.resolve(qualifiedName.names) match {
@@ -316,6 +316,7 @@ trait IRDSL extends IRModule {
   }
 }
 
+/*
 case class IRContext (contextAST: ContextDeclaration, dsl: IRDSL) extends IRModule with IRDSLMember {
   def file: IRFile = dsl.file
   def outer: Option[IRModule] = Some(dsl)
@@ -337,6 +338,7 @@ case class IRContext (contextAST: ContextDeclaration, dsl: IRDSL) extends IRModu
     case Nil => ms.reverse
   }
 }
+*/
 
 case class IRTopLevelClass (classAST: ClassDeclaration, file: IRFile) extends IRClass with IRTopLevelModule {
   protected def implicitModifier = accSuper
@@ -464,10 +466,6 @@ case class IRInterfaceField (modifiersAST: List[Modifier], fieldTypeAST: TypeNam
 }
 
 case class IRDSLField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRDSL) extends IRMemberVariable with IRDSLMember {
-  protected def implicitModifiers = accStatic
-}
-
-case class IRContextField (modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRContext) extends IRMemberVariable with IRContextMember {
   protected def implicitModifiers = 0
 }
 
@@ -695,7 +693,7 @@ case class IREnumConstructor (constructorAST: ConstructorDeclaration, declaringC
   protected def implicitModifiers = 0
 }
 
-case class IRContextConstructor (constructorAST: ConstructorDeclaration, declaringClass: IRContext) extends IRConstructor with IRContextMember {
+case class IRDSLConstructor (constructorAST: ConstructorDeclaration, declaringClass: IRDSL) extends IRConstructor with IRDSLMember {
   protected def implicitModifiers = 0
 }
 
@@ -751,9 +749,8 @@ case class IRClassStaticInitializer (staticInitializerAST: StaticInitializer, de
 
 case class IREnumStaticInitializer (staticInitializerAST: StaticInitializer, declaringClass: IREnum) extends IRStaticInitializer with IREnumMember
 
-trait IROperator extends IRProcedure {
-  def dsl: IRDSL
-  protected def operatorAST: OperatorDeclaration
+case class IROperator (protected val operatorAST: OperatorDeclaration, declaringClass: IRDSL) extends IRProcedure with IRDSLMember {
+  def dsl: IRDSL = declaringClass
 
   lazy val name: String = operatorAST.label.getOrElse("ProteanOperator$" + state.uniqueId)
 
@@ -763,6 +760,8 @@ trait IROperator extends IRProcedure {
   protected def returnBoundsAST: List[TypeName] = operatorAST.returnBounds
   protected def formalParametersAST: List[FormalParameter] = operatorAST.formalParameters
   protected def clausesAST: List[MethodClause] = operatorAST.clauses
+
+  protected def implicitModifiers: Int = 0
 
   override def syntax = Some(operatorSyntax)
 
@@ -801,17 +800,7 @@ trait IROperator extends IRProcedure {
   }
 }
 
-case class IRDSLOperator (operatorAST: OperatorDeclaration, declaringClass: IRDSL) extends IROperator with IRDSLMember {
-  def dsl: IRDSL = declaringClass
-  protected def implicitModifiers: Int = accStatic | accFinal
-}
-
-case class IRContextOperator (operatorAST: OperatorDeclaration, declaringClass: IRContext) extends IROperator with IRContextMember {
-  def dsl: IRDSL = declaringClass.dsl
-  protected def implicitModifiers = 0
-}
-
-case class IRDSLPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
+case class IRPriorities (prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
   def priorityNames = prioritiesAST.names
 
   lazy val constraints: List[List[JPriority]] = prioritiesAST.constraints.map(declaringDSL.staticResolver.constraint)

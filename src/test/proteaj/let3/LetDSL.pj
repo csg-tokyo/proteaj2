@@ -1,19 +1,22 @@
 package let3;
 
-dsl LetDSL {
+dsl LetDSL <V> {
   priority p0, p1 {
     p0 < p1
   }
-  <T, R> R[p1] "let" "a" ":" T "=" _ "in" _ (T v, Local<T> ~> R r) {
-    return r.apply(new Local<T>(v));
+
+  static <T, R> R[p1] "let" "a" ":" T "=" _ "in" _ (T v, LetDSL<T> ~> R r) {
+    return r.apply(new LetDSL<T>(v));
   }
-  context Local <V> {
-    Local (V v) {
-      this.v = v;
-    }
-    V[p0] "a" () {
-      return v;
-    }
-    private V v;
+
+  LetDSL (V v) {
+    this.v = v;
   }
+
+  V[p0] "a" () {
+    return v;
+  }
+
+  private V v;
+
 }

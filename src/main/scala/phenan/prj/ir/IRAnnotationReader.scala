@@ -19,7 +19,6 @@ class IRAnnotationReader (file: IRFile) {
   lazy val fieldSignature  = reader(fieldSigClassName, fieldSignatureAnnotation)
   lazy val operator = reader(operatorClassName, operatorAnnotation)
   lazy val dsl      = reader(dslClassName, dslAnnotation)
-  lazy val context  = marker(contextClassName)
 
   /* read IRAnnotation */
 

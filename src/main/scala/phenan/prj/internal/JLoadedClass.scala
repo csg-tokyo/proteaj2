@@ -23,8 +23,6 @@ class JLoadedClass (val classFile: BClassFile, val compiler: JCompiler) extends 
     parseMethodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
   }
 
-  def isContext = annotations.isContext
-
   lazy val signature = annotations.signature.orElse {
     attributes.signature.flatMap(sig => parseClassSignature(readUTF(sig.signature)))
   } getOrElse {

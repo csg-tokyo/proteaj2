@@ -4,7 +4,6 @@ import proteaj.impl.*;
 
 import static proteaj.impl.OpElemType.*;
 
-@Context
 @DSL(priorities = { "getter", "setter" }, constraints = { @Constraint({ @Priority(dsl = "Ltest/Var;", name = "getter"), @Priority(dsl = "Ltest/Var;", name = "setter") }) })
 @ClassSig(metaParameters = { @MetaParameter(name = "T"), @MetaParameter(name = "id", type = "Lproteaj/lang/Identifier;") })
 public class Var<T> {

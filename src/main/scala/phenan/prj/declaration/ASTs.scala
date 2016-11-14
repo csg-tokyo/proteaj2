@@ -28,24 +28,21 @@ case class ClassDeclaration (modifiers: List[Modifier], name: String, metaParame
 case class EnumDeclaration (modifiers: List[Modifier], name: String, interfaces: List[TypeName], enumConstants: List[EnumConstant], members: List[ClassMember]) extends ModuleDeclaration
 case class InterfaceDeclaration (modifiers: List[Modifier], name: String, metaParameters: List[MetaParameter], superInterfaces: List[TypeName], members: List[InterfaceMember]) extends ModuleDeclaration
 case class AnnotationDeclaration (modifiers: List[Modifier], name: String, members: List[AnnotationMember]) extends ModuleDeclaration
-case class DSLDeclaration (modifiers: List[Modifier], name: String, withDSLs: List[QualifiedName], members: List[DSLMember]) extends ModuleDeclaration
+case class DSLDeclaration (modifiers: List[Modifier], name: String, metaParameters: List[MetaParameter], withDSLs: List[QualifiedName], members: List[DSLMember]) extends ModuleDeclaration
 
 sealed trait ClassMember
 sealed trait InterfaceMember
 sealed trait AnnotationMember
 sealed trait DSLMember
-sealed trait ContextMember
 
 case class InstanceInitializer (block: BlockSnippet) extends ClassMember
 case class StaticInitializer (block: BlockSnippet) extends ClassMember
-case class ConstructorDeclaration (modifiers: List[Modifier], metaParameters: List[MetaParameter], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: BlockSnippet) extends ClassMember with ContextMember
-case class FieldDeclaration (modifiers: List[Modifier], fieldType: TypeName, declarators: List[VariableDeclarator]) extends ClassMember with InterfaceMember with AnnotationMember with DSLMember with ContextMember
+case class ConstructorDeclaration (modifiers: List[Modifier], metaParameters: List[MetaParameter], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: BlockSnippet) extends ClassMember with DSLMember
+case class FieldDeclaration (modifiers: List[Modifier], fieldType: TypeName, declarators: List[VariableDeclarator]) extends ClassMember with InterfaceMember with AnnotationMember with DSLMember
 case class MethodDeclaration (modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, name: String, formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends ClassMember with InterfaceMember
 case class AnnotationElementDeclaration (modifiers: List[Modifier], elementType: TypeName, name: String, dim: Int, defaultValue: Option[AnnotationElement]) extends AnnotationMember
-case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, returnBounds: List[TypeName], priority: Option[QualifiedName], syntax: List[SyntaxElement], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends DSLMember with ContextMember
+case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, returnBounds: List[TypeName], priority: Option[QualifiedName], syntax: List[SyntaxElement], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends DSLMember
 case class PrioritiesDeclaration (names: List[String], constraints: List[List[QualifiedName]]) extends DSLMember
-
-case class ContextDeclaration (modifiers: List[Modifier], name: String, metaParameters: List[MetaParameter], members: List[ContextMember]) extends DSLMember
 
 case class FormalParameter (modifiers: List[Modifier], parameterType: ParameterType, varArgs: Boolean, name: String, dim: Int, initializer: Option[ExpressionSnippet])
 case class VariableDeclarator (name: String, dim: Int, initializer: Option[ExpressionSnippet])

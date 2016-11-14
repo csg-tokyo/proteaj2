@@ -1,38 +1,36 @@
 package struct;
 
-dsl StructDSL {
+dsl StructDSL <sName: Identifier, T1, name1: Identifier, T2, name2: Identifier> {
   priority p0, p1 {
     p0 < p1
   }
 
-  <sName: Identifier, T1, name1: Identifier, T2, name2: Identifier>
-    void[p1] "val" sName "=" "struct" "{" T1 name1 "=" _ T2 name2 "=" _ "}" (T1 v1, T2 v2) activates Struct2Context<sName, T1, name1, T2, name2>
+  static <sName: Identifier, T1, name1: Identifier, T2, name2: Identifier>
+    void[p1] "val" sName "=" "struct" "{" T1 name1 "=" _ T2 name2 "=" _ "}" (T1 v1, T2 v2) activates StructDSL<sName, T1, name1, T2, name2>
   {
-    activate new Struct2Context<sName, T1, name1, T2, name2>(v1, v2);
+    activate new StructDSL<sName, T1, name1, T2, name2>(v1, v2);
   }
 
-  <sName: Identifier, T1, name1: Identifier, T2, name2: Identifier>
-      void[p1] "var" sName "=" "struct" "{" _ ":" name1 _ ":" name2 "}" (T1 v1, T2 v2) activates Struct2Context<sName, T1, name1, T2, name2>
+  static <sName: Identifier, T1, name1: Identifier, T2, name2: Identifier>
+      void[p1] "var" sName "=" "struct" "{" _ ":" name1 _ ":" name2 "}" (T1 v1, T2 v2) activates StructDSL<sName, T1, name1, T2, name2>
     {
-      activate new Struct2Context<sName, T1, name1, T2, name2>(v1, v2);
+      activate new StructDSL<sName, T1, name1, T2, name2>(v1, v2);
     }
 
-  Identifier[p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+  static Identifier[p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
     return new Identifier(name);
   }
 
-  context Struct2Context <sName: Identifier, T1, name1: Identifier, T2, name2: Identifier> {
-    Struct2Context(T1 v1, T2 v2) {
-      this.v1 = v1;
-      this.v2 = v2;
-    }
-
-    T1[p1] sName "." name1 () { return v1; }
-    T2[p1] sName "." name2 () { return v2; }
-
-    private T1 v1;
-    private T2 v2;
+  StructDSL(T1 v1, T2 v2) {
+    this.v1 = v1;
+    this.v2 = v2;
   }
+
+  T1[p1] sName "." name1 () { return v1; }
+  T2[p1] sName "." name2 () { return v2; }
+
+  private T1 v1;
+  private T2 v2;
 }
 
 class Identifier {

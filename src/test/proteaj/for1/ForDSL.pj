@@ -2,28 +2,26 @@ package for1;
 
 import java.util.*;
 
-dsl ForDSL {
-  priority p0, p1 {
-    p0 < p1
-  }
+dsl ForDSL <T, name: Identifier> {
+  priority p0, p1 { p0 < p1 }
 
-  <T, name: Identifier, U> List<U>[p1] "for" name "<-" _ "yield" _ (List<T> list, Variable<T, name> ~> U f) {
+  static <T, name: Identifier, U> List<U>[p1] "for" name "<-" _ "yield" _ (List<T> list, ForDSL<T, name> ~> U f) {
     List<U> result = new ArrayList<U>();
     for (T t : list) {
-      result.add(f.apply(new Variable<T, name>(t)));
+      result.add(f.apply(new ForDSL<T, name>(t)));
     }
     return result;
   }
 
-  Identifier[p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+  static Identifier[p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
     return new Identifier(name);
   }
 
-  context Variable <T, name: Identifier> {
-    Variable (T v) { this.v = v; }
-    T name[p0] () { return v; }
-    private T v;
-  }
+  ForDSL (T v) { this.v = v; }
+
+  T name[p0] () { return v; }
+
+  private T v;
 }
 
 class Identifier {
