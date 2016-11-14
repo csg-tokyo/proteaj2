@@ -1,0 +1,22 @@
+package str;
+
+dsl StrDSL {
+  priority p0, p1, p2 {
+    p0 < PredefOperators.add < p1 < p2
+  }
+
+  String[p2] _[p0] "+" _[p0] _[p1] (String s1, String s2, StrBC ~> String f) {
+    return f.apply(new StrBC(new StringBuilder().append(s1).append(s2)));
+  }
+  context StrBC {
+    StrBC (StringBuilder sb) { this.sb = sb; }
+    StringBuilder sb;
+    String[p1] "+" _[p0] _[p1] (String s, StrBC ~> String f) {
+      sb.append(s);
+      return f.apply(this);
+    }
+    String[p1] "+" _[p0] (String s) {
+      return sb.append(s).toString();
+    }
+  }
+}

@@ -1,0 +1,13 @@
+package map;
+
+import java.util.*;
+
+dsl MapDSL {
+  <K, V> Optional<V> _ "[" _ "]" (Map<K, V> map, K key) {
+    return Optional.<V>ofNullable(map.get(key));
+  }
+
+  <K, V> void _ "+=" _ "->" _ (Map<K, V> map, K key, V value) {
+    map.put(key, value);
+  }
+}

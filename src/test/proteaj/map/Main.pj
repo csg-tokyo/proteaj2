@@ -1,0 +1,12 @@
+package map;
+
+import java.util.*;
+import dsl MapDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    Map<String, String> m = new HashMap<String, String>();
+    m += "foo" -> "bar";
+    System.out.println(m["foo"]);
+  }
+}
