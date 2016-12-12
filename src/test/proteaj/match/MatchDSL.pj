@@ -5,47 +5,50 @@ import java.util.function.*;
 
 dsl MatchDSL {
   priority match, case, matcher, var, id {
-    match > case > matcher > var > id
+    match < case < matcher < var < id
   }
 
-  <T, R> R [match] _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
+  static <T, R> R [match] _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
     for (Case<T, R> c : cases) {
       Optional<R> result = c.apply(t);
       if (result.isPresent()) return result.get();
     }
     return null;
   }
-  <T, R> Case0<T, R> [case] "|" _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
+  static <T, R> Case0<T, R> [case] "|" _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
     return new Case0<T, R> (m, new DelayedApplication<Lazy, R>(f, new Lazy()));
   }
-  <T, A, name: Identifier, R> Case1<T, A, name, R> [case] "|" _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> ~> R f ) {
+  static <T, A, name: Identifier, R> Case1<T, A, name, R> [case] "|" _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> ~> R f ) {
     return new Case1<T, A, name, R> (m, f);
   }
-  <T, R> DefaultCase<T, R> [case] "|" "_" "=>" _ ( Lazy ~> R f ) {
+  static <T, R> DefaultCase<T, R> [case] "|" "_" "=>" _ ( Lazy ~> R f ) {
     return new DefaultCase<T, R> (new DelayedApplication<Lazy, R>(f, new Lazy()));
   }
 
-  <T, name: Identifier> Matcher1<T, T, name> [var] name () {
+  static <T, name: Identifier> Matcher1<T, T, name> [var] name () {
     return new VariablePattern<T, name> ();
   }
 
-  Identifier[id] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+  static Identifier[id] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
     return new Identifier(name);
-  }
-
-  context Lazy {}
-  context Var <A, name: Identifier> {
-    Var (A a) { this.a = a; }
-    A [var] name () { return a; }
-    private A a;
   }
 }
 
+dsl Lazy {
+  Lazy () {}
+}
+
+dsl Var <A, name: Identifier> {
+  Var (A a) { this.a = a; }
+  A [MatchDSL.var] name () { return a; }
+  private A a;
+}
+
 dsl StringMatcherDSL {
-  Matcher0<String> [MatchDSL.matcher] "starts" "with" _ ( String prefix ) {
+  static Matcher0<String> [MatchDSL.matcher] "starts" "with" _ ( String prefix ) {
     return new PrefixMatcher(prefix);
   }
-  <A, name: Identifier> Matcher1<String, A, name> [MatchDSL.matcher] _ "~" _[MatchDSL.matcher] ( String prefix, Matcher1<String, A, name> m ) {
+  static <A, name: Identifier> Matcher1<String, A, name> [MatchDSL.matcher] _ "~" _[MatchDSL.matcher] ( String prefix, Matcher1<String, A, name> m ) {
     return new PrefixedStringMatcher1<A, name>(prefix, m);
   }
 }
@@ -70,17 +73,17 @@ class Case0 <T, R> implements Case<T, R> {
 }
 
 class Case1 <T, A, name: Identifier, R> implements Case<T, R> {
-  Case1 (Matcher1<T, A, name> m, Function<MatchDSL.Var<A, name>, R> f) {
+  Case1 (Matcher1<T, A, name> m, Function<Var<A, name>, R> f) {
     this.matcher = m;
     this.function = f;
   }
   public Optional<R> apply (T t) {
     Optional<A> a = matcher.match(t);
-    if (a.isPresent()) return Optional.<R>of(function.apply(new MatchDSL.Var<A, name>(a.get())));
+    if (a.isPresent()) return Optional.<R>of(function.apply(new Var<A, name>(a.get())));
     else return Optional.<R>empty();
   }
   private Matcher1<T, A, name> matcher;
-  private Function<MatchDSL.Var<A, name>, R> function;
+  private Function<Var<A, name>, R> function;
 }
 
 class DefaultCase <T, R> implements Case<T, R> {

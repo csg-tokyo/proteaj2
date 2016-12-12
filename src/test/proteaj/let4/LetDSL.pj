@@ -1,7 +1,7 @@
 package let4;
 
 dsl LetDSL <V, name: Identifier> {
-  priority p0, p1 { p0 < p1 }
+  priority p0, p1 { p0 > p1 }
 
   static <T, R, name: Identifier> R[p1] "let" name ":" T "=" _ "in" _ (T v, LetDSL<T, name> ~> R r) {
     return r.apply(new LetDSL<T, name>(v));

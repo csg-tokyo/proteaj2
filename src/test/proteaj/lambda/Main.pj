@@ -1,0 +1,12 @@
+package lambda;
+
+import java.util.function.*;
+
+import dsl lambda.Lambda { Lambda.p0 < PredefOperators.add < Lambda.p1 }
+
+public class Main {
+  public static void main (String[] args) {
+    Function<String, String> f = { s => s + "!" };
+    System.out.println(f.apply("hello, world"));
+  }
+}

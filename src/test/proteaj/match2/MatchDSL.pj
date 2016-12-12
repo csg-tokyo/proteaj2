@@ -1,0 +1,107 @@
+package match2;
+
+import dsl lambda.Lambda;
+
+import java.util.*;
+import java.util.function.*;
+
+import lambda.*;
+
+public dsl MatchDSL {
+  static <T, R> R _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
+    for (Case<T, R> c : cases) {
+      Optional<R> result = c.apply(t);
+      if (result.isPresent()) return result.get();
+    }
+    return null;
+  }
+
+  static <T, R> Case<T, R> "|" _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
+    return new Case <T, R> ({ t => m.ifMatch(t, f) });
+  }
+
+  static <T, A, name: Id, R> Case<T, R> "|" _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> ~> R f ) {
+    return new Case <T, R> ({ t => m.ifMatch(t, f) });
+  }
+
+  static <T> Matcher0<T> "_" () {
+    return new Matcher0 <T> ({ t => Boolean.TRUE });
+  }
+
+  static <A, name: Id> Matcher1<A, A, name> name () {
+    return new Matcher1 <A, A, name> ({ a => Optional.<A>of(a) });
+  }
+}
+
+dsl Var <A, name: Id> {
+  Var (A a) { this.value = a; }
+  A name () { return value; }
+  private A value;
+}
+
+dsl Lazy {
+  Lazy () {}
+}
+
+class Case <T, R> {
+  public Case (Function<T, Optional<R>> f) { this.f = f; }
+  public Optional<R> apply (T t) { return f.apply(t); }
+  private Function<T, Optional<R>> f;
+}
+
+class Matcher0 <T> {
+  public <R> Optional<R> ifMatch (T t, Function<Lazy, R> f) {
+    if (predicate.test(t)) return Optional.<R>of(f.apply(new Lazy()));
+    else return Optional.<R>empty();
+  }
+
+  public Matcher0 (Predicate<T> predicate) {
+    this.predicate = predicate;
+  }
+
+  private Predicate<T> predicate;
+}
+
+class Matcher1 <T, A, name: Id> {
+  public <R> Optional<R> ifMatch (T t, Function<Var<A, name>, R> f) {
+    Function<A, R> g = { a => f.apply(new Var<A, name>(a)) };
+    return function.apply(t).<R>map(g);
+  }
+
+  public Matcher1 (Function<T, Optional<A>> function) {
+    this.function = function;
+  }
+
+  private Function<T, Optional<A>> function;
+}
+
+class Matcher2 <T, A, B, nameA: Id, nameB: Id> {
+  public <R> Optional<R> ifMatch (T t, BiFunction<A, B, R> f) {
+    Optional<Pair<A, B>> pair = function.apply(t);
+    if (pair.isPresent()) {
+      A a = pair.get().getA();
+      B b = pair.get().getB();
+      return Optional.<R>of(f.apply(a, b));
+    }
+    else return Optional.<R>empty();
+  }
+
+  public Matcher2 (Function<T, Optional<Pair<A, B>>> function) {
+    this.function = function;
+  }
+
+  private Function<T, Optional<Pair<A, B>>> function;
+}
+
+class Pair <A, B> {
+  public Pair (A a, B b) {
+    this.a = a;
+    this.b = b;
+  }
+
+  A getA () { return a; }
+  B getB () { return b; }
+
+  private A a;
+  private B b;
+}
