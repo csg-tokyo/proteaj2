@@ -38,7 +38,7 @@ class TypeParsersTest extends FunSuite with Matchers {
 
     val r4 = parsers.className(src("java.util.Map.Entry"))
     r4.successful shouldBe true
-    r4.get shouldBe compiler.classLoader.loadClass("java/util/Map$Entry").get
+    r4.get shouldBe compiler.classLoader.loadClass(s"java/util/Map$$Entry").get
   }
 
   test("typeName") {
@@ -68,7 +68,7 @@ class TypeParsersTest extends FunSuite with Matchers {
     r2.get shouldBe ans2
 
     val r3 = parsers.typeName(src("Map.Entry<String, java.util.jar.JarEntry>"))
-    val ans3 = compiler.classLoader.loadClass("java/util/Map$Entry").get.objectType(List(str, je)).get
+    val ans3 = compiler.classLoader.loadClass(s"java/util/Map$$Entry").get.objectType(List(str, je)).get
     r3.successful shouldBe true
     r3.get shouldBe ans3
   }

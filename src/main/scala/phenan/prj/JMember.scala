@@ -12,7 +12,7 @@ trait JMember {
 case class JField (fieldDef: JFieldDef, fieldType: JType, declaring: JModule) extends JMember {
   def modifier: JModifier = fieldDef.mod
   def name: String = fieldDef.name
-  def declaringClass = fieldDef.declaringClass
+  def declaringClass: JClass = fieldDef.declaringClass
 }
 
 trait JProcedure extends JMember {
@@ -20,9 +20,9 @@ trait JProcedure extends JMember {
   def env: Map[String, MetaArgument]
 
   def modifier: JModifier = methodDef.mod
-  def declaringClass = methodDef.declaringClass
+  def declaringClass: JClass = methodDef.declaringClass
 
-  lazy val metaParameters = methodDef.signature.metaParams.map(param => param.name -> param).toMap
+  lazy val metaParameters: Map[String, FormalMetaParameter] = methodDef.signature.metaParams.map(param => param.name -> param).toMap
   lazy val returnType: JGenericType = JGenericType(methodDef.signature.returnType, env, compiler)
   lazy val returnBounds: List[JGenericType] = methodDef.signature.returnBounds.map(sig => JGenericType(sig, env, compiler))
   lazy val parameterTypes: List[JParameter] = methodDef.signature.parameters.map(sig => JParameter(sig, env, compiler))
@@ -75,7 +75,7 @@ trait JProcedure extends JMember {
     case JNotPredicateDef(sig, p) => JNotPredicate(JParameter(sig, env, compiler), p)
   }
 
-  def compiler = declaring.compiler
+  def compiler: JCompiler = declaring.compiler
 }
 
 class JMethod (val methodDef: JMethodDef, val env: Map[String, MetaArgument], val declaring: JModule) extends JProcedure {

@@ -16,12 +16,12 @@ case class MetaVariableRef (name: String, valueType: JType) extends MetaValue {
 }
 
 case class ConcreteMetaValue (ast: IRExpression, valueType: JType) extends MetaValue {
-  def name = ast.toString
+  def name: String = ast.toString
   override def matches(v: MetaArgument): Boolean = this == v
 }
 
 case class JUnboundMetaVariable (valueType: JType) extends MetaValue {
-  def name = "?:" + valueType.name
+  def name: String = "?:" + valueType.name
   def matches(v: MetaArgument): Boolean = v match {
     case m: MetaValue => m.valueType <:< valueType
     case _: JWildcard | _: JRefType => false
@@ -29,7 +29,7 @@ case class JUnboundMetaVariable (valueType: JType) extends MetaValue {
 }
 
 case class JWildcard (upperBound: Option[JRefType], lowerBound: Option[JRefType]) extends MetaArgument {
-  def name = upperBound.map(ub => "? extends " + ub.name).orElse(lowerBound.map(lb => "? super " + lb.name)).getOrElse("?")
+  def name: String = upperBound.map(ub => "? extends " + ub.name).orElse(lowerBound.map(lb => "? super " + lb.name)).getOrElse("?")
 
   def matches (that: MetaArgument): Boolean = that match {
     case that: JRefType  => upperBound.forall(that <:< _) && lowerBound.forall(_ <:< that)
@@ -92,7 +92,7 @@ case class JClassModule (clazz: JClass) extends JModule {
   }
 
   lazy val declaredFields: List[JField] = clazz.fields.filter(_.isStatic).flatMap { fieldDef =>
-    compiler.typeLoader.fromTypeSignature(fieldDef.signature, Map.empty).map(fieldType => new JField(fieldDef, fieldType, this))
+    compiler.typeLoader.fromTypeSignature(fieldDef.signature, Map.empty).map(fieldType => JField(fieldDef, fieldType, this))
   }
 
   lazy val fields: Map[String, JField] = declaredFields.filterNot(_.isPrivate).map(f => f.name -> f).toMap
@@ -105,15 +105,15 @@ case class JClassModule (clazz: JClass) extends JModule {
   lazy val methods: Map[String, List[JMethod]] = declaredMethods.filterNot(_.isPrivate).groupBy(_.name)
   lazy val privateMethods: Map[String, List[JMethod]] = declaredMethods.filter(_.isPrivate).groupBy(_.name)
 
-  def priorities = clazz.priorities
-  def constraints = clazz.priorityConstraints
+  def priorities: Set[JPriority] = clazz.priorities
+  def constraints: List[List[JPriority]] = clazz.priorityConstraints
 
-  lazy val withDSLs = clazz.withDSLs.map(_.classModule)
+  lazy val withDSLs: List[JClassModule] = clazz.withDSLs.map(_.classModule)
 
-  def compiler = clazz.compiler
+  def compiler: JCompiler = clazz.compiler
 
-  lazy val expressionOperators = collectExpressionOperators(declaredMethods.filterNot(_.isPrivate), Nil)
-  lazy val literalOperators = collectLiteralOperators(declaredMethods.filterNot(_.isPrivate), Nil)
+  lazy val expressionOperators: List[(JExpressionSyntax, JMethod)] = collectExpressionOperators(declaredMethods.filterNot(_.isPrivate), Nil)
+  lazy val literalOperators: List[(JLiteralSyntax, JMethod)] = collectLiteralOperators(declaredMethods.filterNot(_.isPrivate), Nil)
 
   private def collectExpressionOperators (ms: List[JMethod], es: List[(JExpressionSyntax, JMethod)]): List[(JExpressionSyntax, JMethod)] = ms match {
     case m :: rest => m.syntax match {
@@ -150,8 +150,8 @@ sealed trait JType extends JModule {
   def <:< (t: JType): Boolean = this.isSubtypeOf(t)
   def >:> (t: JType): Boolean = t.isSubtypeOf(this)
 
-  def <=< (t: JGenericType) = unifyG(t)
-  def >=> (t: JGenericType) = unifyL(t)
+  def <=< (t: JGenericType): Option[Map[String, MetaArgument]] = unifyG(t)
+  def >=> (t: JGenericType): Option[Map[String, MetaArgument]] = unifyL(t)
 
   def findField (name: String, from: JClass, receiverIsThis: Boolean): Option[JField]
   def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod]
@@ -162,14 +162,14 @@ sealed trait JRefType extends JType with MetaArgument {
 }
 
 case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends JRefType {
-  def compiler = erase.compiler
+  def compiler: JCompiler = erase.compiler
 
   def name: String = {
     if (env.isEmpty) erase.name
     else erase.name + env.map(kv => kv._1 + "=" + kv._2.name).mkString("<", ",", ">")
   }
 
-  override def toString = name
+  override def toString: String = name
 
   def superType: Option[JObjectType] = compiler.typeLoader.fromClassTypeSignature(erase.signature.superClass, env)
 
@@ -195,7 +195,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
   }, env, this)
 
   lazy val declaredFields: List[JField] = erase.fields.filterNot(_.isStatic).flatMap { fieldDef =>
-    compiler.typeLoader.fromTypeSignature(fieldDef.signature, env).map(fieldType => new JField(fieldDef, fieldType, this))
+    compiler.typeLoader.fromTypeSignature(fieldDef.signature, env).map(fieldType => JField(fieldDef, fieldType, this))
   }
 
   lazy val declaredMethods: List[JMethod] = {
@@ -244,8 +244,8 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
 
   def matches (that: MetaArgument): Boolean = this == that
 
-  lazy val expressionOperators = collectExpressionOperators(nonPrivateMethodList, Nil)
-  lazy val literalOperators = collectLiteralOperators(nonPrivateMethodList, Nil)
+  lazy val expressionOperators: List[(JExpressionSyntax, JMethod)] = collectExpressionOperators(nonPrivateMethodList, Nil)
+  lazy val literalOperators: List[(JLiteralSyntax, JMethod)] = collectLiteralOperators(nonPrivateMethodList, Nil)
 
   private def collectExpressionOperators (ms: List[JMethod], es: List[(JExpressionSyntax, JMethod)]): List[(JExpressionSyntax, JMethod)] = ms match {
     case m :: rest => m.syntax match {
@@ -286,7 +286,7 @@ case class JObjectType (erase: JClass, env: Map[String, MetaArgument]) extends J
 }
 
 case class JPrimitiveType (clazz: JPrimitiveClass) extends JType {
-  def name = clazz.name
+  def name: String = clazz.name
 
   def methods: Map[String, List[JMethod]] = Map.empty
 
@@ -297,7 +297,7 @@ case class JPrimitiveType (clazz: JPrimitiveClass) extends JType {
 
   lazy val boxed: Option[JRefType] = clazz.wrapperClass.flatMap(_.objectType(Nil))
 
-  def compiler = clazz.compiler
+  def compiler: JCompiler = clazz.compiler
 }
 
 case class JArrayType (componentType: JType) extends JRefType {
@@ -339,8 +339,6 @@ case class JTypeVariable (name: String, bounds: List[JRefType], compiler: JCompi
     }
     case Nil => None
   }
-
-  private lazy val boundHead = bounds.headOption.orElse(compiler.typeLoader.objectType)
 }
 
 case class JCapturedWildcardType private (upperBound: JRefType, lowerBound: Option[JRefType], id: Int) extends JRefType {
@@ -354,7 +352,7 @@ case class JCapturedWildcardType private (upperBound: JRefType, lowerBound: Opti
 
   def findMethod (name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = upperBound.findMethod(name, from, receiverIsThis)
 
-  def compiler = upperBound.compiler
+  def compiler: JCompiler = upperBound.compiler
 }
 
 object JCapturedWildcardType {
@@ -389,5 +387,5 @@ case class JUnboundTypeVariable (name: String, bounds: List[JRefType], compiler:
     case Nil => None
   }
 
-  lazy val boundHead = bounds.headOption.orElse(compiler.typeLoader.objectType)
+  lazy val boundHead: Option[JRefType] = bounds.headOption.orElse(compiler.typeLoader.objectType)
 }

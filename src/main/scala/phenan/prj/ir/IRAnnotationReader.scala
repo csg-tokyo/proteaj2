@@ -14,11 +14,11 @@ class IRAnnotationReader (file: IRFile) {
 
   def read (as: List[Annotation]): List[IRAnnotation] = annotations(as).getOrElse(Nil)
 
-  lazy val classSignature  = reader(classSigClassName, classSignatureAnnotation)
-  lazy val methodSignature = reader(methodSigClassName, methodSignatureAnnotation)
-  lazy val fieldSignature  = reader(fieldSigClassName, fieldSignatureAnnotation)
-  lazy val operator = reader(operatorClassName, operatorAnnotation)
-  lazy val dsl      = reader(dslClassName, dslAnnotation)
+  lazy val classSignature: List[IRAnnotation] => Option[JClassSignature] = reader(classSigClassName, classSignatureAnnotation)
+  lazy val methodSignature: List[IRAnnotation] => Option[JMethodSignature] = reader(methodSigClassName, methodSignatureAnnotation)
+  lazy val fieldSignature: List[IRAnnotation] => Option[JTypeSignature] = reader(fieldSigClassName, fieldSignatureAnnotation)
+  lazy val operator: List[IRAnnotation] => Option[JSyntaxDef] = reader(operatorClassName, operatorAnnotation)
+  lazy val dsl: List[IRAnnotation] => Option[IRDSLInfo] = reader(dslClassName, dslAnnotation)
 
   /* read IRAnnotation */
 
@@ -26,7 +26,7 @@ class IRAnnotationReader (file: IRFile) {
     reader =<< as.find(_.annotationClass.internalName == name)
   }
 
-  private def marker (name: String): List[IRAnnotation] => Boolean = { _.exists(_.annotationClass.internalName == name) }
+  //private def marker (name: String): List[IRAnnotation] => Boolean = { _.exists(_.annotationClass.internalName == name) }
 
   private lazy val classSignatureAnnotation = for {
     metaParams <- array("metaParameters")(elementAnnotation(metaParamClassName, metaParameterAnnotation))
@@ -204,8 +204,8 @@ class IRAnnotationReader (file: IRFile) {
   private def rep [A, B] (reader: A =?> B): List[A] =?> List[B] = read(_.traverse(reader(_)))
   private def opt [A, B] (reader: A =?> B): A =?> Option[B] = read { a => Some(reader(a)) }
 
-  def compiler = file.compiler
-  def resolver = file.resolver
+  def compiler: JCompiler = file.compiler
+  def resolver: NameResolver = file.resolver
 
   implicit def state: JState = file.state
 }

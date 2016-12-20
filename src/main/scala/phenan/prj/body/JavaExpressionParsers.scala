@@ -41,7 +41,7 @@ trait JavaExpressionParsers {
 
     lazy val arrayInitializer: HParser[IRArrayInitializer] = ( "new" ~> typeParsers.componentType ) ~ dimension1 >> {
       case componentType ~ dim => '{' ~> getExpressionParser(componentType.array(dim - 1), env).*(',') <~ ','.? <~ '}' ^^ {
-        case components => IRArrayInitializer(componentType, dim, components)
+        IRArrayInitializer(componentType, dim, _)
       }
     }
 
@@ -67,7 +67,7 @@ trait JavaExpressionParsers {
     }
 
     private def anonymousClass_Arguments (metaArgs: List[MetaArgument], constructor: JConstructor): Option[HParser[(Map[String, MetaArgument], List[IRExpression], List[IRContextRef])]] = {
-      if (constructor.parameterTypes.isEmpty && metaArgs.isEmpty) Some(( '(' ~> ')' ) .? ^^^ (Map.empty[String, MetaArgument], Nil, Nil))
+      if (constructor.parameterTypes.isEmpty && metaArgs.isEmpty) Some(( '(' ~> ')' ) .? ^^^ ((Map.empty[String, MetaArgument], Nil, Nil)))
       else procedureArguments(constructor, metaArgs)
     }
 
@@ -159,11 +159,11 @@ trait JavaExpressionParsers {
 
     lazy val variableRef: HParser[IRLocalVariableRef] = identifier ^^? { env.localVariable }
 
-    lazy val intExpression = getExpressionParser(compiler.typeLoader.int, env)
+    lazy val intExpression: HParser[IRExpression] = getExpressionParser(compiler.typeLoader.int, env)
 
-    lazy val dimension = ( '[' ~> ']' ).* ^^ { _.length }
+    lazy val dimension: HParser[Int] = ( '[' ~> ']' ).* ^^ { _.length }
 
-    lazy val dimension1 = ( '[' ~> ']' ).+ ^^ { _.length }
+    lazy val dimension1: HParser[Int] = ( '[' ~> ']' ).+ ^^ { _.length }
 
     private def procedureCall [T] (procedure: JProcedure)(f: (Map[String, MetaArgument], List[IRExpression], List[IRContextRef]) => T): HParser[T] = {
       getArgumentsParser(procedure, env) ^^? { case (bind, args) => env.inferContexts(procedure, bind).map(f(bind, args, _)) }

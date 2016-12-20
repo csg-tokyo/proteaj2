@@ -19,7 +19,7 @@ class NameResolverTest extends FunSuite with Matchers {
     resolver.resolve(List("java", "util", "ArrayList")).get shouldBe compiler.classLoader.load("java/util/ArrayList").get
 
     resolver.resolve(List("java", "util", "Map", "Entry")) shouldBe a [Success[_]]
-    resolver.resolve(List("java", "util", "Map", "Entry")).get shouldBe compiler.classLoader.load("java/util/Map$Entry").get
+    resolver.resolve(List("java", "util", "Map", "Entry")).get shouldBe compiler.classLoader.load(s"java/util/Map$$Entry").get
   }
 
   test ("短縮名称によるロード") {
@@ -58,7 +58,7 @@ class NameResolverTest extends FunSuite with Matchers {
     resolver.resolve(List("ArrayList")).get shouldBe compiler.classLoader.load("java/util/ArrayList").get
 
     resolver.resolve(List("Map", "Entry")) shouldBe a [Success[_]]
-    resolver.resolve(List("Map", "Entry")).get shouldBe compiler.classLoader.load("java/util/Map$Entry").get
+    resolver.resolve(List("Map", "Entry")).get shouldBe compiler.classLoader.load(s"java/util/Map$$Entry").get
   }
 
   test ("クラス内") {

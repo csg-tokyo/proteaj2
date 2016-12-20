@@ -55,11 +55,11 @@ object JConfig {
     }
   }
 
-  def proteaJLibPath = {
+  def proteaJLibPath: String = {
     Thread.currentThread().getContextClassLoader.getResource("proteaj/lang/PredefOperators.class").getPath.stripSuffix("proteaj/lang/PredefOperators.class")
   }
 
-  def configure (config: JConfig, parser: CmdLineParser) = {
+  def configure (config: JConfig, parser: CmdLineParser): Option[(JState, List[String])] = {
     config.classPath = config.classPath  + ':' + proteaJLibPath
     config.configure match {
       case Success(state) => Some((state, config.getArgs))
@@ -68,13 +68,13 @@ object JConfig {
     }
   }
 
-  def printSimpleUsage (parser: CmdLineParser) = {
+  private def printSimpleUsage (parser: CmdLineParser) = {
     parser.printSingleLineUsage(System.out)
     println()
     None
   }
 
-  def printError (parser: CmdLineParser, e: Throwable) = {
+  private def printError (parser: CmdLineParser, e: Throwable) = {
     System.out.println(e.getMessage)
     parser.printSingleLineUsage(System.out)
     println()

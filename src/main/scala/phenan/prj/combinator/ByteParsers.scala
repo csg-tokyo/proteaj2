@@ -15,11 +15,11 @@ trait ByteParsers {
   val f8  = ByteParser(_.f8)
   val utf = ByteParser(_.utf)
 
-  def ret [T] (v: => T) = ByteParser.pure(Try(v))
+  def ret [T] (v: => T): ByteParser[T] = ByteParser.pure(Try(v))
 
-  def pure [T] (v: => Try[T]) = ByteParser.pure(v)
+  def pure [T] (v: => Try[T]): ByteParser[T] = ByteParser.pure(v)
 
-  def failure (e: Exception) = ByteParser.failure(e)
+  def failure (e: Exception): ByteParser[Nothing] = ByteParser.failure(e)
 
   def bytes (n: Int) = ByteParser(_.bytes(n))
   def padding (n: Int) = ByteParser(_.padding(n))

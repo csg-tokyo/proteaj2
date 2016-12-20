@@ -57,6 +57,7 @@ class JCompilerTest extends FunSuite with Matchers with BeforeAndAfterAll {
   override protected def beforeAll(): Unit = {
     if (new java.io.File("bin").isDirectory) "rm -r bin" ! ProcessLogger(_ => ())
     "mkdir bin" ! ProcessLogger(_ => ())
+    ()
   }
 
   def compileAndRun (mainClass: String, files: List[String]): String = {

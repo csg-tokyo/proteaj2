@@ -40,7 +40,7 @@ class UnificationTest extends FunSuite with Matchers {
 
     val entrySetMethod = ssMap.findMethod("entrySet", ssMap.erase, true).head
 
-    val ssMapEntryType = compiler.classLoader.loadClass("java/util/Map$Entry").get.objectType(List(stringType, stringType)).get
+    val ssMapEntryType = compiler.classLoader.loadClass(s"java/util/Map$$Entry").get.objectType(List(stringType, stringType)).get
     val setOfssMapEntryType = compiler.classLoader.loadClass("java/util/Set").get.objectType(List(ssMapEntryType)).get
 
     val map = setOfssMapEntryType <=< entrySetMethod.returnType

@@ -8,10 +8,9 @@ import phenan.prj.ir.IRFile
 import phenan.prj.state.JState
 
 import scala.collection.JavaConversions._
-import scala.util.control.Exception._
 
 object JavaClassFileGenerator {
-  def compile (files: List[IRFile], state: JState) = {
+  def compile (files: List[IRFile], state: JState): Unit = {
     val compiler = ToolProvider.getSystemJavaCompiler
     if (compiler == null) {
       state.error("Java Compiler cannot be found")

@@ -40,7 +40,7 @@ trait Generators {
   }
 
   implicit class UnionGenerator [T <: Union] (generator: => Generator[T]) {
-    def :|: [U] (that: => Generator[U]): Generator[U :|: T] = new Generator[U :|: T]((buf, indent, spacing, union) => union match {
+    def :|: [U] (that: Generator[U]): Generator[U :|: T] = new Generator[U :|: T]((buf, indent, spacing, union) => union match {
       case -:|: (u) => that.g(buf, indent, spacing, u)
       case :|:- (t) => generator.g(buf, indent, spacing, t)
     })

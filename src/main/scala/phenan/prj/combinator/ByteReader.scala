@@ -8,8 +8,8 @@ class ByteReader private (in: DataInputStream) {
 
   def u1: Int    = read(1, in.readUnsignedByte())
   def u2: Int    = read(2, in.readUnsignedShort())
-  def s1: Int    = read(1, in.readByte())
-  def s2: Int    = read(2, in.readShort())
+  def s1: Int    = read(1, in.readByte().toInt)
+  def s2: Int    = read(2, in.readShort().toInt)
   def s4: Int    = read(4, in.readInt())
   def s8: Long   = read(8, in.readLong())
   def f4: Float  = read(4, in.readFloat())
@@ -29,7 +29,7 @@ class ByteReader private (in: DataInputStream) {
     else bytes(n - rem)
   }
 
-  def position = pos
+  def position: Long = pos
 
   private def close() { in.close() }
 
