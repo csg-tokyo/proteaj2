@@ -1,0 +1,11 @@
+package loop;
+
+import dsl LoopDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    loop 10 {
+      System.out.println("hello, world!");
+    };
+  }
+}

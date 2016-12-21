@@ -48,6 +48,7 @@ object JTypeSignature {
   lazy val typeTypeSig = SimpleClassTypeSignature(CommonNames.typeClassName, Nil)
   lazy val classSigTypeSig = SimpleClassTypeSignature(CommonNames.classSigClassName, Nil)
   lazy val objectTypeSig = SimpleClassTypeSignature(CommonNames.objectClassName, Nil)
+  lazy val boxedVoidTypeSig = SimpleClassTypeSignature(CommonNames.boxedVoidClassName, Nil)
 
   def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature(CommonNames.functionClassName, List(from, to))
   def enumTypeSig (e: JTypeArgument): JClassTypeSignature = SimpleClassTypeSignature(CommonNames.enumClassName, List(e))

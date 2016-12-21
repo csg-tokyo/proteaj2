@@ -1,0 +1,9 @@
+package loop;
+
+dsl LoopDSL {
+  static void "loop" _ _ (int n, LoopDSL ~> Void body) {
+    for (int i = 0; i < n; i = i + 1) {
+      body.apply(new LoopDSL());
+    }
+  }
+}

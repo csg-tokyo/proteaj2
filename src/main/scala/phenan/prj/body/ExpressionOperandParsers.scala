@@ -5,7 +5,7 @@ import phenan.prj.combinator._
 import phenan.prj.ir._
 
 trait ExpressionOperandParsers {
-  this: ExpressionParsers with TypeParsers with TwoLevelParsers =>
+  this: ExpressionParsers with TypeParsers with TwoLevelParsers with StatementParsers =>
 
   def getExpressionOperandParser (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): HParser[IRExpression] = {
     getExpressionOperandParserOpt(param, pri, binding, procedure, env).getOrElse(HParser.failure("fail to parse argument expression"))
@@ -34,5 +34,13 @@ trait ExpressionOperandParsers {
   private def getExpressionOperandParserOpt (param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], procedure: JProcedure, env: Environment): Option[HParser[IRExpression]] = for {
     expectedType <- ExpectedTypeInferencer.expected(param, binding, procedure)
     contexts     <- ExpectedTypeInferencer.contexts(param.contexts, binding, procedure)
-  } yield getExpressionParser(expectedType, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ { _.withContexts(contexts) }
+  } yield {
+    if (compiler.typeLoader.void.boxed.contains(expectedType) && contexts.nonEmpty) {
+      val boxed = getExpressionParser(expectedType, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ { _.withContexts(contexts) }
+      val unboxed = getExpressionParser(compiler.typeLoader.void, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ { e => IRStatementExpression(IRExpressionStatement(e), contexts, expectedType) }
+      val block = getStatementParsers(compiler.typeLoader.void, env.withContexts(contexts)).block ^^ { b => IRStatementExpression(b, contexts, expectedType) }
+      boxed | unboxed | block
+    }
+    else getExpressionParser(expectedType, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ { _.withContexts(contexts) }
+  }
 }

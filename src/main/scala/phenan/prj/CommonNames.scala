@@ -16,6 +16,7 @@ object CommonNames {
   val finalizerClassName      = "proteaj/impl/Finalizer"
   val typeClassName           = "proteaj/lang/Type"
   val predefOperatorsName     = "proteaj/lang/PredefOperators"
+  val boxedVoidClassName      = "java/lang/Void"
   val classClassName          = "java/lang/Class"
   val enumClassName           = "java/lang/Enum"
   val iterableClassName       = "java/lang/Iterable"

@@ -295,6 +295,7 @@ object JavaReprGenerator {
     case e: IRDefaultArgument      => Union[Expression](defaultArgument(e))
     case e: IRContextualArgument   => contextualArgument(e, contexts)
     case e: IRContextRef           => Union[Expression](contextRef(e, contexts))
+    case e: IRStatementExpression  => statementExpression(e, contexts)
   }
 
   def assignment (e: IRAssignmentExpression, contexts: List[IRContextRef]): Assignment = e match {
@@ -368,7 +369,7 @@ object JavaReprGenerator {
   }
 
   def contextualArgument (e: IRContextualArgument, contexts: List[IRContextRef]): Expression = {
-    contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), getStaticType(e.argument), Nil, contexts ++ e.contexts)
+    contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), getStaticType(e.argument), Nil, e.contexts ++ contexts)
   }
 
   private def contextualArgument (cs: List[IRContextRef], e: Expression, t: JType, throws: List[TypeSig], contexts: List[IRContextRef]): Expression = cs match {
@@ -377,6 +378,12 @@ object JavaReprGenerator {
       contextualArgument(rest, Union[Expression](lambda(objectType(functionType), typeToSig(t),
         List(parameter(c.contextType, contextName(contexts.size - 1))), throws, Block(List(returnStatement(e))))), functionType, throws, contexts.tail)
     case Nil       => e
+  }
+
+  def statementExpression (e: IRStatementExpression, contexts: List[IRContextRef]): Expression = {
+    val lam = Union[Expression](lambda(objectClassSig, typeSig(JTypeSignature.boxedVoidTypeSig), Nil, Nil, Block(List(singleStatement(e.stmt, contexts ++ e.contexts, Nil), returnStatement(Union[Expression](Union[JavaLiteral](NullLiteral)))))))
+    val app = Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", Nil))
+    contextualArgument(e.contexts, app, e.voidType, Nil, e.contexts ++ contexts)
   }
 
   def contextRef (e: IRContextRef, contexts: List[IRContextRef]): LocalRef = {

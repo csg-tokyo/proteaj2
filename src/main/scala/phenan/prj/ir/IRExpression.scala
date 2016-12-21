@@ -11,7 +11,7 @@ sealed trait IRExpression {
   def activates: List[IRContextRef]
   def deactivates: List[IRContextRef]
 
-  def withContexts (contexts: List[IRContextRef]) = {
+  def withContexts (contexts: List[IRContextRef]): IRExpression = {
     if (contexts.isEmpty) this
     else IRContextualArgument(this, contexts)
   }
@@ -68,7 +68,7 @@ case class IRCastExpression (destType: JType, expression: IRExpression) extends 
 }
 
 case class IRArrayAccess (array: IRExpression, index: IRExpression) extends IRLeftHandSide {
-  def staticType = array.staticType match {
+  def staticType: Option[JType] = array.staticType match {
     case Some(JArrayType(component)) => Some(component)
     case _ => None
   }
@@ -147,11 +147,11 @@ sealed trait IRJavaLiteral extends IRExpression with IRAnnotationElement {
 sealed trait IRClassLiteral extends IRJavaLiteral
 
 case class IRObjectClassLiteral (clazz: JClass, dim: Int) extends IRClassLiteral {
-  def staticType = clazz.objectType(Nil).map(_.array(dim)).flatMap(clazz.compiler.typeLoader.classTypeOf)
+  def staticType: Option[JObjectType] = clazz.objectType(Nil).map(_.array(dim)).flatMap(clazz.compiler.typeLoader.classTypeOf)
 }
 
 case class IRPrimitiveClassLiteral (primitiveClass: JPrimitiveType, dim: Int) extends IRClassLiteral {
-  def staticType = primitiveClass.boxed.map(_.array(dim)).flatMap(primitiveClass.compiler.typeLoader.classTypeOf)
+  def staticType: Option[JObjectType] = primitiveClass.boxed.map(_.array(dim)).flatMap(primitiveClass.compiler.typeLoader.classTypeOf)
 }
 
 case class IRCharLiteral (value: Char, compiler: JCompiler) extends IRJavaLiteral {
@@ -171,7 +171,7 @@ case class IRBooleanLiteral (value: Boolean, compiler: JCompiler) extends IRJava
 }
 
 case class IRStringLiteral (value: String, compiler: JCompiler) extends IRJavaLiteral {
-  def staticType = compiler.typeLoader.stringType
+  def staticType: Option[JObjectType] = compiler.typeLoader.stringType
 }
 
 case class IRNullLiteral (expected: JType) extends IRJavaLiteral {
@@ -205,3 +205,9 @@ case class IRAnnotation (annotationClass: JClass, args: Map[String, IRAnnotation
 case class IRAnnotationElementArray (array: List[IRAnnotationElement]) extends IRAnnotationElement
 
 case class IREnumConstantRef (field: JFieldDef) extends IRAnnotationElement
+
+case class IRStatementExpression (stmt: IRStatement, contexts: List[IRContextRef], voidType: JType) extends IRExpression {
+  def staticType: Option[JType] = Some(voidType)
+  def activates: List[IRContextRef] = Nil
+  def deactivates: List[IRContextRef] = Nil
+}
