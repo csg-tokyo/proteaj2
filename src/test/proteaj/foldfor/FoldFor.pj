@@ -9,7 +9,7 @@ dsl FoldFor <A, B, aName: Identifier, bName: Identifier> {
 
   static <E, R, acc: Identifier, elem: Identifier> R[p1]
     "for" "(" acc "=" _ ";" elem ":" _ ")" acc "=" _
-    (R ini, List<E> es, FoldFor<E, R, elem, acc> ~> R body)
+    (R ini, List<E> es, FoldFor<E, R, elem, acc> |- R body)
   {
     R a = ini;
     for (E e : es) {
@@ -20,7 +20,7 @@ dsl FoldFor <A, B, aName: Identifier, bName: Identifier> {
 
   static <E, R, acc: Identifier, elem: Identifier> R[p1]
     "fold-for" "(" acc "=" _ ";" elem ":" _ ")" _
-    (R ini, List<E> es, FoldFor<E, R, elem, acc> ~> R body)
+    (R ini, List<E> es, FoldFor<E, R, elem, acc> |- R body)
   {
     R a = ini;
     for (E e : es) {

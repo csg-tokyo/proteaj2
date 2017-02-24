@@ -5,7 +5,7 @@ dsl WhereDSL {
     p0 < PredefOperators.add < p1
   }
 
-  <T, R, name1: Identifier> R _ "where" name1 "=" _ (Local<T, name1> ~> R f, T value) {
+  <T, R, name1: Identifier> R _ "where" name1 "=" _ (Local<T, name1> |- R f, T value) {
     return f.apply(new Local<T, name1>(value));
   }
 

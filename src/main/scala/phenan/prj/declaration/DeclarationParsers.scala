@@ -208,7 +208,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val parameterType: HParser[ParameterType] = contextualType | typeName
 
-  lazy val contextualType = ( typeName <~ ( elem('~') ~> elem('>') ).^ ) ~ parameterType ^^ {
+  lazy val contextualType = ( typeName <~ ( elem('|') ~> elem('-') ).^ ) ~ parameterType ^^ {
     case ct ~ pt => ContextualType(ct, pt)
   }
 

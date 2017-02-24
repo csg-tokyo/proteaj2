@@ -16,11 +16,11 @@ public dsl MatchDSL {
     return null;
   }
 
-  static <T, R> Case<T, R> "|" _ "=>" _ ( Matcher0<T> m, Lazy ~> R f ) {
+  static <T, R> Case<T, R> "|" _ "=>" _ ( Matcher0<T> m, Lazy |- R f ) {
     return new Case <T, R> ({ t => m.ifMatch(t, f) });
   }
 
-  static <T, A, name: Id, R> Case<T, R> "|" _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> ~> R f ) {
+  static <T, A, name: Id, R> Case<T, R> "|" _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> |- R f ) {
     return new Case <T, R> ({ t => m.ifMatch(t, f) });
   }
 

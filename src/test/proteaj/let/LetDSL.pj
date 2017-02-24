@@ -1,7 +1,7 @@
 package let;
 
 dsl LetDSL<V> {
-  static <R> R "let" "a" "=" _ "in" _ (String v, LetDSL<String> ~> R r) {
+  static <R> R "let" "a" "=" _ "in" _ (String v, LetDSL<String> |- R r) {
     return r.apply(new LetDSL<String>(v));
   }
 

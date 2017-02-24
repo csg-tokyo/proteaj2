@@ -5,7 +5,7 @@ dsl StrDSL {
     p0 < PredefOperators.add < p1 < p2
   }
 
-  String[p2] _[p0] "+" _[p0] _[p1] (String s1, String s2, StrBC ~> String f) {
+  String[p2] _[p0] "+" _[p0] _[p1] (String s1, String s2, StrBC |- String f) {
     return f.apply(new StrBC(new StringBuilder().append(s1).append(s2)));
   }
   context StrBC {

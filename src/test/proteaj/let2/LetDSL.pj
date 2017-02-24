@@ -5,7 +5,7 @@ dsl LetDSL <V, name: Name> {
 
   static Name[p0] "a" () { return new Name('a'); }
   static Name[p0] "b" () { return new Name('b'); }
-  static <R, name: Name> R[p1] "let" name "=" _ "in" _ (String v, LetDSL<String, name> ~> R r) {
+  static <R, name: Name> R[p1] "let" name "=" _ "in" _ (String v, LetDSL<String, name> |- R r) {
     return r.apply(new LetDSL<String, name>(v));
   }
 

@@ -9,11 +9,11 @@ dsl BadDSL {
     return new Identifier(name);
   }
 
-  static <T, R, name: Identifier> R[p1] "let" name ":" T "=" _[p1] "in" _[p1] "tel" (T v, DSL1<T, name> ~> R r) {
+  static <T, R, name: Identifier> R[p1] "let" name ":" T "=" _[p1] "in" _[p1] "tel" (T v, DSL1<T, name> |- R r) {
     return r.apply(new DSL1<T, name>(v));
   }
 
-  static <T, R, name: Identifier> R[p1] "let" name ":" T "=" _[p1] "in" _[p1] "end" (T v, DSL2<T, name> ~> R r) {
+  static <T, R, name: Identifier> R[p1] "let" name ":" T "=" _[p1] "in" _[p1] "end" (T v, DSL2<T, name> |- R r) {
     return r.apply(new DSL2<T, name>(v));
   }
 }

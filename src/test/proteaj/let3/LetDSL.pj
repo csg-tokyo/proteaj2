@@ -5,7 +5,7 @@ dsl LetDSL <V> {
     p0 > p1
   }
 
-  static <T, R> R[p1] "let" "a" ":" T "=" _ "in" _ (T v, LetDSL<T> ~> R r) {
+  static <T, R> R[p1] "let" "a" ":" T "=" _ "in" _ (T v, LetDSL<T> |- R r) {
     return r.apply(new LetDSL<T>(v));
   }
 

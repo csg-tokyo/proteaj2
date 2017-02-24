@@ -5,23 +5,23 @@ import java.util.function.*;
 public dsl Lambda <T, name: Id> {
   priority p0, p1 { p0 < p1 }
 
-  public static <T, R, name: Id> Function<T, R>[p0] "{" name ":" T "=>" _ "}" (Lambda<T, name> ~> R body) {
+  public static <T, R, name: Id> Function<T, R>[p0] "{" name ":" T "=>" _ "}" (Lambda<T, name> |- R body) {
     return new LambdaFunction <T, R, name> (body);
   }
 
-  public static <T, R, name: Id> Function<T, R>[p0] "{" name "=>" _ "}" (Lambda<T, name> ~> R body) {
+  public static <T, R, name: Id> Function<T, R>[p0] "{" name "=>" _ "}" (Lambda<T, name> |- R body) {
     return new LambdaFunction <T, R, name> (body);
   }
 
-  public static <T, name: Id> Predicate<T>[p0] "{" name ":" T "=>" _ "}" (Lambda<T, name> ~> Boolean body) {
+  public static <T, name: Id> Predicate<T>[p0] "{" name ":" T "=>" _ "}" (Lambda<T, name> |- Boolean body) {
     return new LambdaPredicate <T, name> (body);
   }
 
-  public static <T, name: Id> Predicate<T>[p0] "{" name "=>" _ "}" (Lambda<T, name> ~> Boolean body) {
+  public static <T, name: Id> Predicate<T>[p0] "{" name "=>" _ "}" (Lambda<T, name> |- Boolean body) {
     return new LambdaPredicate <T, name> (body);
   }
 
-  public static <T, U, R, n1: Id, n2: Id> BiFunction<T, U, R>[p0] "{" n1 "," n2 "=>" _ "}" (Lambda<T, n1> ~> Lambda<U, n2> ~> R body) {
+  public static <T, U, R, n1: Id, n2: Id> BiFunction<T, U, R>[p0] "{" n1 "," n2 "=>" _ "}" (Lambda<T, n1> |- Lambda<U, n2> |- R body) {
     return new LambdaBiFunction <T, U, R, n1, n2> (body);
   }
 
