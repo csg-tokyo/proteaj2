@@ -35,6 +35,10 @@ case class IRNormalForStatement (local: IRLocalDeclaration, condition: Option[IR
 case class IRAncientForStatement (init: List[IRExpression], condition: Option[IRExpression], update: List[IRExpression], statement: IRStatement) extends IRForStatement
 case class IREnhancedForStatement (elementType: JType, name: String, dim: Int, iterable: IRExpression, statement: IRStatement) extends IRForStatement
 
+case class IRTryStatement (tryBlock: IRBlock, catchBlocks: List[IRExceptionHandler], finallyBlock: Option[IRBlock]) extends IRStatement
+
+case class IRExceptionHandler (exceptionType: JType, name: String, catchBlock: IRBlock)
+
 case class IRActivateStatement (expression: IRExpression) extends IRStatement
 
 case class IRThrowStatement (expression: IRExpression) extends IRStatement

@@ -194,6 +194,7 @@ object JavaReprGenerator {
     case i: IRIfStatement         => Union[Statement](ifStatement(i, contexts, activates))
     case w: IRWhileStatement      => Union[Statement](whileStatement(w, contexts, activates))
     case f: IRForStatement        => Union[Statement](forStatement(f, contexts, activates))
+    case t: IRTryStatement        => Union[Statement](tryStatement(t, contexts, activates))
     case t: IRThrowStatement      => Union[Statement](throwStatement(t, contexts))
     case r: IRReturnStatement     => Union[Statement](returnStatement(r, contexts))
     case e: IRExpressionStatement => Union[Statement](expressionStatement(e, contexts))
@@ -237,6 +238,9 @@ object JavaReprGenerator {
 
   def enhancedForStatement (stmt: IREnhancedForStatement, contexts: List[IRContextRef], activates: List[JRefType]): EnhancedForStatement =
     EnhancedForStatement (typeToSig(stmt.elementType), stmt.name, stmt.dim, expression(stmt.iterable, contexts), singleStatement(stmt.statement, contexts, activates))
+
+  def tryStatement (stmt: IRTryStatement, contexts: List[IRContextRef], activates: List[JRefType]): TryStatement =
+    TryStatement (block(stmt.tryBlock, contexts, activates), stmt.catchBlocks.map(e => ExceptionHandler(typeToSig(e.exceptionType), e.name, block(e.catchBlock, contexts, activates))), stmt.finallyBlock.map(block(_, contexts, activates)))
 
   def throwStatement (stmt: IRThrowStatement, contexts: List[IRContextRef]): ThrowStatement = ThrowStatement(expression(stmt.expression, contexts))
 

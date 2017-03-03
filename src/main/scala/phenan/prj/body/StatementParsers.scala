@@ -46,7 +46,7 @@ trait StatementParsers {
 
     lazy val statement: HParser[IRStatement] = block | controlStatement | expressionStatement
 
-    lazy val controlStatement: HParser[IRStatement] = ifStatement | whileStatement | forStatement | activateStatement | throwStatement | returnStatement
+    lazy val controlStatement: HParser[IRStatement] = ifStatement | whileStatement | forStatement | tryStatement | activateStatement | throwStatement | returnStatement
 
     lazy val ifStatement: HParser[IRIfStatement] = ( "if" ~> '(' ~> expression(compiler.typeLoader.boolean) <~ ')' ) ~ statement ~ ( "else" ~> statement ).? ^^ {
       case cond ~ thenStmt ~ elseStmt => IRIfStatement(cond, thenStmt, elseStmt)
@@ -75,6 +75,18 @@ trait StatementParsers {
     }
 
     protected[StatementParsers] lazy val forControlRest = expression(compiler.typeLoader.boolean).? ~ ( ';' ~> statementExpressionList ) ~ ( ')' ~> statement )
+
+    lazy val tryStatement = tryFinallyStatement | tryCatchStatement
+
+    lazy val tryFinallyStatement = ( "try" ~> block ) ~ ( "finally" ~> block ) ^^ { case tryBlock ~ finallyBlock => IRTryStatement(tryBlock, Nil, Some(finallyBlock)) }
+
+    lazy val tryCatchStatement = ( "try" ~> block ) ~ exceptionHandler.+ ~ ( "finally" ~> block ).? ^^ {
+      case tryBlock ~ catchBlocks ~ finallyBlock => IRTryStatement(tryBlock, catchBlocks, finallyBlock)
+    }
+
+    lazy val exceptionHandler = ( "catch" ~> '(' ~> typeName ) ~ ( identifier <~ ')' ) >> {
+      case t ~ id => getStatementParsers(returnType, env.defineLocal(t, id)).block ^^ { IRExceptionHandler(t, id, _) }
+    }
 
     lazy val activateStatement = "activate" ~> env.activateTypes.map(expression).reduceOption(_ | _).getOrElse(HParser.failure("activates clause is not found")) <~ ';' ^^ IRActivateStatement
 

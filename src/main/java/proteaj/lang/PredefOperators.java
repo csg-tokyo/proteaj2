@@ -18,6 +18,27 @@ public class PredefOperators {
       pattern = {
           @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq")),
           @OpElem(kind = OpElemType.Name, name = "=="),
+          @OpElem(kind = OpElemType.Name, name = "null")
+      }
+  )
+  public static boolean equalsToInt (Object obj) { return obj == null; }
+
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq")),
+          @OpElem(kind = OpElemType.Name, name = "!="),
+          @OpElem(kind = OpElemType.Name, name = "null")
+      }
+  )
+  public static boolean notEqualsToInt (Object obj) { return obj != null; }
+
+  
+  @Operator(
+      priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq"),
+      pattern = {
+          @OpElem(kind = OpElemType.Hole, priority = @Priority(dsl = "Lproteaj/lang/PredefOperators;", name = "eq")),
+          @OpElem(kind = OpElemType.Name, name = "=="),
           @OpElem(kind = OpElemType.Hole)
       }
   )

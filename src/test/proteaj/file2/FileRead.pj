@@ -1,0 +1,32 @@
+package file2;
+
+import java.io.*;
+
+dsl FileRead {
+  static void "open" _  _ (String fileName, FileRead |- Void body) throws IOException {
+    BufferedReader reader = new BufferedReader(new FileReader(fileName));
+    body.apply(new FileRead(reader));
+    reader.close();
+    try {
+      body.apply(new FileRead(reader));
+    } finally {
+      if (reader != null) reader.close();
+    }
+  }
+  String "read" "line" () { 
+    String res = nextLine;
+    try {
+      this.nextLine = reader.readLine();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return res;
+  }
+  boolean "has next" () { return nextLine != null; }
+  FileRead (BufferedReader reader) throws IOException {
+    this.reader = reader;
+    this.nextLine = reader.readLine();
+  }
+  private BufferedReader reader;
+  private String nextLine;
+}

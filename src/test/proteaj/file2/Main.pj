@@ -1,0 +1,12 @@
+package file2;
+
+import java.io.*;
+import dsl FileRead;
+
+public class Main {
+  public static void main (String[] args) throws IOException {
+    open "file.txt" {
+      while (has next) { System.out.println(read line); }
+    };
+  }
+}
