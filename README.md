@@ -11,7 +11,7 @@ Simple examples
 The following code defines a protean operator with syntax `"p" _`.
 
     dsl Print {
-      void "p" _ (String msg) { System.out.println(msg); }
+      static void "p" _ (String msg) { System.out.println(msg); }
     }
 
 We can use this operator as follows.
@@ -46,6 +46,44 @@ For example, we can define the following operators.
 
 This feature is useful for implementing user-defined literals.
 
+
+"let" expression
+----
+
+Programmers can implement "let" expressions in ProteaJ.
+A "let" expression binds a value to the given name.
+The name is available in the body of the expression.
+The following code defines "let" expression.
+
+     dsl Let <T, name: Id> {
+       // operator priority
+       priority p0, p1 { p0 < p1 }
+       // static operator
+       static <T, R, name: Id> R[p0] "let" name ":" T "=" _ "in" _ (T value, Let<T, name> |- R body) {
+         return body.apply(new Let<T, name>(value));
+       }
+       static Id[p1] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+         return new Id(name);
+       }
+       // instance operator
+       T[p1] name[p1] () { return value; }
+       // constructor
+       Let (T value) { this.value = value; }
+       // field
+       private T value;
+     }
+     class Id {
+       public Id (String name) { this.name = name; }
+       private String name;
+     }
+
+We can use it as follows:
+
+     import dsl Let;
+     ...
+     System.out.println(
+       let id : String = "hello" in id + "world!"
+     );
 
 Author
 ----
