@@ -7,8 +7,6 @@ import scala.util.matching.Regex
 import scala.util.parsing.combinator.PackratParsers
 import scala.util.parsing.input.{CharSequenceReader, Positional, Reader}
 
-import scala.language.implicitConversions
-
 trait TwoLevelParsers {
   self =>
 
@@ -17,7 +15,7 @@ trait TwoLevelParsers {
   def delimiter: LParser[Any]
 
   type Input = Reader[Elem]
-  type ParseResult[T] = Impl.ParseResult[T]
+  type ParseResult[+T] = Impl.ParseResult[T]
   type ~ [+A, +B] = Impl.~[A, B]
 
   val ~ = Impl.~
@@ -159,7 +157,7 @@ trait TwoLevelParsers {
             val rs = list :+ res
             if (f(rs)) Success(list, in)
             else apply_rec(rs, next)
-          case fail => Success(list, in)
+          case _ => Success(list, in)
         }
       })
 

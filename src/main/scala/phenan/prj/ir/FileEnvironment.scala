@@ -13,7 +13,7 @@ case class FileEnvironment (file: IRFile) {
   lazy val userConstraints: List[List[JPriority]] = file.userConstraints.map(resolver.constraint)
   lazy val priorities: List[JPriority] = sortPriorities(collectPriorities(dsls, Set.empty), dsls.flatMap(_.constraints) ++ userConstraints)
 
-  def resolver = file.resolver
+  def resolver: NameResolver = file.resolver
 
   private def collectCompanions (ds: Set[JClassModule], checked: Set[JClassModule]): Set[JClassModule] = {
     if (ds.isEmpty) checked

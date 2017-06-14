@@ -7,7 +7,7 @@ import javax.tools._
 import phenan.prj.ir.IRFile
 import phenan.prj.state.JState
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 object JavaClassFileGenerator {
   def compile (files: List[IRFile], state: JState): Unit = {
@@ -18,7 +18,7 @@ object JavaClassFileGenerator {
     else {
       val compileOptions = List("-d", state.destination, "-cp", state.classPath)
       val compilationUnits = files.flatMap(JavaSourceObject(_, state))
-      val res = compiler.getTask(null, null, null, compileOptions, null, compilationUnits).call()
+      val res = compiler.getTask(null, null, null, compileOptions.asJava, null, compilationUnits.asJava).call()
       state.info("compile status : " + res)
     }
   }

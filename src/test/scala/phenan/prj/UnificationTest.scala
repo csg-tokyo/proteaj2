@@ -2,7 +2,6 @@ package phenan.prj
 
 import org.scalatest._
 import phenan.prj.state.JConfig
-import phenan.prj.typing.MetaArgumentChecker
 
 class UnificationTest extends FunSuite with Matchers {
   val compiler = new JCompiler(JConfig().configure.get)

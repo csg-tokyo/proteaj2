@@ -7,12 +7,12 @@ import scalaz.Memo._
 trait CommonParsers extends ScannerlessParsers {
   lazy val delimiter: LParser[Any] = elem("white space", Character.isWhitespace).*
 
-  lazy val emptyBrackets = emptyBracket.* ^^ { _.size }
-  lazy val emptyBracket = '[' ~> ']'
+  lazy val emptyBrackets: HParser[Int] = emptyBracket.* ^^ { _.size }
+  lazy val emptyBracket: HParser[Char] = '[' ~> ']'
 
-  lazy val qualifiedName = identifier.+('.')
+  lazy val qualifiedName: HParser[List[String]] = identifier.+('.')
 
-  lazy val identifier = (elem("identifier start", Character.isJavaIdentifierStart) ~ elem("identifier part", Character.isJavaIdentifierPart).*).^ ^^ {
+  lazy val identifier: HParser[String] = (elem("identifier start", Character.isJavaIdentifierStart) ~ elem("identifier part", Character.isJavaIdentifierPart).*).^ ^^ {
     case s ~ ps => (s :: ps).mkString
   }
 

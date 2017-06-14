@@ -3,7 +3,6 @@ package phenan.prj.internal
 import phenan.prj.exception._
 import phenan.prj.state.JState
 
-import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
 class BConstantPoolReader (pool: BConstantPool)(implicit state: JState) {

@@ -144,7 +144,7 @@ class RootResolver private[ir] (val compiler: JCompiler) extends NameResolver {
     else resolve(name.head)
   }
 
-  def isKnownPackage (names: List[String]) = knownPackages.contains(names)
+  def isKnownPackage (names: List[String]): Boolean = knownPackages.contains(names)
 
   def findClass (packageName: List[String], name: String, rest: List[String]): Try[JClass] = {
     val names = packageName :+ name
@@ -178,7 +178,7 @@ class RootResolver private[ir] (val compiler: JCompiler) extends NameResolver {
   def findInnerClass (clazz: JClass, name: String): Try[JClass] = compiler.classLoader.loadInnerClass(clazz, name)
   def findClass (name: String): Try[JClass] = compiler.classLoader.loadClass(name)
 
-  def root = this
+  def root: RootResolver = this
 
   private val abbreviated: String => Try[JClass] = mutableHashMapMemo { name =>
     findClass("java/lang/" + name).orElse(findClass("proteaj/lang/" + name))

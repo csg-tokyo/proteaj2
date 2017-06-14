@@ -33,7 +33,7 @@ trait ExpressionParsers {
 
     lazy val parenthesized: HParser[IRExpression] = '(' ~> expression <~ ')'
 
-    lazy val literal = getLiteralParser(expected, env).^
+    lazy val literal: HParser[IRExpression] = getLiteralParser(expected, env).^
 
     private val expression_cached: JPriority => HParser[IRExpression] = mutableHashMapMemo(createExpressionParser)
 

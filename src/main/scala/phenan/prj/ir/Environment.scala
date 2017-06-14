@@ -55,20 +55,20 @@ sealed trait ModuleEnvironment extends Environment {
 
 class Environment_Instance (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = clazz.thisType
-  def resolver = clazz.resolver
+  def resolver: NameResolver = clazz.resolver
 }
 
 class Environment_Static (val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
   def thisType: Option[JObjectType] = None
-  def resolver = clazz.staticResolver
+  def resolver: NameResolver = clazz.staticResolver
 }
 
 sealed trait ChildEnvironment extends Environment {
   def parent: Environment
 
-  def clazz = parent.clazz
-  def thisType = parent.thisType
-  def fileEnvironment = parent.fileEnvironment
+  def clazz: IRModule = parent.clazz
+  def thisType: Option[JObjectType] = parent.thisType
+  def fileEnvironment: FileEnvironment = parent.fileEnvironment
 }
 
 trait Environment_Variables extends ChildEnvironment {
@@ -80,28 +80,28 @@ trait Environment_Contexts extends ChildEnvironment {
   def activated: List[IRContextRef]
   def deactivated: List[IRContextRef]
 
-  val dslEnvironment = parent.dslEnvironment.changeContext(activated, deactivated)
+  val dslEnvironment: DSLEnvironment = parent.dslEnvironment.changeContext(activated, deactivated)
 }
 
 case class Environment_Method (procedure: IRProcedure, parent: Environment) extends Environment_Variables with Environment_Contexts {
   def variables: List[(JType, String)] = procedure.parameterVariables
   def activated: List[IRContextRef] = procedure.requiresContexts
   def deactivated: List[IRContextRef] = Nil
-  def activateTypes = procedure.activateTypes
+  def activateTypes: List[JRefType] = procedure.activateTypes
   def exceptions: List[JRefType] = procedure.exceptions ++ resolver.root.compiler.typeLoader.uncheckedExceptionTypes
   def resolver: NameResolver = procedure.resolver
 }
 
 case class Environment_LocalVariables (variables: List[(JType, String)], parent: Environment) extends Environment_Variables {
-  def dslEnvironment = parent.dslEnvironment
-  def activateTypes = parent.activateTypes
+  def dslEnvironment: DSLEnvironment = parent.dslEnvironment
+  def activateTypes: List[JRefType] = parent.activateTypes
   def exceptions: List[JRefType] = parent.exceptions
   def resolver: NameResolver = parent.resolver
 }
 
 case class Environment_LocalContexts (activated: List[IRContextRef], deactivated: List[IRContextRef], parent: Environment) extends Environment_Contexts {
   def locals: Map[String, IRLocalVariableRef] = parent.locals
-  def activateTypes = parent.activateTypes
+  def activateTypes: List[JRefType] = parent.activateTypes
   def exceptions: List[JRefType] = parent.exceptions
   def resolver: NameResolver = parent.resolver
 }

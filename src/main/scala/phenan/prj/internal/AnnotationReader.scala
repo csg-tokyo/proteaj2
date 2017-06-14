@@ -23,7 +23,7 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
     case (CommonNames.classSigClassName, ann) :: rest => classAnnotations(rest, JClassAnnotations(classSignature(ann), result.dsl, result.isPure))
     case (CommonNames.dslClassName, ann) :: rest      => classAnnotations(rest, JClassAnnotations(result.signature, dsl(ann), result.isPure))
     case (CommonNames.pureClassName, _) :: rest       => classAnnotations(rest, JClassAnnotations(result.signature, result.dsl, true))
-    case (_, ann) :: rest                             => classAnnotations(rest, result)
+    case (_, _) :: rest                               => classAnnotations(rest, result)
     case Nil => result
   }
 
@@ -32,14 +32,14 @@ class AnnotationReader (classFile: BClassFile)(implicit state: JState) {
     case (CommonNames.operatorClassName, ann) :: rest  => methodAnnotations(rest, JMethodAnnotations(result.signature, operator(ann), result.isPure, result.isFinalizer))
     case (CommonNames.pureClassName, _) :: rest        => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, true, result.isFinalizer))
     case (CommonNames.finalizerClassName, _) :: rest   => methodAnnotations(rest, JMethodAnnotations(result.signature, result.operator, result.isPure, true))
-    case (_, ann) :: rest                              => methodAnnotations(rest, result)
+    case (_, _) :: rest                                => methodAnnotations(rest, result)
     case Nil => result
   }
 
   private def fieldAnnotations (as: List[(String, BAnnotation)], result: JFieldAnnotations): JFieldAnnotations = as match {
     case (CommonNames.fieldSigClassName, ann) :: rest => fieldAnnotations(rest, JFieldAnnotations(fieldSignature(ann), result.isPure))
-    case (CommonNames.pureClassName, _) :: rest => fieldAnnotations(rest, JFieldAnnotations(result.signature, true))
-    case (_, ann) :: rest                 => fieldAnnotations(rest, result)
+    case (CommonNames.pureClassName, _) :: rest       => fieldAnnotations(rest, JFieldAnnotations(result.signature, true))
+    case (_, _) :: rest                               => fieldAnnotations(rest, result)
     case Nil => result
   }
 

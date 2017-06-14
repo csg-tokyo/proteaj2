@@ -1,7 +1,7 @@
 package phenan.prj
 
 case class JClassSignature (metaParams: List[FormalMetaParameter], superClass: JClassTypeSignature, interfaces: List[JClassTypeSignature]) {
-  override def toString = {
+  override def toString: String = {
     metaParams.mkString("<", ", ", ">") + " : " + superClass + interfaces.map(" : " + _).mkString
   }
 }
@@ -26,7 +26,7 @@ case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSi
     val target = if (varArgs) JArrayTypeSignature(typeSig) else typeSig
     contexts.foldRight(target)(JTypeSignature.functionTypeSig)
   }
-  override def toString = {
+  override def toString: String = {
     val cs = contexts.map('@' + _.toString).mkString
     val da = defaultArg.map('?' + _).mkString
     if(varArgs) cs + typeSig.toString + '*' + da
@@ -35,7 +35,7 @@ case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSi
 }
 
 case class FormalMetaParameter (name: String, metaType: JTypeSignature, bounds: List[JTypeSignature]) {
-  override def toString = {
+  override def toString: String = {
     if (bounds.nonEmpty) name + bounds.mkString(" extends ", " & ", "")
     else if (metaType == JTypeSignature.typeTypeSig) name
     else name + " : " + metaType
@@ -62,11 +62,11 @@ object JTypeSignature {
 sealed trait JClassTypeSignature extends JTypeSignature {
   def internalName: String
   def signatureString: String
-  override def toString = 'L' + signatureString + ';'
+  override def toString: String = 'L' + signatureString + ';'
 }
 
 case class SimpleClassTypeSignature (clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature {
-  def internalName = clazz
+  def internalName: String = clazz
   def signatureString: String = {
     if (args.isEmpty) clazz
     else clazz + args.mkString("<", "", ">")
@@ -74,7 +74,7 @@ case class SimpleClassTypeSignature (clazz: String, args: List[JTypeArgument]) e
 }
 
 case class MemberClassTypeSignature (outer: JClassTypeSignature, clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature {
-  def internalName = outer.internalName + '$' + clazz
+  def internalName: String = outer.internalName + '$' + clazz
   def signatureString: String = {
     if (args.isEmpty) outer.signatureString + '.' + clazz
     else outer.signatureString + '.' + clazz + args.mkString("<", "", ">")
@@ -83,7 +83,7 @@ case class MemberClassTypeSignature (outer: JClassTypeSignature, clazz: String, 
 
 sealed trait JPrimitiveTypeSignature extends JTypeSignature {
   def symbol: Char
-  override def toString = symbol.toString
+  override def toString: String = symbol.toString
 }
 
 case object ByteTypeSignature extends JPrimitiveTypeSignature { def symbol = 'B' }
@@ -97,11 +97,11 @@ case object BoolTypeSignature extends JPrimitiveTypeSignature { def symbol = 'Z'
 case object VoidTypeSignature extends JPrimitiveTypeSignature { def symbol = 'V' }
 
 case class JArrayTypeSignature (component: JTypeSignature) extends JTypeSignature {
-  override def toString = '[' + component.toString
+  override def toString: String = '[' + component.toString
 }
 
 case class JTypeVariableSignature (name: String) extends JTypeSignature {
-  override def toString = 'T' + name + ';'
+  override def toString: String = 'T' + name + ';'
 }
 
 case class JCapturedWildcardSignature (upperBound: Option[JTypeSignature], lowerBound: Option[JTypeSignature]) extends JTypeSignature
@@ -113,7 +113,7 @@ sealed trait JTypeArgument {
 case class MetaVariableSignature (name: String) extends JTypeArgument
 
 case class WildcardArgument (upperBound: Option[JTypeSignature], lowerBound: Option[JTypeSignature]) extends JTypeArgument {
-  override def toString = upperBound match {
+  override def toString: String = upperBound match {
     case Some(ub) => '+' + ub.toString
     case None => lowerBound match {
       case Some(lb) => '-' + lb.toString
