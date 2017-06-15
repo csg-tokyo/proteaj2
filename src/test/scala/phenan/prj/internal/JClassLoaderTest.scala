@@ -9,6 +9,10 @@ import phenan.prj.state._
 import scala.util._
 
 class JClassLoaderTest extends FunSuite with Matchers {
+  private val classPath = Thread.currentThread().getContextClassLoader.getResource("proteaj/lang/PredefOperators.class").getPath.stripSuffix("proteaj/lang/PredefOperators.class")
+  private val testClassPath = classPath + "../test-classes"
+  private val testSourcePath = classPath + "../../../src/test/java"
+
   test ("String 型をロード") {
     val loader = new JCompiler(JConfig().configure.get).classLoader
 
@@ -19,7 +23,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   test ("proteaj/impl/DSL をロード") {
     val config = JConfig()
-    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes/"
+    config.classPath = classPath
     val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("proteaj/impl/DSL")
@@ -29,7 +33,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   test ("proteaj/lang/Type はロードできない") {
     val config = JConfig()
-    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes/"
+    config.classPath = classPath
     val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("proteaj/lang/Type")
@@ -53,7 +57,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   test("ソースをJClassLoader経由でコンパイル") {
     val config = JConfig()
-    config.sourcePath = "/Users/ichikawa/workspaces/Idea/prj/src/test/java"
+    config.sourcePath = testSourcePath
     val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("test/Hello")
@@ -64,7 +68,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   test("ClassSigが読めるか") {
     val config = JConfig()
-    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
+    config.classPath = testClassPath
     val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("test/Var")
@@ -79,7 +83,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   test("Operatorが読めるか") {
     val config = JConfig()
-    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/test-classes/"
+    config.classPath = testClassPath
     val loader = new JCompiler(config.configure.get).classLoader
 
     val clazz = loader.load("test/Var")

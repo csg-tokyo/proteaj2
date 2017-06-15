@@ -26,9 +26,11 @@ class EnvironmentTest extends FunSuite with Matchers {
     method.environment.resolver.typeVariable("T") shouldBe a [Some[_]]
   }
 
+  private val classPath = Thread.currentThread().getContextClassLoader.getResource("proteaj/lang/PredefOperators.class").getPath.stripSuffix("proteaj/lang/PredefOperators.class")
+
   lazy val compiler: JCompiler = {
     val config = JConfig()
-    config.classPath = "/Users/ichikawa/workspaces/Idea/prj/target/scala-2.11/classes/"
+    config.classPath = classPath
     new JCompiler(config.configure.get)
   }
 

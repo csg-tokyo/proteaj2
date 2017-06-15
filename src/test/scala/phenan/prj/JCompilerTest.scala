@@ -62,6 +62,6 @@ class JCompilerTest extends FunSuite with Matchers with BeforeAndAfterAll {
 
   def compileAndRun (mainClass: String, files: List[String]): String = {
     JCompiler.main((List("-d", "bin") ++ files).toArray)
-    ( "java -cp bin:target/scala-2.11/classes " + mainClass ).!!
+    ( "java -cp bin:target/scala-2.12/classes " + mainClass ).!!
   }
 }

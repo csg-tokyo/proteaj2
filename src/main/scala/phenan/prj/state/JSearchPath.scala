@@ -5,8 +5,8 @@ import java.util.jar._
 
 import scala.util._
 
-class JSearchPath private (classPath: Stream[SearchPathEntry], sourcePath: Stream[SearchPathEntry]) {
-  def find (name: String): Option[FoundFile] = {
+class JSearchPath private (classPath: Stream[JSearchPathEntry], sourcePath: Stream[JSearchPathEntry]) {
+  def find (name: String): Option[JFoundFile] = {
     val sourceFile = sourcePath.flatMap(path => path.findSourceFile(name + ".pj") orElse path.findSourceFile(name + ".java")).headOption
     val classFile = classPath.flatMap(path => path.findClassFile(name + ".class")).headOption
 
@@ -15,22 +15,22 @@ class JSearchPath private (classPath: Stream[SearchPathEntry], sourcePath: Strea
     else if (sourceFile.get.lastModified < classFile.get.lastModified) classFile
     else sourceFile
   }
-  
+
   private[state] def close(): Unit = {
     classPath.foreach(_.close())
     sourcePath.foreach(_.close())
   }
 }
 
-sealed trait FoundFile {
+sealed trait JFoundFile {
   def lastModified: Long
 }
 
-sealed trait FoundClassFile extends FoundFile {
+sealed trait FoundClassFile extends JFoundFile {
   def in: InputStream
 }
 
-sealed trait FoundSourceFile extends FoundFile {
+sealed trait FoundSourceFile extends JFoundFile {
   def name: String
   def in: Reader
 }
@@ -57,13 +57,13 @@ private[state] class FoundSourceFileFromJarPath (entry: JarEntry, jar: JarFile) 
   override def lastModified: Long = entry.getLastModifiedTime.toMillis
 }
 
-private[state] sealed trait SearchPathEntry {
+private[state] sealed trait JSearchPathEntry {
   def findClassFile (name: String): Option[FoundClassFile]
   def findSourceFile (name: String): Option[FoundSourceFile]
   def close(): Unit
 }
 
-private[state] class DirectoryPath (dirName: String) extends SearchPathEntry {
+private[state] class JDirectoryPath(dirName: String) extends JSearchPathEntry {
   override def findClassFile (name: String): Option[FoundClassFile] = {
     findFile(name).map(file => new FoundClassFileFromDirPath(file))
   }
@@ -83,7 +83,7 @@ private[state] class DirectoryPath (dirName: String) extends SearchPathEntry {
   }
 }
 
-private[state] class JarFilePath (jarFile: JarFile) extends SearchPathEntry {
+private[state] class JarFilePath (jarFile: JarFile) extends JSearchPathEntry {
   override def findClassFile (name: String): Option[FoundClassFile] = {
     Option(jarFile.getJarEntry(name)).map(entry => new FoundClassFileFromJarPath(entry, jarFile))
   }
@@ -108,10 +108,10 @@ object JSearchPath {
   import phenan.util.TryUtil._
   import scalaz.Scalaz._
 
-  private def parsePath (path: String): Try[Stream[SearchPathEntry]] = {
+  private def parsePath (path: String): Try[Stream[JSearchPathEntry]] = {
     path.split(File.pathSeparator).toStream.traverse { file =>
       if (file.endsWith(".jar") || file.endsWith(".zip")) Try(new JarFilePath(new JarFile(file)))
-      else Try(new DirectoryPath(normalizeDirPath(file)))
+      else Try(new JDirectoryPath(normalizeDirPath(file)))
     }
   }
 

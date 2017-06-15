@@ -14,6 +14,10 @@ import scala.collection.mutable
 
 class JCompiler (val state: JState) {
 
+ /* def compile(): Unit = {
+    for (file <- state.files) declarationCompiler.compile()
+  }
+  */
   def generateIR (files: List[String]): Unit = {
     for (file <- files) generateIR(file)
   }
@@ -45,6 +49,9 @@ class JCompiler (val state: JState) {
 }
 
 object JCompiler {
+  /*def main (args: Array[String]): Unit = Config.configure(args).foreach { config =>
+    new JCompiler(config).compile()
+  }*/
   def main (args: Array[String]): Unit = JConfig.parseCommandLineArgs(args).foreach { case (state, files) =>
     val compiler = new JCompiler(state)
     compiler.generateIR(files)
