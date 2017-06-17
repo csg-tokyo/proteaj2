@@ -43,8 +43,8 @@ trait JMembers {
 
     lazy val syntax: Option[JSyntax] = methodDef.syntax.map {
       case JExpressionSyntaxDef(p, s) => JExpressionSyntax(p, translatePattern(s, Nil, parameterTypes))
-      case JLiteralSyntaxDef(p, s) => JLiteralSyntax(p, translatePattern(s, Nil, parameterTypes))
-      case JStatementSyntaxDef(p, s) => ???
+      case JLiteralSyntaxDef(p, s)    => JLiteralSyntax(p, translatePattern(s, Nil, parameterTypes))
+      case JStatementSyntaxDef(_, _)  => ???
     }
 
     private def translatePattern(pattern: List[JSyntaxElementDef], result: List[JSyntaxElement], restParameters: List[JParameter]): List[JSyntaxElement] = pattern match {

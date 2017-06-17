@@ -93,8 +93,8 @@ trait JClassLoader {
   def erase (signature: JArrayTypeSignature, metaParams: List[FormalMetaParameter]): Try[JArrayClass] = erase(signature.component, metaParams).map(arrayClassOf)
 
   def erase (signature: JClassTypeSignature): Try[JClass] = signature match {
-    case SimpleClassTypeSignature(clazz, args)        => loadClass(clazz)
-    case MemberClassTypeSignature(outer, clazz, args) => erase(outer).flatMap(loadInnerClass(_, clazz))
+    case SimpleClassTypeSignature(clazz, _)        => loadClass(clazz)
+    case MemberClassTypeSignature(outer, clazz, _) => erase(outer).flatMap(loadInnerClass(_, clazz))
   }
 
   def erase_PE (signature: JClassTypeSignature): Option[JClass] = erase(signature) match {

@@ -54,7 +54,7 @@ object ByteParser {
   }
 
   private class ParserRef [T] (p: => ByteParser[T]) extends ByteParser[T] {
-    lazy val parser = p
+    lazy val parser: ByteParser[T] = p
     override def perform(reader: ByteReader): Try[T] = parser.perform(reader)
     override def map [U](g: T => U): ByteParser[U] = parser.map(g)
     override def flatMap[U](g: T => ByteParser[U]): ByteParser[U] = parser.flatMap(g)

@@ -265,7 +265,7 @@ trait Unifier {
         val objArgs = obj.erase.signature.metaParams.flatMap(param => obj.env.get(param.name))
         if (objArgs.size == as.size) checkArgs(objArgs.zip(as), args)
         else None
-      case MemberClassTypeSignature(outer, _, as) => ???
+      case MemberClassTypeSignature(_, _, _) => ???
     }
 
     def check (obj: JObjectType, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = {
@@ -312,7 +312,7 @@ trait Unifier {
 
     private def typeVariableSignature (rt: JRefType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = {
       if (args.contains(tvs.name)) args(tvs.name) match {
-        case JUnboundTypeVariable(name, bounds) if bounds.forall(_ >:> rt) => Some(args + (tvs.name -> rt))
+        case JUnboundTypeVariable(_, bounds) if bounds.forall(_ >:> rt) => Some(args + (tvs.name -> rt))
         case ref: JRefType if rt >:> ref             => Some(args)
         case JWildcard(ub, _) if ub.forall(rt >:> _) => Some(args)
         case _ => None
@@ -329,7 +329,7 @@ trait Unifier {
     }
 
     private def unifyClass (target: JObjectType, signatures: List[JClassTypeSignature], checked: Set[JClassTypeSignature]): Option[JClassTypeSignature] = signatures match {
-      case sig :: rest if sig.internalName == target.erase.internalName => Some(sig)
+      case sig :: _ if sig.internalName == target.erase.internalName => Some(sig)
       case sig :: rest => unifyClass(target, rest ++ directSuperTypes(sig).filterNot(checked.contains), checked + sig)
       case Nil => None
     }
@@ -341,7 +341,7 @@ trait Unifier {
           (cls.signature.superClass :: cls.signature.interfaces).map(assign(_, cls.signature.metaParams.map(_.name).zip(args).toMap))
         case None => Nil
       }
-      case MemberClassTypeSignature(outer, clazz, args) => ???
+      case MemberClassTypeSignature(_, _, _) => ???
     }
 
     private def assign (sig: JTypeArgument, map: Map[String, JTypeArgument]): JTypeArgument = sig match {
@@ -530,7 +530,7 @@ trait Unifier {
           val objArgs = t.erase.signature.metaParams.flatMap(param => t.env.get(param.name))
           if (objArgs.size == as.size) checkArgs(objArgs.zip(as), args)
           else None
-        case MemberClassTypeSignature(outer, _, as) => ???
+        case MemberClassTypeSignature(_, _, _) => ???
       }
     }
 
@@ -591,7 +591,7 @@ trait Unifier {
     }
 
     private def unifyClass (types: List[JObjectType], checked: Set[JObjectType], cts: JClassTypeSignature): Option[JObjectType] = types match {
-      case t :: rest if t.erase.internalName == cts.internalName => Some(t)
+      case t :: _ if t.erase.internalName == cts.internalName => Some(t)
       case t :: rest => unifyClass(rest ++ t.superTypes.filterNot(checked.contains), checked + t, cts)
       case Nil => None
     }

@@ -27,10 +27,7 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   test ("proteaj/impl/DSL をロード") {
     import defaultCompiler._
-    /*val config = JConfig()
-    config.classPath = classPath
-    val loader = new JCompiler(config.configure.get).classLoader
-    */
+
     val clazz = load("proteaj/impl/DSL")
     clazz shouldBe a [Success[_]]
     clazz.get shouldBe a [JClass]
@@ -38,9 +35,6 @@ class JClassLoaderTest extends FunSuite with Matchers {
 
   test ("proteaj/lang/Type はロードできない") {
     import defaultCompiler._
-    /*val config = JConfig()
-    config.classPath = classPath
-    val loader = new JCompiler(config.configure.get).classLoader*/
 
     val clazz = load("proteaj/lang/Type")
     clazz shouldBe a [Failure[_]]

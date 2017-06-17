@@ -23,10 +23,6 @@ trait Inject[C <: Union, T] {
 }
 
 object Inject {
-  implicit def leftInject [L, R <: Union]: Inject[L :|: R, L] = new Inject[L :|: R, L] {
-    def apply (l: L): L :|: R = -:|:(l)
-  }
-  implicit def rightInject [L, R <: Union, T] (implicit inject: Inject[R, T]): Inject[L :|: R, T] = new Inject[L :|: R, T] {
-    def apply (t: T): L :|: R = :|:-(inject(t))
-  }
+  implicit def leftInject [L, R <: Union]: Inject[L :|: R, L] = (l: L) => -:|:(l)
+  implicit def rightInject [L, R <: Union, T] (implicit inject: Inject[R, T]): Inject[L :|: R, T] = (t: T) => :|:-(inject(t))
 }

@@ -201,7 +201,7 @@ trait JavaReprGenerator {
     case r: IRReturnStatement     => Union[Statement](returnStatement(r, contexts))
     case e: IRExpressionStatement => Union[Statement](expressionStatement(e, contexts))
     case a: IRActivateStatement   => Union[Statement](activateStatement(a, contexts, activates))
-    case l: IRLocalDeclarationStatement => throw InvalidASTException("local variable declaration is not a single statement")
+    case _: IRLocalDeclarationStatement => throw InvalidASTException("local variable declaration is not a single statement")
   }
 
   private def localDeclarationStatement (stmt: IRLocalDeclarationStatement, contexts: List[IRContextRef]) = LocalDeclarationStatement (localDeclaration(stmt.declaration, contexts))
@@ -457,7 +457,7 @@ trait JavaReprGenerator {
   /* literals */
 
   private def javaLiteral (literal: IRJavaLiteral): JavaLiteral = literal match {
-    case n: IRNullLiteral    => Union[JavaLiteral](NullLiteral)
+    case _: IRNullLiteral    => Union[JavaLiteral](NullLiteral)
     case c: IRClassLiteral   => Union[JavaLiteral](classLiteral(c))
     case s: IRStringLiteral  => Union[JavaLiteral](Literal(s.value))
     case c: IRCharLiteral    => Union[JavaLiteral](Literal(c.value))
@@ -476,12 +476,12 @@ trait JavaReprGenerator {
   /* signatures */
 
   private def typeToSig (t: JType): TypeSig = t match {
-    case obj: JObjectType           => Union[TypeSig](objectType(obj))
-    case prm: JPrimitiveType        => Union[TypeSig](PrimitiveSig(prm.name))
-    case JArrayType(component)      => Union[TypeSig](ArraySig(typeToSig(component)))
-    case JTypeVariable(name, _)     => Union[TypeSig](TypeVariableSig(name))
-    case cap: JCapturedWildcardType => throw InvalidASTException("captured wildcard is found in generated Java AST")
-    case unb: JUnboundTypeVariable  => throw InvalidASTException("unbound type variable is found in generated Java AST")
+    case obj: JObjectType         => Union[TypeSig](objectType(obj))
+    case prm: JPrimitiveType      => Union[TypeSig](PrimitiveSig(prm.name))
+    case JArrayType(component)    => Union[TypeSig](ArraySig(typeToSig(component)))
+    case JTypeVariable(name, _)   => Union[TypeSig](TypeVariableSig(name))
+    case _: JCapturedWildcardType => throw InvalidASTException("captured wildcard is found in generated Java AST")
+    case _: JUnboundTypeVariable  => throw InvalidASTException("unbound type variable is found in generated Java AST")
   }
 
   private def objectType (obj: JObjectType): ClassSig = Union[ClassSig](topLevelClassObjectType(obj))
@@ -493,7 +493,7 @@ trait JavaReprGenerator {
   private def metaArgument (arg: MetaArgument): Option[TypeArg] = arg match {
     case ref: JRefType   => Some(Union[TypeArg](typeToSig(ref)))
     case wild: JWildcard => Some(Union[TypeArg](wildcard(wild)))
-    case meta: MetaValue => None
+    case _: MetaValue    => None
   }
 
   private def wildcard (wild: JWildcard): Wildcard = wild match {
@@ -511,7 +511,7 @@ trait JavaReprGenerator {
     case p: JPrimitiveTypeSignature    => Union[TypeSig](primitiveSig(p))
     case JTypeVariableSignature(n)     => Union[TypeSig](TypeVariableSig(n))
     case JArrayTypeSignature(c)        => Union[TypeSig](ArraySig(typeSig(c)))
-    case c: JCapturedWildcardSignature => throw InvalidASTException("captured wildcard is found in generated Java code")
+    case _: JCapturedWildcardSignature => throw InvalidASTException("captured wildcard is found in generated Java code")
   }
 
   private def classSig (signature: JClassTypeSignature): ClassSig = signature match {
@@ -538,9 +538,9 @@ trait JavaReprGenerator {
   }
 
   private def typeArg (arg: JTypeArgument): Option[TypeArg] = arg match {
-    case signature: JTypeSignature      => Some(Union[TypeArg](typeSig(signature)))
-    case wild: WildcardArgument         => Some(Union[TypeArg](wildcard(wild)))
-    case metaVar: MetaVariableSignature => None
+    case signature: JTypeSignature => Some(Union[TypeArg](typeSig(signature)))
+    case wild: WildcardArgument    => Some(Union[TypeArg](wildcard(wild)))
+    case _: MetaVariableSignature  => None
   }
 
   private def wildcard (wild: WildcardArgument): Wildcard = wild match {

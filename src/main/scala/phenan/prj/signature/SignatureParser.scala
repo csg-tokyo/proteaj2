@@ -1,7 +1,6 @@
 package phenan.prj.signature
 
 import phenan.prj._
-import phenan.prj.state.JState
 
 import scala.util.parsing.combinator.PackratParsers
 import scala.util.parsing.input.CharSequenceReader

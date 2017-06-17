@@ -21,7 +21,7 @@ trait IRs {
       case c: ClassDeclaration => IRTopLevelClass(c, this)
       case e: EnumDeclaration => IRTopLevelEnum(e, this)
       case i: InterfaceDeclaration => IRTopLevelInterface(i, this)
-      case a: AnnotationDeclaration => ???
+      case _: AnnotationDeclaration => ???
       case d: DSLDeclaration => IRTopLevelDSL(d, this)
     }
 
@@ -226,7 +226,7 @@ trait IRs {
       case (c: ClassDeclaration) :: rest => declaredMembers(rest, IRClassInnerClass(c, this) :: ms)
       case (e: EnumDeclaration) :: rest => declaredMembers(rest, IRClassInnerEnum(e, this) :: ms)
       case (i: InterfaceDeclaration) :: rest => declaredMembers(rest, IRClassInnerInterface(i, this) :: ms)
-      case (a: AnnotationDeclaration) :: rest => declaredMembers(rest, ??? :: ms)
+      case (_: AnnotationDeclaration) :: rest => declaredMembers(rest, ??? :: ms)
       case (d: DSLDeclaration) :: rest => declaredMembers(rest, IRClassInnerDSL(d, this) :: ms)
       case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRClassField(mods, ft, _, this)) ++ ms)
       case (m: MethodDeclaration) :: rest => declaredMembers(rest, IRClassMethod(m, this) :: ms)
@@ -261,7 +261,7 @@ trait IRs {
       case (c: ClassDeclaration) :: rest => declaredMembers(rest, IREnumInnerClass(c, this) :: ms)
       case (e: EnumDeclaration) :: rest => declaredMembers(rest, IREnumInnerEnum(e, this) :: ms)
       case (i: InterfaceDeclaration) :: rest => declaredMembers(rest, IREnumInnerInterface(i, this) :: ms)
-      case (a: AnnotationDeclaration) :: rest => declaredMembers(rest, ??? :: ms)
+      case (_: AnnotationDeclaration) :: rest => declaredMembers(rest, ??? :: ms)
       case (d: DSLDeclaration) :: rest => declaredMembers(rest, IREnumInnerDSL(d, this) :: ms)
       case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IREnumField(mods, ft, _, this)) ++ ms)
       case (m: MethodDeclaration) :: rest => declaredMembers(rest, IREnumMethod(m, this) :: ms)
@@ -291,7 +291,7 @@ trait IRs {
       case (c: ClassDeclaration) :: rest => declaredMembers(rest, IRInterfaceInnerClass(c, this) :: ms)
       case (e: EnumDeclaration) :: rest => declaredMembers(rest, IRInterfaceInnerEnum(e, this) :: ms)
       case (i: InterfaceDeclaration) :: rest => declaredMembers(rest, IRInterfaceInnerInterface(i, this) :: ms)
-      case (a: AnnotationDeclaration) :: rest => declaredMembers(rest, ??? :: ms)
+      case (_: AnnotationDeclaration) :: rest => declaredMembers(rest, ??? :: ms)
       case (d: DSLDeclaration) :: rest => declaredMembers(rest, IRInterfaceInnerDSL(d, this) :: ms)
       case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRInterfaceField(mods, ft, _, this)) ++ ms)
       case (m: MethodDeclaration) :: rest => declaredMembers(rest, IRInterfaceMethod(m, this) :: ms)
@@ -621,7 +621,7 @@ trait IRs {
     private def getFormalParameterSignatures(formalParameters: List[IRFormalParameter], signatures: List[JParameterSignature]): List[JParameterSignature] = formalParameters match {
       case param :: rest => param.signature match {
         case Success(sig) => getFormalParameterSignatures(rest, sig :: signatures)
-        case Failure(e) =>
+        case Failure(_) =>
           error("invalid formal parameter " + param)
           getFormalParameterSignatures(rest, signatures)
       }

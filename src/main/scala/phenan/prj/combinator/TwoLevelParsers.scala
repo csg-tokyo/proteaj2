@@ -18,7 +18,7 @@ trait TwoLevelParsers {
   type ParseResult[+T] = Impl.ParseResult[T]
   type ~ [+A, +B] = Impl.~[A, B]
 
-  val ~ = Impl.~
+  val ~ : Impl.~.type = Impl.~
   val ParseSuccess = Impl.Success
   val ParseFailure = Impl.NoSuccess
 

@@ -78,13 +78,13 @@ trait JTypeLoader {
       clazz <- loadClass_PE(className)
       args  <- fromTypeArguments(typeArgs, env)
     } yield getLoadedObjectType(clazz, args)
-    case MemberClassTypeSignature(outer, name, typeArgs) => ???    // not supported yet
+    case MemberClassTypeSignature(_, _, _) => ???    // not supported yet
   }
 
   def fromTypeVariableSignature (sig: JTypeVariableSignature, env: Map[String, MetaArgument]): Option[JRefType] = env.get(sig.name).flatMap {
     case t: JRefType  => Some(t)
     case w: JWildcard => w.upperBound.orElse(objectType).map(ub => JCapturedWildcardType(ub, w.lowerBound))
-    case p: MetaValue =>
+    case _: MetaValue =>
       error("invalid type variable : " + sig.name)
       None
   }

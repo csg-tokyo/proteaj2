@@ -6,27 +6,27 @@ import scalaz.Memo._
 
 sealed trait DToken {
   def raw: String
-  override def toString = raw
+  override def toString: String = raw
 }
 
 class Identifier private (val id: String) extends DToken {
-  def raw = id
+  def raw: String = id
 }
 
 class Symbol private (val symbol: Char) extends DToken {
-  def raw = symbol.toString
+  def raw: String = symbol.toString
 }
 
 class Whitespace private (ws: Char) extends DToken {
-  def raw = ws.toString
+  def raw: String = ws.toString
 }
 
 class CharLiteral private (literal: Char) extends DToken {
-  def raw = '\'' + LiteralUtil.escape(literal) + '\''
+  def raw: String = '\'' + LiteralUtil.escape(literal) + '\''
 }
 
 class StrLiteral private (val value: String) extends DToken {
-  def raw = '\"' + value.flatMap(LiteralUtil.escape) + '\"'
+  def raw: String = '\"' + value.flatMap(LiteralUtil.escape) + '\"'
 }
 
 class ErrorToken private (msg: String) extends DToken {

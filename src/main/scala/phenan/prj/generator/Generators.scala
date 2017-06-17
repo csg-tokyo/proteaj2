@@ -69,7 +69,7 @@ trait Generators {
 
   def elem [T] (f: T => String): Generator[T] = new Generator[T] ((buf, _, spacing, t) => appendString(buf, spacing, f(t)))
 
-  def lexical [T] (f: T => String): Generator[T] = new Generator[T] ((buf, _, spacing, t) => {
+  def lexical [T] (f: T => String): Generator[T] = new Generator[T] ((buf, _, _, t) => {
     buf.append(f(t))
     false
   })
