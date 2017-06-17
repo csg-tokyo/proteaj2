@@ -32,8 +32,16 @@ case class BAnnotationElement_Annotation (annotation: BAnnotation) extends BAnno
 case class BAnnotationElement_Array (array: List[BAnnotationElement]) extends BAnnotationElement
 
 
-case class ClassAttributes (innerClasses: Option[InnerClassesAttribute], signature: Option[SignatureAttribute], annotations: Option[RuntimeVisibleAnnotationsAttribute])
+case class ClassAttributes
+(innerClasses: Option[InnerClassesAttribute] = None,
+ signature: Option[SignatureAttribute] = None,
+ annotations: Option[RuntimeVisibleAnnotationsAttribute] = None)
 
-case class FieldAttributes (signature: Option[SignatureAttribute], annotations: Option[RuntimeVisibleAnnotationsAttribute])
+case class FieldAttributes
+(signature: Option[SignatureAttribute] = None,
+ annotations: Option[RuntimeVisibleAnnotationsAttribute] = None)
 
-case class MethodAttributes (signature: Option[SignatureAttribute], exceptions: Option[ExceptionsAttribute], annotations: Option[RuntimeVisibleAnnotationsAttribute])
+case class MethodAttributes
+(signature: Option[SignatureAttribute] = None,
+ exceptions: Option[ExceptionsAttribute] = None,
+ annotations: Option[RuntimeVisibleAnnotationsAttribute] = None)

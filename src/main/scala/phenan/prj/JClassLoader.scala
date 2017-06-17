@@ -1,19 +1,35 @@
 package phenan.prj
 
-import phenan.prj.exception.ClassFileNotFoundException
-import phenan.prj.state.JState
+import phenan.prj.exception._
+
+import phenan.prj.CommonNames._
+import phenan.prj.signature.DescriptorParser
 
 import scala.util._
+import scalaz.Memo.mutableHashMapMemo
 
 trait JClassLoader {
-  def load(name: String): Try[JErasedType]
-  def load(name: String, dim: Int): Try[JErasedType]
-  def loadClass: String => Try[JClass]
+  this: JCompiler with DescriptorParser with JErasedTypes with Application =>
+
+  def loadClass: (String) => Try[JClass]
+
+  def load (name: String): Try[JErasedType] = {
+    if (name.startsWith("[")) parseArrayDescriptor(name) match {
+      case Some(desc) => erase(desc, Nil)
+      case None => Failure(InvalidTypeException("invalid type descriptor : " + name))
+    }
+    else loadClass(name)
+  }
+
+  def load (name: String, dim: Int): Try[JErasedType] = {
+    if (dim > 0) loadClass(name).map(clazz => arrayOf(clazz, dim))
+    else loadClass(name)
+  }
 
   def loadClass_PE (name: String): Option[JClass] = loadClass(name) match {
     case Success(clazz) => Some(clazz)
     case Failure(e)     =>
-      state.error("fail to load class " + name, e)
+      error("fail to load class " + name, e)
       None
   }
 
@@ -21,22 +37,26 @@ trait JClassLoader {
     Failure(ClassFileNotFoundException("class " + outer.name + "$" + name + " is not found"))
   }
 
-  def arrayOf: JErasedType => JArrayClass
-  def arrayOf(clazz: JErasedType, dim: Int): JErasedType
+  def arrayClassOf: JErasedType => JArrayClass = mutableHashMapMemo(JArrayClass)
 
-  def boolean: JPrimitiveClass
-  def byte: JPrimitiveClass
-  def char: JPrimitiveClass
-  def short: JPrimitiveClass
-  def int: JPrimitiveClass
-  def long: JPrimitiveClass
-  def float: JPrimitiveClass
-  def double: JPrimitiveClass
-  def void: JPrimitiveClass
+  def arrayOf(clazz: JErasedType, dim: Int): JErasedType = {
+    if (dim > 0) arrayOf(arrayClassOf(clazz), dim - 1)
+    else clazz
+  }
+
+  def booleanClass: JPrimitiveClass = JPrimitiveClass("boolean", boxedBooleanClassName)
+  def byteClass: JPrimitiveClass    = JPrimitiveClass("byte", boxedByteClassName)
+  def charClass: JPrimitiveClass    = JPrimitiveClass("char", boxedCharClassName)
+  def shortClass: JPrimitiveClass   = JPrimitiveClass("short", boxedShortClassName)
+  def intClass: JPrimitiveClass     = JPrimitiveClass("int", boxedIntClassName)
+  def longClass: JPrimitiveClass    = JPrimitiveClass("long", boxedLongClassName)
+  def floatClass: JPrimitiveClass   = JPrimitiveClass("float", boxedFloatClassName)
+  def doubleClass: JPrimitiveClass  = JPrimitiveClass("double", boxedDoubleClassName)
+  def voidClass: JPrimitiveClass    = JPrimitiveClass("void", boxedVoidClassName)
 
   lazy val primitives: Map[String, JPrimitiveClass] = Map(
-    "boolean" -> boolean, "byte" -> byte, "char" -> char, "short" -> short, "int" -> int,
-    "long" -> long, "float" -> float, "double" -> double, "void" -> void
+    "boolean" -> booleanClass, "byte" -> byteClass, "char" -> charClass, "short" -> shortClass, "int" -> intClass,
+    "long" -> longClass, "float" -> floatClass, "double" -> doubleClass, "void" -> voidClass
   )
 
   lazy val objectClass: Option[JClass] = loadClass_PE(CommonNames.objectClassName)
@@ -48,7 +68,7 @@ trait JClassLoader {
   lazy val functionClass: Option[JClass] = loadClass_PE(CommonNames.functionClassName)
 
   lazy val predefOperatorsClass: Option[JClass] = loadClass_PE(CommonNames.predefOperatorsName)
-  lazy val typeClass: JClass = new JTypeClass(compiler)
+  lazy val typeClass: JClass = JTypeClass
 
   def erase (signature: JTypeSignature, metaParams: List[FormalMetaParameter]): Try[JErasedType] = signature match {
     case prm: JPrimitiveTypeSignature => Success(erase(prm))
@@ -59,18 +79,18 @@ trait JClassLoader {
   }
 
   def erase (signature: JPrimitiveTypeSignature): JPrimitiveClass = signature match {
-    case ByteTypeSignature   => byte
-    case CharTypeSignature   => char
-    case DoubleTypeSignature => double
-    case FloatTypeSignature  => float
-    case IntTypeSignature    => int
-    case LongTypeSignature   => long
-    case ShortTypeSignature  => short
-    case BoolTypeSignature   => boolean
-    case VoidTypeSignature   => void
+    case ByteTypeSignature   => byteClass
+    case CharTypeSignature   => charClass
+    case DoubleTypeSignature => doubleClass
+    case FloatTypeSignature  => floatClass
+    case IntTypeSignature    => intClass
+    case LongTypeSignature   => longClass
+    case ShortTypeSignature  => shortClass
+    case BoolTypeSignature   => booleanClass
+    case VoidTypeSignature   => voidClass
   }
 
-  def erase (signature: JArrayTypeSignature, metaParams: List[FormalMetaParameter]): Try[JArrayClass] = erase(signature.component, metaParams).map(arrayOf)
+  def erase (signature: JArrayTypeSignature, metaParams: List[FormalMetaParameter]): Try[JArrayClass] = erase(signature.component, metaParams).map(arrayClassOf)
 
   def erase (signature: JClassTypeSignature): Try[JClass] = signature match {
     case SimpleClassTypeSignature(clazz, args)        => loadClass(clazz)
@@ -80,17 +100,14 @@ trait JClassLoader {
   def erase_PE (signature: JClassTypeSignature): Option[JClass] = erase(signature) match {
     case Success(t) => Some(t)
     case Failure(e) =>
-      state.error("class type not found : " + signature, e)
+      error("class type not found : " + signature, e)
       None
   }
 
   def erase_Force (signature: JTypeSignature, metaParams: List[FormalMetaParameter]): JErasedType = erase(signature, metaParams) match {
     case Success(t) => t
     case Failure(e) =>
-      state.error("type not found : " + signature, e)
+      error("type not found : " + signature, e)
       objectClass.get
   }
-
-  def compiler: JCompiler
-  implicit def state: JState = compiler.state
 }

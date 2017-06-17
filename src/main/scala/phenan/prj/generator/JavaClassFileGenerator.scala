@@ -4,39 +4,34 @@ import java.io.File
 import java.net.URI
 import javax.tools._
 
-import phenan.prj.ir.IRFile
-import phenan.prj.state.JState
+import phenan.prj.Application
+import phenan.prj.ir._
 
 import scala.collection.JavaConverters._
 
-object JavaClassFileGenerator {
-  def compile (files: List[IRFile], state: JState): Unit = {
+trait JavaClassFileGenerator {
+  this: JavaReprGenerator with IRs with Application =>
+
+  def generateClassFile (files: List[IRFile]): Unit = {
     val compiler = ToolProvider.getSystemJavaCompiler
-    if (compiler == null) {
-      state.error("Java Compiler cannot be found")
-    }
+    if (compiler == null) error("Java Compiler cannot be found")
     else {
-      val compileOptions = List("-d", state.destination, "-cp", state.classPath)
-      val compilationUnits = files.flatMap(JavaSourceObject(_, state))
+      val compileOptions = List("-d", config.destination.getAbsolutePath, "-cp", config.getClassPathString)
+      val compilationUnits = files.flatMap(createJavaSourceObject)
       val res = compiler.getTask(null, null, null, compileOptions.asJava, null, compilationUnits.asJava).call()
-      state.info("compile status : " + res)
+      info("compile status : " + res)
     }
   }
-}
 
-class JavaSourceObject private (uri: URI, src: String) extends SimpleJavaFileObject (uri, JavaFileObject.Kind.SOURCE) {
-  override def getCharContent(ignoreEncodingErrors: Boolean): CharSequence = src
-}
-
-object JavaSourceObject {
-  def apply (file: IRFile, state: JState): Option[JavaSourceObject] = try {
+  private def createJavaSourceObject (file: IRFile): Option[JavaSourceObject] = try {
     val uri = getURI(file.filePath)
-    val src = JavaReprGenerator.javaFile(file)
+    val src = generateJavaFile(file)
     Some(new JavaSourceObject(uri, JavaCodeGenerators.javaFile(src)))
   } catch { case e: Exception  =>
-    state.error("compile failed : " + file.filePath, e)
+    error("compile failed : " + file.filePath, e)
     None
   }
+
   private def getURI (path: String): URI = {
     val absolutePath = new File(path).getAbsolutePath
     if (absolutePath.endsWith(".java")) URI.create("string://" + absolutePath)
@@ -46,4 +41,9 @@ object JavaSourceObject {
       else URI.create("string://" + absolutePath.substring(0, dot) + JavaFileObject.Kind.SOURCE.extension)
     }
   }
+
+  private class JavaSourceObject (uri: URI, src: String) extends SimpleJavaFileObject (uri, JavaFileObject.Kind.SOURCE) {
+    override def getCharContent(ignoreEncodingErrors: Boolean): CharSequence = src
+  }
 }
+

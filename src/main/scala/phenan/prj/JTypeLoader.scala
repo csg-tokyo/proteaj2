@@ -5,48 +5,50 @@ import scalaz.syntax.traverse._
 import scalaz.std.list._
 import scalaz.std.option._
 
-class JTypeLoader (compiler: JCompiler) {
-  val arrayOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
+trait JTypeLoader {
+  this: JModules with JErasedTypes with JClassLoader with Application =>
+
+  val arrayTypeOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
 
   def getObjectType (clazz: JClass, args: List[MetaArgument]): Option[JObjectType] = {
     val result = getLoadedObjectType(clazz, args)
     if (validTypeArgs(clazz.signature.metaParams, args, result.env)) Some(result)
     else {
-      state.error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
+      error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
       None
     }
   }
 
-  lazy val typeType = compiler.classLoader.typeClass.objectType(Nil)
-  lazy val objectType = compiler.classLoader.objectClass.flatMap(_.objectType(Nil))
-  lazy val stringType = compiler.classLoader.stringClass.flatMap(_.objectType(Nil))
-  lazy val anyClassType = compiler.classLoader.classClass.flatMap(_.objectType(List(JWildcard(None, None))))
+  lazy val typeType: Option[JObjectType]     = typeClass.objectType(Nil)
+  lazy val objectType: Option[JObjectType]   = objectClass.flatMap(_.objectType(Nil))
+  lazy val stringType: Option[JObjectType]   = stringClass.flatMap(_.objectType(Nil))
+  lazy val anyClassType: Option[JObjectType] = classClass.flatMap(_.objectType(List(JWildcard(None, None))))
 
-  lazy val byte    = compiler.classLoader.byte.primitiveType
-  lazy val char    = compiler.classLoader.char.primitiveType
-  lazy val double  = compiler.classLoader.double.primitiveType
-  lazy val float   = compiler.classLoader.float.primitiveType
-  lazy val int     = compiler.classLoader.int.primitiveType
-  lazy val long    = compiler.classLoader.long.primitiveType
-  lazy val short   = compiler.classLoader.short.primitiveType
-  lazy val boolean = compiler.classLoader.boolean.primitiveType
-  lazy val void    = compiler.classLoader.void.primitiveType
+  lazy val byteType: JPrimitiveType    = byteClass.primitiveType
+  lazy val charType: JPrimitiveType    = charClass.primitiveType
+  lazy val doubleType: JPrimitiveType  = doubleClass.primitiveType
+  lazy val floatType: JPrimitiveType   = floatClass.primitiveType
+  lazy val intType: JPrimitiveType     = intClass.primitiveType
+  lazy val longType: JPrimitiveType    = longClass.primitiveType
+  lazy val shortType: JPrimitiveType   = shortClass.primitiveType
+  lazy val booleanType: JPrimitiveType = booleanClass.primitiveType
+  lazy val voidType: JPrimitiveType    = voidClass.primitiveType
 
   lazy val superTypesOfArray: List[JObjectType] = CommonNames.superClassesOfArray.flatMap { name =>
-    compiler.classLoader.loadClass_PE(name).flatMap(_.objectType(Nil))
+    loadClass_PE(name).flatMap(_.objectType(Nil))
   }
 
-  lazy val runtimeExceptionType = compiler.classLoader.runtimeExceptionClass.flatMap(_.objectType(Nil))
-  lazy val errorType = compiler.classLoader.errorClass.flatMap(_.objectType(Nil))
+  lazy val runtimeExceptionType: Option[JObjectType] = runtimeExceptionClass.flatMap(_.objectType(Nil))
+  lazy val errorType: Option[JObjectType] = errorClass.flatMap(_.objectType(Nil))
 
-  lazy val uncheckedExceptionTypes = (runtimeExceptionType ++ errorType).toList
+  lazy val uncheckedExceptionTypes: List[JObjectType] = (runtimeExceptionType ++ errorType).toList
 
-  def iterableOf (arg: JRefType) = compiler.classLoader.iterableClass.flatMap(_.objectType(List(arg)))
-  def classTypeOf (arg: JType) = boxing(arg).flatMap(t => compiler.classLoader.classClass.flatMap(_.objectType(List(t))))
-  def functionTypeOf (from: JType, to: JType) = for {
+  def iterableOf (arg: JRefType): Option[JObjectType] = iterableClass.flatMap(_.objectType(List(arg)))
+  def classTypeOf (arg: JType): Option[JObjectType] = boxing(arg).flatMap(t => classClass.flatMap(_.objectType(List(t))))
+  def functionTypeOf (from: JType, to: JType): Option[JObjectType] = for {
     f <- boxing(from)
     t <- boxing(to)
-    func <- compiler.classLoader.functionClass
+    func <- functionClass
     r <- func.objectType(List(f, t))
   } yield r
 
@@ -66,14 +68,14 @@ class JTypeLoader (compiler: JCompiler) {
     case JArrayTypeSignature(component)  => fromTypeSignature(component, env).map(_.array)
     case cap: JCapturedWildcardSignature => fromCapturedWildcardSignature(cap, env)
     case prm: JPrimitiveTypeSignature    =>
-      state.error("do not use this method for primitive type signature : " + prm)
+      error("do not use this method for primitive type signature : " + prm)
       None
   }
 
   def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaArgument]): Option[JObjectType] = sig match {
     case JTypeSignature.typeTypeSig => typeType
     case SimpleClassTypeSignature(className, typeArgs) => for {
-      clazz <- compiler.classLoader.loadClass_PE(className)
+      clazz <- loadClass_PE(className)
       args  <- fromTypeArguments(typeArgs, env)
     } yield getLoadedObjectType(clazz, args)
     case MemberClassTypeSignature(outer, name, typeArgs) => ???    // not supported yet
@@ -83,7 +85,7 @@ class JTypeLoader (compiler: JCompiler) {
     case t: JRefType  => Some(t)
     case w: JWildcard => w.upperBound.orElse(objectType).map(ub => JCapturedWildcardType(ub, w.lowerBound))
     case p: MetaValue =>
-      state.error("invalid type variable : " + sig.name)
+      error("invalid type variable : " + sig.name)
       None
   }
 
@@ -93,7 +95,7 @@ class JTypeLoader (compiler: JCompiler) {
     }
   }
 
-  def fromPrimitiveSignature (p: JPrimitiveTypeSignature): JPrimitiveType = compiler.classLoader.erase(p).primitiveType
+  def fromPrimitiveSignature (p: JPrimitiveTypeSignature): JPrimitiveType = erase(p).primitiveType
 
   def fromTypeArguments (args: List[JTypeArgument], env: Map[String, MetaArgument]): Option[List[MetaArgument]] = args.traverse {
     case sig: JTypeSignature            => fromTypeSignature_RefType(sig, env)
@@ -117,11 +119,9 @@ class JTypeLoader (compiler: JCompiler) {
     arg.isSubtypeOf(fromTypeSignature(bound, env).get)
   }
 
-  def state = compiler.state
-
   private def getArrayType (component: JType): JArrayType = JArrayType(component)
 
   private def getLoadedObjectType (clazz: JClass, args: List[MetaArgument]): JObjectType = memoizedGetObjectType((clazz, clazz.signature.metaParams.map(_.name).zip(args).toMap))
 
-  private val memoizedGetObjectType: ((JClass, Map[String, MetaArgument])) => JObjectType = mutableHashMapMemo { pair => new JObjectType(pair._1, pair._2) }
+  private val memoizedGetObjectType: ((JClass, Map[String, MetaArgument])) => JObjectType = mutableHashMapMemo { pair => JObjectType(pair._1, pair._2) }
 }

@@ -8,57 +8,59 @@ import phenan.util._
 import CommonNames._
 import JavaRepr._
 
-object JavaReprGenerator {
+trait JavaReprGenerator {
+  this: JTypeLoader with IRs with IRStatements with IRExpressions with JModules with JMembers with JErasedTypes =>
+
   /* AST transformation : ProteaJ IR ==> Java AST */
 
-  def javaFile (file: IRFile): JavaFile = JavaFile (file.packageName.map(_.names.mkString(".")), file.topLevelModules.map(moduleDef))
+  def generateJavaFile (file: IRFile): JavaFile = JavaFile (file.packageName.map(_.names.mkString(".")), file.topLevelModules.map(moduleDef))
 
-  def moduleDef (clazz: IRModule): ModuleDef = clazz match {
+  private def moduleDef (clazz: IRModule): ModuleDef = clazz match {
     case cls: IRTopLevelClass     => Union[ModuleDef](classDef(cls))
     case enm: IRTopLevelEnum      => Union[ModuleDef](enumDef(enm))
     case ifc: IRTopLevelInterface => Union[ModuleDef](interfaceDef(ifc))
     case dsl: IRTopLevelDSL       => Union[ModuleDef](dslDef(dsl))
   }
 
-  def classDef (clazz: IRClass): ClassDef = new ClassDef {
-    def annotations = Annotations.classAnnotations(clazz)
-    def modifiers = clazz.mod ^ JModifier.accSuper
-    def name = clazz.simpleName
-    def typeParameters = typeParams(clazz.signature.metaParams)
-    def superType = classSig(clazz.signature.superClass)
-    def interfaces = clazz.signature.interfaces.map(classSig)
-    def members = clazz.declaredMembers.map(classMember) ++ clazz.syntheticMethods.map(syntheticMember)
+  private def classDef (clazz: IRClass): ClassDef = new ClassDef {
+    def annotations: List[JavaAnnotation] = Annotations.classAnnotations(clazz)
+    def modifiers: JModifier = clazz.mod ^ JModifier.accSuper
+    def name: String = clazz.simpleName
+    def typeParameters: List[TypeParam] = typeParams(clazz.signature.metaParams)
+    def superType: ClassSig = classSig(clazz.signature.superClass)
+    def interfaces: List[ClassSig] = clazz.signature.interfaces.map(classSig)
+    def members: List[ClassMember] = clazz.declaredMembers.map(classMember) ++ clazz.syntheticMethods.map(syntheticMember)
   }
 
-  def enumDef (enum: IREnum): EnumDef = new EnumDef {
-    def annotations = Annotations.enumAnnotations(enum)
-    def modifiers = enum.mod ^ JModifier.accSuper
-    def name = enum.simpleName
-    def interfaces = enum.signature.interfaces.map(classSig)
-    def constants = enum.enumConstants.map(enumConstantDef)
-    def members = enum.enumMembers.map(enumMember)
+  private def enumDef (enum: IREnum): EnumDef = new EnumDef {
+    def annotations: List[JavaAnnotation] = Annotations.enumAnnotations(enum)
+    def modifiers: JModifier = enum.mod ^ JModifier.accSuper
+    def name: String = enum.simpleName
+    def interfaces: List[ClassSig] = enum.signature.interfaces.map(classSig)
+    def constants: List[EnumConstantDef] = enum.enumConstants.map(enumConstantDef)
+    def members: List[ClassMember] = enum.enumMembers.map(enumMember)
   }
 
-  def interfaceDef (interface: IRInterface): InterfaceDef = new InterfaceDef {
-    def annotations = Annotations.interfaceAnnotations(interface)
-    def modifiers = interface.mod
-    def name = interface.simpleName
-    def typeParameters = typeParams(interface.signature.metaParams)
-    def superInterfaces = interface.signature.interfaces.map(classSig)
-    def members = interface.declaredMembers.map(interfaceMember)
+  private def interfaceDef (interface: IRInterface): InterfaceDef = new InterfaceDef {
+    def annotations: List[JavaAnnotation] = Annotations.interfaceAnnotations(interface)
+    def modifiers: JModifier = interface.mod
+    def name: String = interface.simpleName
+    def typeParameters: List[TypeParam] = typeParams(interface.signature.metaParams)
+    def superInterfaces: List[ClassSig] = interface.signature.interfaces.map(classSig)
+    def members: List[ClassMember] = interface.declaredMembers.map(interfaceMember)
   }
 
-  def dslDef (dsl: IRDSL): ClassDef = new ClassDef {
-    def annotations = Annotations.dslAnnotations(dsl)
-    def modifiers = dsl.mod ^ JModifier.accSuper
-    def name = dsl.simpleName
-    def typeParameters = typeParams(dsl.signature.metaParams)
-    def superType = objectClassSig
+  private def dslDef (dsl: IRDSL): ClassDef = new ClassDef {
+    def annotations: List[JavaAnnotation] = Annotations.dslAnnotations(dsl)
+    def modifiers: JModifier = dsl.mod ^ JModifier.accSuper
+    def name: String = dsl.simpleName
+    def typeParameters: List[TypeParam] = typeParams(dsl.signature.metaParams)
+    def superType: ClassSig = objectClassSig
     def interfaces = Nil
-    def members = dsl.declaredMembers.flatMap(dslMember) ++ dsl.syntheticMethods.map(syntheticMember)
+    def members: List[ClassMember] = dsl.declaredMembers.flatMap(dslMember) ++ dsl.syntheticMethods.map(syntheticMember)
   }
 
-  def classMember (member: IRClassMember): ClassMember = member match {
+  private def classMember (member: IRClassMember): ClassMember = member match {
     case field: IRClassField             => Union[ClassMember](fieldDef(field))
     case method: IRClassMethod           => Union[ClassMember](methodDef(method))
     case constructor: IRClassConstructor => Union[ClassMember](constructorDef(constructor))
@@ -67,7 +69,7 @@ object JavaReprGenerator {
     case module: IRModule                => Union[ClassMember](moduleDef(module))
   }
 
-  def enumMember (member: IREnumMember): ClassMember = member match {
+  private def enumMember (member: IREnumMember): ClassMember = member match {
     case field: IREnumField             => Union[ClassMember](fieldDef(field))
     case method: IREnumMethod           => Union[ClassMember](methodDef(method))
     case constructor: IREnumConstructor => Union[ClassMember](constructorDef(constructor))
@@ -77,119 +79,119 @@ object JavaReprGenerator {
     case _ => throw InvalidASTException("invalid enum declaration AST")
   }
 
-  def interfaceMember (member: IRInterfaceMember): ClassMember = member match {
+  private def interfaceMember (member: IRInterfaceMember): ClassMember = member match {
     case field: IRInterfaceField   => Union[ClassMember](fieldDef(field))
     case method: IRInterfaceMethod => Union[ClassMember](methodDef(method))
     case module: IRModule          => Union[ClassMember](moduleDef(module))
   }
 
-  def dslMember (member: IRDSLMember): Option[ClassMember] = member match {
+  private def dslMember (member: IRDSLMember): Option[ClassMember] = member match {
     case field: IRDSLField             => Some(Union[ClassMember](fieldDef(field)))
     case operator: IROperator          => Some(Union[ClassMember](operatorDef(operator)))
     case constructor: IRDSLConstructor => Some(Union[ClassMember](constructorDef(constructor)))
     case _: IRPriorities               => None
   }
 
-  def syntheticMember (synthetic: IRSyntheticMethod): ClassMember = synthetic match {
+  private def syntheticMember (synthetic: IRSyntheticMethod): ClassMember = synthetic match {
     case ini: IRParameterInitializer => Union[ClassMember](parameterInitializerDef(ini))
   }
 
-  def fieldDef (field: IRField): FieldDef = new FieldDef {
-    def annotations = Annotations.fieldAnnotations(field)
-    def modifiers = field.mod
-    def fieldType = typeSig(field.signature)
-    def name = field.name
+  private def fieldDef (field: IRField): FieldDef = new FieldDef {
+    def annotations: List[JavaAnnotation] = Annotations.fieldAnnotations(field)
+    def modifiers: JModifier = field.mod
+    def fieldType: TypeSig = typeSig(field.signature)
+    def name: String = field.name
     def initializer: Option[Expression] = field.initializer.map(expression(_, Nil))
   }
 
-  def methodDef (method: IRMethod): MethodDef = new MethodDef {
-    def annotations = Annotations.methodAnnotations(method)
-    def modifiers = method.mod
-    def typeParameters = typeParams(method.signature.metaParams)
-    def returnType = typeSig(method.signature.returnType)
-    def name = method.name
-    def parameters = method.parameters.map(parameter)
-    def throws = method.signature.throwTypes.map(typeSig)
-    def body = method.methodBody.map(methodBody(_, method.requiresContexts, method.activateTypes))
+  private def methodDef (method: IRMethod): MethodDef = new MethodDef {
+    def annotations: List[JavaAnnotation] = Annotations.methodAnnotations(method)
+    def modifiers: JModifier = method.mod
+    def typeParameters: List[TypeParam] = typeParams(method.signature.metaParams)
+    def returnType: TypeSig = typeSig(method.signature.returnType)
+    def name: String = method.name
+    def parameters: List[Param] = method.parameters.map(parameter)
+    def throws: List[TypeSig] = method.signature.throwTypes.map(typeSig)
+    def body: Option[Block] = method.methodBody.map(methodBody(_, method.requiresContexts, method.activateTypes))
   }
 
-  def operatorDef (operator: IROperator): MethodDef = new MethodDef {
-    def annotations = Annotations.operatorAnnotations(operator)
-    def modifiers = operator.mod
-    def typeParameters = typeParams(operator.signature.metaParams)
-    def returnType = typeSig(operator.signature.returnType)
-    def name = operator.name
-    def parameters = operator.parameters.map(parameter)
-    def throws = operator.signature.throwTypes.map(typeSig)
-    def body = operator.operatorBody.map(methodBody(_, operator.requiresContexts, operator.activateTypes))
+  private def operatorDef (operator: IROperator): MethodDef = new MethodDef {
+    def annotations: List[JavaAnnotation] = Annotations.operatorAnnotations(operator)
+    def modifiers: JModifier = operator.mod
+    def typeParameters: List[TypeParam] = typeParams(operator.signature.metaParams)
+    def returnType: TypeSig = typeSig(operator.signature.returnType)
+    def name: String = operator.name
+    def parameters: List[Param] = operator.parameters.map(parameter)
+    def throws: List[TypeSig] = operator.signature.throwTypes.map(typeSig)
+    def body: Option[Block] = operator.operatorBody.map(methodBody(_, operator.requiresContexts, operator.activateTypes))
   }
 
-  def parameterInitializerDef (initializer: IRParameterInitializer): MethodDef = new MethodDef {
-    def annotations = Annotations.paramInitializerAnnotations(initializer)
-    def modifiers = initializer.mod
+  private def parameterInitializerDef (initializer: IRParameterInitializer): MethodDef = new MethodDef {
+    def annotations: List[JavaAnnotation] = Annotations.paramInitializerAnnotations(initializer)
+    def modifiers: JModifier = initializer.mod
     def typeParameters = Nil
-    def returnType = typeSig(initializer.signature.returnType)
-    def name = initializer.name
+    def returnType: TypeSig = typeSig(initializer.signature.returnType)
+    def name: String = initializer.name
     def parameters = Nil
     def throws = Nil
-    def body = initializer.expression.map(parameterInitializer)
+    def body: Option[Block] = initializer.expression.map(parameterInitializer)
   }
 
-  def constructorDef (constructor: IRConstructor): ConstructorDef = new ConstructorDef {
-    def annotations = Annotations.constructorAnnotations(constructor)
-    def modifiers = constructor.mod
-    def typeParameters = typeParams(constructor.signature.metaParams)
-    def className = constructor.declaringClass.simpleName
-    def parameters = constructor.parameters.map(parameter)
-    def throws = constructor.signature.throwTypes.map(typeSig)
-    def body = constructor.constructorBody.map(constructorBody(_, constructor.requiresContexts, constructor.activateTypes)).getOrElse {
+  private def constructorDef (constructor: IRConstructor): ConstructorDef = new ConstructorDef {
+    def annotations: List[JavaAnnotation] = Annotations.constructorAnnotations(constructor)
+    def modifiers: JModifier = constructor.mod
+    def typeParameters: List[TypeParam] = typeParams(constructor.signature.metaParams)
+    def className: String = constructor.declaringClass.simpleName
+    def parameters: List[Param] = constructor.parameters.map(parameter)
+    def throws: List[TypeSig] = constructor.signature.throwTypes.map(typeSig)
+    def body: Block = constructor.constructorBody.map(constructorBody(_, constructor.requiresContexts, constructor.activateTypes)).getOrElse {
       throw InvalidASTException("constructor must have its body")
     }
   }
 
-  def instanceInitializerDef (iin: IRInstanceInitializer): InstanceInitializerDef = InstanceInitializerDef {
+  private def instanceInitializerDef (iin: IRInstanceInitializer): InstanceInitializerDef = InstanceInitializerDef {
     iin.initializerBody.map(initializerBody).getOrElse {
       throw InvalidASTException("invalid instance initializer")
     }
   }
 
-  def staticInitializerDef (sin: IRStaticInitializer): StaticInitializerDef = StaticInitializerDef {
+  private def staticInitializerDef (sin: IRStaticInitializer): StaticInitializerDef = StaticInitializerDef {
     sin.initializerBody.map(initializerBody).getOrElse {
       throw InvalidASTException("invalid static initializer")
     }
   }
 
-  def enumConstantDef (constant: IREnumConstant): EnumConstantDef = EnumConstantDef(constant.name)
+  private def enumConstantDef (constant: IREnumConstant): EnumConstantDef = EnumConstantDef(constant.name)
 
-  def parameter (param: IRFormalParameter): Param = Param (param.actualTypeSignature.map(typeSig).getOrElse { throw InvalidASTException("invalid parameter type") }, param.name)
+  private def parameter (param: IRFormalParameter): Param = Param (param.actualTypeSignature.map(typeSig).getOrElse { throw InvalidASTException("invalid parameter type") }, param.name)
 
-  def parameter (paramType: JType, name: String): Param = Param (typeToSig(paramType), name)
+  private def parameter (paramType: JType, name: String): Param = Param (typeToSig(paramType), name)
 
-  def methodBody (body: IRMethodBody, contexts: List[IRContextRef], activates: List[JRefType]): Block = Block {
+  private def methodBody (body: IRMethodBody, contexts: List[IRContextRef], activates: List[JRefType]): Block = Block {
     contextDeclarations(contexts, 0) ++ blockStatements(body.block.statements, contexts, activates, Nil)
   }
 
-  def constructorBody (body: IRConstructorBody, contexts: List[IRContextRef], activates: List[JRefType]): Block = body.constructorCall match {
+  private def constructorBody (body: IRConstructorBody, contexts: List[IRContextRef], activates: List[JRefType]): Block = body.constructorCall match {
     case Some(c) => Block(Union[Statement](explicitConstructorCall(c, Nil)) :: contextDeclarations(contexts, 0) ++ blockStatements(body.statements, contexts, activates, Nil))
     case None    => Block(contextDeclarations(contexts, 0) ++ blockStatements(body.statements, contexts, activates, Nil))
   }
 
-  def initializerBody (body: IRInitializerBody): Block = block(body.block, Nil, Nil)
+  private def initializerBody (body: IRInitializerBody): Block = block(body.block, Nil, Nil)
 
-  def parameterInitializer (body: IRExpression): Block = Block(List(Union[Statement](ReturnStatement(expression(body, Nil)))))
+  private def parameterInitializer (body: IRExpression): Block = Block(List(Union[Statement](ReturnStatement(expression(body, Nil)))))
 
   /* statements */
 
-  def block (b: IRBlock, contexts: List[IRContextRef], activates: List[JRefType]): Block = Block(blockStatements(b.statements, contexts, activates, Nil))
+  private def block (b: IRBlock, contexts: List[IRContextRef], activates: List[JRefType]): Block = Block(blockStatements(b.statements, contexts, activates, Nil))
 
-  def blockStatements (statements: List[IRStatement], contexts: List[IRContextRef], activates: List[JRefType], result: List[Statement]): List[Statement] = statements match {
+  private def blockStatements (statements: List[IRStatement], contexts: List[IRContextRef], activates: List[JRefType], result: List[Statement]): List[Statement] = statements match {
     case (l: IRLocalDeclarationStatement) :: rest => blockStatements(rest, contexts, activates, result :+ Union[Statement](localDeclarationStatement(l, contexts)))
     case (e: IRExpressionStatement) :: rest       => blockStatements(rest, contexts ++ e.activates, activates, result ++ (Union[Statement](expressionStatement(e, contexts)) :: contextDeclarations(e.activates, contexts.size)))
     case single :: rest                           => blockStatements(rest, contexts, activates, result :+ singleStatement(single, contexts, activates))
     case Nil                                      => result
   }
 
-  def singleStatement (statement: IRStatement, contexts: List[IRContextRef], activates: List[JRefType]): Statement = statement match {
+  private def singleStatement (statement: IRStatement, contexts: List[IRContextRef], activates: List[JRefType]): Statement = statement match {
     case b: IRBlock               => Union[Statement](block(b, contexts, activates))
     case i: IRIfStatement         => Union[Statement](ifStatement(i, contexts, activates))
     case w: IRWhileStatement      => Union[Statement](whileStatement(w, contexts, activates))
@@ -202,70 +204,70 @@ object JavaReprGenerator {
     case l: IRLocalDeclarationStatement => throw InvalidASTException("local variable declaration is not a single statement")
   }
 
-  def localDeclarationStatement (stmt: IRLocalDeclarationStatement, contexts: List[IRContextRef]) = LocalDeclarationStatement (localDeclaration(stmt.declaration, contexts))
+  private def localDeclarationStatement (stmt: IRLocalDeclarationStatement, contexts: List[IRContextRef]) = LocalDeclarationStatement (localDeclaration(stmt.declaration, contexts))
 
-  def localDeclaration (declaration: IRLocalDeclaration, contexts: List[IRContextRef]) = LocalDeclaration (typeToSig(declaration.localType), declaration.declarators.map(localDeclarator(_, contexts)))
+  private def localDeclaration (declaration: IRLocalDeclaration, contexts: List[IRContextRef]) = LocalDeclaration (typeToSig(declaration.localType), declaration.declarators.map(localDeclarator(_, contexts)))
 
-  def localDeclarator (declarator: IRVariableDeclarator, contexts: List[IRContextRef]) = LocalDeclarator (declarator.name, declarator.dim, declarator.init.map(expression(_, contexts)))
+  private def localDeclarator (declarator: IRVariableDeclarator, contexts: List[IRContextRef]) = LocalDeclarator (declarator.name, declarator.dim, declarator.init.map(expression(_, contexts)))
 
-  def contextDeclarations (contexts: List[IRContextRef], offset: Int): List[Statement] = contexts.zipWithIndex.map {
+  private def contextDeclarations (contexts: List[IRContextRef], offset: Int): List[Statement] = contexts.zipWithIndex.map {
     case (c, i) => Union[Statement](contextDeclarationStatement(c, i, offset))
   }
 
-  def contextDeclarationStatement (context: IRContextRef, index: Int, offset: Int) = LocalDeclarationStatement (contextDeclaration(context, index, offset))
+  private def contextDeclarationStatement (context: IRContextRef, index: Int, offset: Int) = LocalDeclarationStatement (contextDeclaration(context, index, offset))
 
-  def contextDeclaration (context: IRContextRef, index: Int, offset: Int) = LocalDeclaration (typeToSig(context.contextType), List(contextDeclarator(context.contextType, index, offset)))
+  private def contextDeclaration (context: IRContextRef, index: Int, offset: Int) = LocalDeclaration (typeToSig(context.contextType), List(contextDeclarator(context.contextType, index, offset)))
 
-  def contextDeclarator (contextType: JObjectType, index: Int, offset: Int): LocalDeclarator = LocalDeclarator (contextName(index + offset), 0, Some(contextAccess(contextType, index)))
+  private def contextDeclarator (contextType: JObjectType, index: Int, offset: Int): LocalDeclarator = LocalDeclarator (contextName(index + offset), 0, Some(contextAccess(contextType, index)))
 
-  def ifStatement (stmt: IRIfStatement, contexts: List[IRContextRef], activates: List[JRefType]): IfStatement =
+  private def ifStatement (stmt: IRIfStatement, contexts: List[IRContextRef], activates: List[JRefType]): IfStatement =
     IfStatement (expression(stmt.condition, contexts), singleStatement(stmt.thenStatement, contexts, activates), stmt.elseStatement.map(singleStatement(_, contexts, activates)))
 
-  def whileStatement (stmt: IRWhileStatement, contexts: List[IRContextRef], activates: List[JRefType]): WhileStatement =
+  private def whileStatement (stmt: IRWhileStatement, contexts: List[IRContextRef], activates: List[JRefType]): WhileStatement =
     WhileStatement (expression(stmt.condition, contexts), singleStatement(stmt.statement, contexts, activates))
 
-  def forStatement (stmt: IRForStatement, contexts: List[IRContextRef], activates: List[JRefType]): ForStatement = stmt match {
+  private def forStatement (stmt: IRForStatement, contexts: List[IRContextRef], activates: List[JRefType]): ForStatement = stmt match {
     case s: IRNormalForStatement   => Union[ForStatement](normalForStatement(s, contexts, activates))
     case s: IRAncientForStatement  => Union[ForStatement](ancientForStatement(s, contexts, activates))
     case s: IREnhancedForStatement => Union[ForStatement](enhancedForStatement(s, contexts, activates))
   }
 
-  def normalForStatement (stmt: IRNormalForStatement, contexts: List[IRContextRef], activates: List[JRefType]): NormalForStatement =
+  private def normalForStatement (stmt: IRNormalForStatement, contexts: List[IRContextRef], activates: List[JRefType]): NormalForStatement =
     NormalForStatement (Union[ForInit](localDeclaration(stmt.local, contexts)), stmt.condition.map(expression(_, contexts)), stmt.update.map(expression(_, contexts)), singleStatement(stmt.statement, contexts, activates))
 
-  def ancientForStatement (stmt: IRAncientForStatement, contexts: List[IRContextRef], activates: List[JRefType]): NormalForStatement =
+  private def ancientForStatement (stmt: IRAncientForStatement, contexts: List[IRContextRef], activates: List[JRefType]): NormalForStatement =
     NormalForStatement (Union[ForInit](stmt.init.map(expression(_, contexts))), stmt.condition.map(expression(_, contexts)), stmt.update.map(expression(_, contexts)), singleStatement(stmt.statement, contexts, activates))
 
-  def enhancedForStatement (stmt: IREnhancedForStatement, contexts: List[IRContextRef], activates: List[JRefType]): EnhancedForStatement =
+  private def enhancedForStatement (stmt: IREnhancedForStatement, contexts: List[IRContextRef], activates: List[JRefType]): EnhancedForStatement =
     EnhancedForStatement (typeToSig(stmt.elementType), stmt.name, stmt.dim, expression(stmt.iterable, contexts), singleStatement(stmt.statement, contexts, activates))
 
-  def tryStatement (stmt: IRTryStatement, contexts: List[IRContextRef], activates: List[JRefType]): TryStatement =
+  private def tryStatement (stmt: IRTryStatement, contexts: List[IRContextRef], activates: List[JRefType]): TryStatement =
     TryStatement (block(stmt.tryBlock, contexts, activates), stmt.catchBlocks.map(e => ExceptionHandler(typeToSig(e.exceptionType), e.name, block(e.catchBlock, contexts, activates))), stmt.finallyBlock.map(block(_, contexts, activates)))
 
-  def throwStatement (stmt: IRThrowStatement, contexts: List[IRContextRef]): ThrowStatement = ThrowStatement(expression(stmt.expression, contexts))
+  private def throwStatement (stmt: IRThrowStatement, contexts: List[IRContextRef]): ThrowStatement = ThrowStatement(expression(stmt.expression, contexts))
 
-  def returnStatement (stmt: IRReturnStatement, contexts: List[IRContextRef]): ReturnStatement = ReturnStatement(expression(stmt.expression, contexts))
+  private def returnStatement (stmt: IRReturnStatement, contexts: List[IRContextRef]): ReturnStatement = ReturnStatement(expression(stmt.expression, contexts))
 
-  def expressionStatement (stmt: IRExpressionStatement, contexts: List[IRContextRef]): ExpressionStatement = ExpressionStatement(expression(stmt.expression, contexts))
+  private def expressionStatement (stmt: IRExpressionStatement, contexts: List[IRContextRef]): ExpressionStatement = ExpressionStatement(expression(stmt.expression, contexts))
 
-  def activateStatement (stmt: IRActivateStatement, contexts: List[IRContextRef], activates: List[JRefType]): ExpressionStatement = {
+  private def activateStatement (stmt: IRActivateStatement, contexts: List[IRContextRef], activates: List[JRefType]): ExpressionStatement = {
     val activateType = stmt.expression.staticType.getOrElse(throw InvalidASTException("invalid activate statement"))
     val index = activates.indexOf(activateType)
     if (index >= 0) activateContext(expression(stmt.expression, contexts), index)
     else throw InvalidASTException("activated context is not declared in the activates clause")
   }
 
-  def explicitConstructorCall (constructorCall: IRExplicitConstructorCall, contexts: List[IRContextRef]): ExplicitConstructorCall = constructorCall match {
+  private def explicitConstructorCall (constructorCall: IRExplicitConstructorCall, contexts: List[IRContextRef]): ExplicitConstructorCall = constructorCall match {
     case c: IRThisConstructorCall  => Union[ExplicitConstructorCall](thisConstructorCall(c, contexts))
     case c: IRSuperConstructorCall => Union[ExplicitConstructorCall](superConstructorCall(c, contexts))
   }
 
-  def thisConstructorCall (constructorCall: IRThisConstructorCall, contexts: List[IRContextRef]): ThisConstructorCall = {
+  private def thisConstructorCall (constructorCall: IRThisConstructorCall, contexts: List[IRContextRef]): ThisConstructorCall = {
     if (constructorCall.requiredContexts.nonEmpty) ???
     else ThisConstructorCall(typeArgs(constructorCall.constructor, constructorCall.metaArgs), constructorCall.args.map(expression(_, contexts)))
   }
 
-  def superConstructorCall (constructorCall: IRSuperConstructorCall, contexts: List[IRContextRef]): SuperConstructorCall = {
+  private def superConstructorCall (constructorCall: IRSuperConstructorCall, contexts: List[IRContextRef]): SuperConstructorCall = {
     if (constructorCall.requiredContexts.nonEmpty) ???
     else SuperConstructorCall(typeArgs(constructorCall.constructor, constructorCall.metaArgs), constructorCall.args.map(expression(_, contexts)))
   }
@@ -283,7 +285,7 @@ object JavaReprGenerator {
 
   /* expressions */
 
-  def expression (expression: IRExpression, contexts: List[IRContextRef]): Expression = expression match {
+  private def expression (expression: IRExpression, contexts: List[IRContextRef]): Expression = expression match {
     case e: IRAssignmentExpression => Union[Expression](assignment(e, contexts))
     case e: IRMethodCall           => Union[Expression](methodCall(e, contexts))
     case e: IRFieldAccess          => Union[Expression](fieldAccess(e, contexts))
@@ -302,19 +304,19 @@ object JavaReprGenerator {
     case e: IRStatementExpression  => statementExpression(e, contexts)
   }
 
-  def assignment (e: IRAssignmentExpression, contexts: List[IRContextRef]): Assignment = e match {
+  private def assignment (e: IRAssignmentExpression, contexts: List[IRContextRef]): Assignment = e match {
     case e: IRSimpleAssignmentExpression => simpleAssignment(e, contexts)
   }
 
-  def simpleAssignment (e: IRSimpleAssignmentExpression, contexts: List[IRContextRef]): SimpleAssignment = SimpleAssignment(expression(e.left, contexts), expression(e.right, contexts))
+  private def simpleAssignment (e: IRSimpleAssignmentExpression, contexts: List[IRContextRef]): SimpleAssignment = SimpleAssignment(expression(e.left, contexts), expression(e.right, contexts))
 
-  def fieldAccess (e: IRFieldAccess, contexts: List[IRContextRef]): FieldAccess = e match {
+  private def fieldAccess (e: IRFieldAccess, contexts: List[IRContextRef]): FieldAccess = e match {
     case IRInstanceFieldAccess(expr, field)  => FieldAccess(Union[Receiver](expression(expr, contexts)), field.name)
     case IRStaticFieldAccess(field)          => FieldAccess(Union[Receiver](ClassRef(field.declaringClass.name)), field.name)
     case IRSuperFieldAccess(thisType, field) => FieldAccess(Union[Receiver](SuperRef(ClassRef(thisType.erase.name))), field.name)
   }
 
-  def methodCall (e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = e match {
+  private def methodCall (e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = e match {
     case m: IRInstanceMethodCall => instanceMethodCall(m.instance, m, contexts)
     case m: IRStaticMethodCall   => staticMethodCall(m, contexts)
     case m: IRSuperMethodCall    => superMethodCall(m, contexts)
@@ -322,7 +324,7 @@ object JavaReprGenerator {
     case op: IRDSLOperation      => staticMethodCall(op, contexts)
   }
 
-  def instanceMethodCall (instance: IRExpression, e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = {
+  private def instanceMethodCall (instance: IRExpression, e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = {
     if (e.requiredContexts.nonEmpty) {
       val lam = instanceMethodWrapper(getStaticType(e), getStaticType(instance), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
       MethodCall(Union[Receiver](lam), Nil, "apply", expression(instance, contexts) :: e.args.map(expression(_, contexts)))
@@ -330,7 +332,7 @@ object JavaReprGenerator {
     else MethodCall(Union[Receiver](expression(instance, contexts)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
   }
 
-  def staticMethodCall (e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = {
+  private def staticMethodCall (e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = {
     if (e.requiredContexts.nonEmpty) {
       val lam = staticMethodWrapper(getStaticType(e), ClassRef(e.method.declaringClass.name), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
       MethodCall(Union[Receiver](lam), Nil, "apply", e.args.map(expression(_, contexts)))
@@ -338,7 +340,7 @@ object JavaReprGenerator {
     else MethodCall(Union[Receiver](ClassRef(e.method.declaringClass.name)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
   }
 
-  def superMethodCall (e: IRSuperMethodCall, contexts: List[IRContextRef]): MethodCall = {
+  private def superMethodCall (e: IRSuperMethodCall, contexts: List[IRContextRef]): MethodCall = {
     if (e.requiredContexts.nonEmpty) {
       val lam = superMethodWrapper(getStaticType(e), SuperRef(ClassRef(e.thisType.erase.name)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
       MethodCall(Union[Receiver](lam), Nil, "apply", e.args.map(expression(_, contexts)))
@@ -346,7 +348,7 @@ object JavaReprGenerator {
     else MethodCall(Union[Receiver](SuperRef(ClassRef(e.thisType.erase.name))), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
   }
 
-  def newExpression (e: IRNewExpression, contexts: List[IRContextRef]): Expression = {
+  private def newExpression (e: IRNewExpression, contexts: List[IRContextRef]): Expression = {
     if (e.requiredContexts.nonEmpty) {
       val lam = newExpressionWrapper(e.constructor.declaring, typeArgs(e.constructor, e.metaArgs), e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
       Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", e.args.map(expression(_, contexts))))
@@ -354,43 +356,43 @@ object JavaReprGenerator {
     else Union[Expression](NewExpression(typeArgs(e.constructor, e.metaArgs), objectType(e.constructor.declaring), e.args.map(expression(_, contexts))))
   }
 
-  def newArray (e: IRNewArray, contexts: List[IRContextRef]): NewArray = NewArray(typeToSig(e.componentType), e.length.map(expression(_, contexts)), e.dim)
+  private def newArray (e: IRNewArray, contexts: List[IRContextRef]): NewArray = NewArray(typeToSig(e.componentType), e.length.map(expression(_, contexts)), e.dim)
 
-  def arrayInit (e: IRArrayInitializer, contexts: List[IRContextRef]): ArrayInit = ArrayInit(typeToSig(e.componentType), e.dim, e.components.map(expression(_, contexts)))
+  private def arrayInit (e: IRArrayInitializer, contexts: List[IRContextRef]): ArrayInit = ArrayInit(typeToSig(e.componentType), e.dim, e.components.map(expression(_, contexts)))
 
-  def arrayAccess (e: IRArrayAccess, contexts: List[IRContextRef]): ArrayAccess = ArrayAccess(expression(e.array, contexts), expression(e.index, contexts))
+  private def arrayAccess (e: IRArrayAccess, contexts: List[IRContextRef]): ArrayAccess = ArrayAccess(expression(e.array, contexts), expression(e.index, contexts))
 
-  def castExpression (e: IRCastExpression, contexts: List[IRContextRef]): CastExpression = CastExpression(typeToSig(e.destType), expression(e.expression, contexts))
+  private def castExpression (e: IRCastExpression, contexts: List[IRContextRef]): CastExpression = CastExpression(typeToSig(e.destType), expression(e.expression, contexts))
 
-  def variableArguments (e: IRVariableArguments, contexts: List[IRContextRef]): Expression = e.componentType match {
+  private def variableArguments (e: IRVariableArguments, contexts: List[IRContextRef]): Expression = e.componentType match {
     case Some(p: JPrimitiveType) => Union[Expression](ArrayInit(typeToSig(p), 1, e.args.map(expression(_, contexts))))
     case Some(r: JRefType)       => Union[Expression](MethodCall(arraysRef, List(Union[TypeArg](typeToSig(r))), "mkArray", e.args.map(expression(_, contexts))))
     case None                    => throw InvalidASTException("invalid component type of variable arguments")
   }
 
-  def defaultArgument (e: IRDefaultArgument): MethodCall = {
+  private def defaultArgument (e: IRDefaultArgument): MethodCall = {
     MethodCall(Union[Receiver](ClassRef(e.defaultMethod.declaringClass.name)), Nil, e.defaultMethod.name, Nil)
   }
 
-  def contextualArgument (e: IRContextualArgument, contexts: List[IRContextRef]): Expression = {
+  private def contextualArgument (e: IRContextualArgument, contexts: List[IRContextRef]): Expression = {
     contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), getStaticType(e.argument), Nil, e.contexts ++ contexts)
   }
 
   private def contextualArgument (cs: List[IRContextRef], e: Expression, t: JType, throws: List[TypeSig], contexts: List[IRContextRef]): Expression = cs match {
     case c :: rest =>
-      val functionType = t.compiler.typeLoader.functionTypeOf(c.contextType, t).getOrElse(throw InvalidASTException("invalid context type"))
+      val functionType = functionTypeOf(c.contextType, t).getOrElse(throw InvalidASTException("invalid context type"))
       contextualArgument(rest, Union[Expression](lambda(objectType(functionType), typeToSig(t),
         List(parameter(c.contextType, contextName(contexts.size - 1))), throws, Block(List(returnStatement(e))))), functionType, throws, contexts.tail)
     case Nil       => e
   }
 
-  def statementExpression (e: IRStatementExpression, contexts: List[IRContextRef]): Expression = {
+  private def statementExpression (e: IRStatementExpression, contexts: List[IRContextRef]): Expression = {
     val lam = Union[Expression](lambda(objectClassSig, typeSig(JTypeSignature.boxedVoidTypeSig), Nil, Nil, Block(List(singleStatement(e.stmt, contexts ++ e.contexts, Nil), returnStatement(Union[Expression](Union[JavaLiteral](NullLiteral)))))))
     val app = Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", Nil))
-    contextualArgument(e.contexts, app, e.voidType, Nil, e.contexts ++ contexts)
+    contextualArgument(e.contexts, app, voidType, Nil, e.contexts ++ contexts)
   }
 
-  def contextRef (e: IRContextRef, contexts: List[IRContextRef]): LocalRef = {
+  private def contextRef (e: IRContextRef, contexts: List[IRContextRef]): LocalRef = {
     val index = contexts.indexOf(e)
     if (index >= 0) LocalRef(contextName(index))
     else throw InvalidASTException("context not found")
@@ -445,7 +447,7 @@ object JavaReprGenerator {
     def annotations: List[JavaAnnotation] = Nil
     def modifiers: JModifier = JModifier(JModifier.accPublic)
     def typeParameters: List[TypeParam] = Nil
-    def returnType = retType
+    def returnType: TypeSig = retType
     def name: String = "apply"
     def parameters: List[Param] = params
     def throws: List[TypeSig] = exceptions
@@ -454,7 +456,7 @@ object JavaReprGenerator {
 
   /* literals */
 
-  def javaLiteral (literal: IRJavaLiteral): JavaLiteral = literal match {
+  private def javaLiteral (literal: IRJavaLiteral): JavaLiteral = literal match {
     case n: IRNullLiteral    => Union[JavaLiteral](NullLiteral)
     case c: IRClassLiteral   => Union[JavaLiteral](classLiteral(c))
     case s: IRStringLiteral  => Union[JavaLiteral](Literal(s.value))
@@ -464,47 +466,47 @@ object JavaReprGenerator {
     case z: IRBooleanLiteral => Union[JavaLiteral](Literal(z.value))
   }
 
-  def classLiteral (c: IRClassLiteral): ClassLiteral = c match {
+  private def classLiteral (c: IRClassLiteral): ClassLiteral = c match {
     case IRObjectClassLiteral(clazz, d)        => ClassLiteral(clazz.name, d)
     case IRPrimitiveClassLiteral(primitive, d) => ClassLiteral(primitive.name, d)
   }
 
-  def classLiteral (clazz: JClass): ClassLiteral = ClassLiteral(clazz.name, 0)
+  private def classLiteral (clazz: JClass): ClassLiteral = ClassLiteral(clazz.name, 0)
 
   /* signatures */
 
-  def typeToSig (t: JType): TypeSig = t match {
+  private def typeToSig (t: JType): TypeSig = t match {
     case obj: JObjectType           => Union[TypeSig](objectType(obj))
     case prm: JPrimitiveType        => Union[TypeSig](PrimitiveSig(prm.name))
     case JArrayType(component)      => Union[TypeSig](ArraySig(typeToSig(component)))
-    case JTypeVariable(name, _, _)  => Union[TypeSig](TypeVariableSig(name))
+    case JTypeVariable(name, _)     => Union[TypeSig](TypeVariableSig(name))
     case cap: JCapturedWildcardType => throw InvalidASTException("captured wildcard is found in generated Java AST")
     case unb: JUnboundTypeVariable  => throw InvalidASTException("unbound type variable is found in generated Java AST")
   }
 
-  def objectType (obj: JObjectType): ClassSig = Union[ClassSig](topLevelClassObjectType(obj))
+  private def objectType (obj: JObjectType): ClassSig = Union[ClassSig](topLevelClassObjectType(obj))
 
-  def topLevelClassObjectType (obj: JObjectType): TopLevelClassSig = TopLevelClassSig (obj.erase.name, obj.erase.signature.metaParams.flatMap { param =>
+  private def topLevelClassObjectType (obj: JObjectType): TopLevelClassSig = TopLevelClassSig (obj.erase.name, obj.erase.signature.metaParams.flatMap { param =>
       metaArgument(obj.env.getOrElse(param.name, throw InvalidASTException("invalid type argument")))
   })
 
-  def metaArgument (arg: MetaArgument): Option[TypeArg] = arg match {
+  private def metaArgument (arg: MetaArgument): Option[TypeArg] = arg match {
     case ref: JRefType   => Some(Union[TypeArg](typeToSig(ref)))
     case wild: JWildcard => Some(Union[TypeArg](wildcard(wild)))
     case meta: MetaValue => None
   }
 
-  def wildcard (wild: JWildcard): Wildcard = wild match {
+  private def wildcard (wild: JWildcard): Wildcard = wild match {
     case JWildcard(Some(ub), _) => Union[Wildcard](UpperBoundWildcard(typeToSig(ub)))
     case JWildcard(_, Some(lb)) => Union[Wildcard](LowerBoundWildcard(typeToSig(lb)))
     case JWildcard(None, None)  => Union[Wildcard](UnboundWildcard)
   }
 
-  def typeParams (mps: List[FormalMetaParameter]): List[TypeParam] = mps.filter(_.metaType == JTypeSignature.typeTypeSig).map(typeParam)
+  private def typeParams (mps: List[FormalMetaParameter]): List[TypeParam] = mps.filter(_.metaType == JTypeSignature.typeTypeSig).map(typeParam)
 
-  def typeParam (mp: FormalMetaParameter): TypeParam = TypeParam(mp.name, mp.bounds.map(typeSig))
+  private def typeParam (mp: FormalMetaParameter): TypeParam = TypeParam(mp.name, mp.bounds.map(typeSig))
 
-  def typeSig (signature: JTypeSignature): TypeSig = signature match {
+  private def typeSig (signature: JTypeSignature): TypeSig = signature match {
     case c: JClassTypeSignature        => Union[TypeSig](classSig(c))
     case p: JPrimitiveTypeSignature    => Union[TypeSig](primitiveSig(p))
     case JTypeVariableSignature(n)     => Union[TypeSig](TypeVariableSig(n))
@@ -512,18 +514,18 @@ object JavaReprGenerator {
     case c: JCapturedWildcardSignature => throw InvalidASTException("captured wildcard is found in generated Java code")
   }
 
-  def classSig (signature: JClassTypeSignature): ClassSig = signature match {
+  private def classSig (signature: JClassTypeSignature): ClassSig = signature match {
     case s: SimpleClassTypeSignature => Union[ClassSig](topLevelClassSig(s))
     case m: MemberClassTypeSignature => Union[ClassSig](memberClassSig(m))
   }
 
-  def objectClassSig: ClassSig = classSig(JTypeSignature.objectTypeSig)
+  private def objectClassSig: ClassSig = classSig(JTypeSignature.objectTypeSig)
 
-  def topLevelClassSig (signature: SimpleClassTypeSignature): TopLevelClassSig = TopLevelClassSig (signature.internalName.replace('/', '.').replace('$', '.'), signature.args.flatMap(typeArg))
+  private def topLevelClassSig (signature: SimpleClassTypeSignature): TopLevelClassSig = TopLevelClassSig (signature.internalName.replace('/', '.').replace('$', '.'), signature.args.flatMap(typeArg))
 
-  def memberClassSig (signature: MemberClassTypeSignature): MemberClassSig = MemberClassSig (classSig(signature.outer), signature.clazz, signature.args.flatMap(typeArg))
+  private def memberClassSig (signature: MemberClassTypeSignature): MemberClassSig = MemberClassSig (classSig(signature.outer), signature.clazz, signature.args.flatMap(typeArg))
 
-  def primitiveSig (signature: JPrimitiveTypeSignature): PrimitiveSig = signature match {
+  private def primitiveSig (signature: JPrimitiveTypeSignature): PrimitiveSig = signature match {
     case ByteTypeSignature   => PrimitiveSig("byte")
     case CharTypeSignature   => PrimitiveSig("char")
     case DoubleTypeSignature => PrimitiveSig("double")
@@ -535,13 +537,13 @@ object JavaReprGenerator {
     case VoidTypeSignature   => PrimitiveSig("void")
   }
 
-  def typeArg (arg: JTypeArgument): Option[TypeArg] = arg match {
+  private def typeArg (arg: JTypeArgument): Option[TypeArg] = arg match {
     case signature: JTypeSignature      => Some(Union[TypeArg](typeSig(signature)))
     case wild: WildcardArgument         => Some(Union[TypeArg](wildcard(wild)))
     case metaVar: MetaVariableSignature => None
   }
 
-  def wildcard (wild: WildcardArgument): Wildcard = wild match {
+  private def wildcard (wild: WildcardArgument): Wildcard = wild match {
     case WildcardArgument(Some(ub), _) => Union[Wildcard](UpperBoundWildcard(typeSig(ub)))
     case WildcardArgument(_, Some(lb)) => Union[Wildcard](LowerBoundWildcard(typeSig(lb)))
     case WildcardArgument(None, None)  => Union[Wildcard](UnboundWildcard)
@@ -549,20 +551,20 @@ object JavaReprGenerator {
 
   /* annotation */
 
-  def annotation (ann: IRAnnotation): JavaAnnotation = JavaAnnotation (ann.annotationClass.name, ann.args.mapValues(annotationElement))
+  private def annotation (ann: IRAnnotation): JavaAnnotation = JavaAnnotation (ann.annotationClass.name, ann.args.mapValues(annotationElement))
 
-  def annotationElement (e: IRAnnotationElement): AnnotationElement = e match {
+  private def annotationElement (e: IRAnnotationElement): AnnotationElement = e match {
     case array: IRAnnotationElementArray => Union[AnnotationElement](elementArray(array))
     case ann: IRAnnotation        => Union[AnnotationElement](annotation(ann))
     case literal: IRJavaLiteral   => Union[AnnotationElement](javaLiteral(literal))
     case const: IREnumConstantRef => Union[AnnotationElement](enumConstRef(const))
   }
 
-  def elementArray (array: IRAnnotationElementArray): ElementArray = ElementArray (array.array.map(annotationElement))
+  private def elementArray (array: IRAnnotationElementArray): ElementArray = ElementArray (array.array.map(annotationElement))
 
-  def enumConstRef (const: IREnumConstantRef): EnumConstRef = EnumConstRef (const.field.declaringClass.name, const.field.name)
+  private def enumConstRef (const: IREnumConstantRef): EnumConstRef = EnumConstRef (const.field.declaringClass.name, const.field.name)
 
-  object Annotations {
+  private object Annotations {
     def classAnnotations (clazz: IRClass): List[JavaAnnotation] = {
       if (clazz.isDSL) classLikeAnnotations(clazz) :+ dslAnnotation(clazz.memberPriorities, clazz.priorityConstraints, clazz.withDSLs)
       else classLikeAnnotations(clazz)

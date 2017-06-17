@@ -12,7 +12,8 @@ libraryDependencies ++= Seq(
   "org.scalaz" %% "scalaz-core" % "7.2.13",
   "org.slf4j" % "slf4j-api" % "1.7.25",
   "ch.qos.logback" % "logback-classic" % "1.2.3",
-  "args4j" % "args4j" % "2.32"
+  "args4j" % "args4j" % "2.32",
+  "com.github.scopt" %% "scopt" % "3.6.0"
 )
 
 unmanagedJars in Compile := (file(System.getProperty("java.home")) / ".." / "lib" * "tools.jar").classpath

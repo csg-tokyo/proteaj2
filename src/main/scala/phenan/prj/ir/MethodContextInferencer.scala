@@ -1,10 +1,11 @@
 package phenan.prj.ir
 
 import phenan.prj._
-import phenan.prj.typing._
 
-class MethodContextInferencer (unifier: Unifier, contexts: List[IRContextRef]) {
-  def inferContexts (procedure: JProcedure, e: Map[String, MetaArgument]): Option[(List[IRContextRef], Map[String, MetaArgument])] = inferContexts(procedure.requires, Nil, e, contexts)
+trait MethodContextInferencer {
+  this: Unifier with IRExpressions with JModules with JMembers =>
+
+  def inferMethodContexts(procedure: JProcedure, e: Map[String, MetaArgument], contexts: List[IRContextRef]): Option[(List[IRContextRef], Map[String, MetaArgument])] = inferContexts(procedure.requires, Nil, e, contexts)
 
   private def inferContexts (requires: List[JGenericType], cs: List[IRContextRef], e: Map[String, MetaArgument], contexts: List[IRContextRef]): Option[(List[IRContextRef], Map[String, MetaArgument])] = requires match {
     case req :: rest => findRequiredContext(req, contexts, e) match {
@@ -15,7 +16,7 @@ class MethodContextInferencer (unifier: Unifier, contexts: List[IRContextRef]) {
   }
 
   private def findRequiredContext (req: JGenericType, cs: List[IRContextRef], e: Map[String, MetaArgument]): Option[(IRContextRef, Map[String, MetaArgument])] = cs match {
-    case c :: rest => unifier.infer(c.contextType, req, e) match {
+    case c :: rest => inferType(c.contextType, req, e) match {
       case Some(ma) => Some((c, ma))
       case None     => findRequiredContext(req, rest, e)
     }

@@ -8,6 +8,10 @@ import phenan.prj._
 import phenan.prj.state._
 
 class EnvironmentTest extends FunSuite with Matchers {
+  val compiler = JCompiler(Config())
+
+  import compiler._
+
   test ("ジェネリクス") {
     val src =
       """package test;
@@ -26,16 +30,16 @@ class EnvironmentTest extends FunSuite with Matchers {
     method.environment.resolver.typeVariable("T") shouldBe a [Some[_]]
   }
 
-  private val classPath = Thread.currentThread().getContextClassLoader.getResource("proteaj/lang/PredefOperators.class").getPath.stripSuffix("proteaj/lang/PredefOperators.class")
+  /*private val classPath = Thread.currentThread().getContextClassLoader.getResource("proteaj/lang/PredefOperators.class").getPath.stripSuffix("proteaj/lang/PredefOperators.class")
 
   lazy val compiler: JCompiler = {
     val config = JConfig()
     config.classPath = classPath
     new JCompiler(config.configure.get)
-  }
+  }*/
 
   def compile (src: String, name: String): Option[IRModule] = {
-    compiler.generateIR(new StringReader(src), name + ".java")
+    compiler.compileFile(new StringReader(src), name + ".java")
     compiler.findIR(name)
   }
 }

@@ -2,32 +2,28 @@ package phenan.prj
 
 import java.io._
 
-import phenan.prj.body.BodyCompiler
+import phenan.prj.body._
 import phenan.prj.declaration.DeclarationCompiler
-import phenan.prj.generator.JavaClassFileGenerator
+import phenan.prj.generator.{JavaClassFileGenerator, JavaReprGenerator}
 import phenan.prj.internal._
 import phenan.prj.ir._
+import phenan.prj.signature._
 import phenan.prj.state._
-import phenan.prj.typing._
 
 import scala.collection.mutable
 
-class JCompiler (val state: JState) {
+trait JCompiler {
+  this: IRs with DeclarationCompiler with JavaClassFileGenerator with Application =>
 
- /* def compile(): Unit = {
-    for (file <- state.files) declarationCompiler.compile()
-  }
-  */
-  def generateIR (files: List[String]): Unit = {
-    for (file <- files) generateIR(file)
-  }
-
-  def generateIR (file: String): Unit = {
-    declarationCompiler.compile(file).foreach(registerIR)
+  def compile (): Unit = {
+    for (file <- inputFiles; ir <- compileDeclaration(file)) {
+      registerIR(ir)
+    }
+    generateClassFile(files.toList)
   }
 
-  def generateIR (reader: Reader, file: String): Unit = {
-    declarationCompiler.compile(reader, file).foreach(registerIR)
+  def compileFile(reader: Reader, file: String): Unit = {
+    compileDeclaration(reader, file).foreach(registerIR)
   }
 
   def registerIR (ir: IRFile): Unit = {
@@ -37,24 +33,20 @@ class JCompiler (val state: JState) {
 
   def findIR (name: String): Option[IRModule] = modules.get(name)
 
-  val unifier = new Unifier(this)
-  val operatorPool = new OperatorPool(this)
-  val classLoader: JClassLoader = new JClassLoaderImpl(this)
-  val typeLoader: JTypeLoader = new JTypeLoader(this)
-  val declarationCompiler = new DeclarationCompiler(this)
-  val bodyCompiler = new BodyCompiler(this)
-
   private val files: mutable.MutableList[IRFile] = mutable.MutableList.empty
   private var modules: Map[String, IRModule] = Map.empty
 }
 
 object JCompiler {
-  /*def main (args: Array[String]): Unit = Config.configure(args).foreach { config =>
-    new JCompiler(config).compile()
-  }*/
-  def main (args: Array[String]): Unit = JConfig.parseCommandLineArgs(args).foreach { case (state, files) =>
-    val compiler = new JCompiler(state)
-    compiler.generateIR(files)
-    JavaClassFileGenerator.compile(compiler.files.toList, compiler.state)
-  }
+  case class JCompilerImpl (config: Config) extends JCompiler
+    with BodyCompiler with BodyParser with DeclarationCompiler with JavaClassFileGenerator with JavaReprGenerator
+    with StatementParser with ExpressionParser with ExpressionOperatorParser with ExpressionOperandParser with JavaExpressionParser with ArgumentParser
+    with LiteralParser with LiteralOperatorParser with LiteralOperandParser with JavaLiteralParser with TypeParser
+    with Unifier with ExpectedTypeInferencer with MethodContextInferencer with NameResolvers with OperatorPool
+    with ClassFileLoader with ClassFileAnalyzer with ClassFileParser
+    with JTypeLoader with JClassLoader with Environments with DSLEnvironments with FileEnvironments
+    with IRs with IRStatements with IRExpressions with IRAnnotationReader with SignatureParser with DescriptorParser
+    with Syntax with JModules with JMembers with JErasedTypes with Application
+
+  def apply (config: Config): JCompilerImpl = JCompilerImpl(config)
 }
