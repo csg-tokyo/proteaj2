@@ -5,7 +5,6 @@ import java.io.StringReader
 import org.scalatest._
 
 import phenan.prj._
-import phenan.prj.ir._
 import phenan.prj.state._
 
 import scala.util._

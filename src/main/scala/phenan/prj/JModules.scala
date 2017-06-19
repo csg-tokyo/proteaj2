@@ -3,7 +3,7 @@ package phenan.prj
 import phenan.prj.ir.IRExpressions
 
 trait JModules {
-  this: Unifier with JTypeLoader with IRExpressions with Syntax with JMembers with JErasedTypes =>
+  this: JTypeLoader with IRExpressions with Syntax with JMembers with JErasedTypes =>
 
   sealed trait MetaArgument {
     def name: String
@@ -150,17 +150,9 @@ trait JModules {
 
     def isSubtypeOf(that: JType): Boolean
 
-    def unifyG(t: JGenericType): Option[Map[String, MetaArgument]] = unifyType(this, t)
-
-    def unifyL(t: JGenericType): Option[Map[String, MetaArgument]] = inferType(this, t)
-
     def <:<(t: JType): Boolean = this.isSubtypeOf(t)
 
     def >:>(t: JType): Boolean = t.isSubtypeOf(this)
-
-    def <=<(t: JGenericType): Option[Map[String, MetaArgument]] = unifyG(t)
-
-    def >=>(t: JGenericType): Option[Map[String, MetaArgument]] = unifyL(t)
 
     def findField(name: String, from: JClass, receiverIsThis: Boolean): Option[JField]
 

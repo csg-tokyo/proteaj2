@@ -1,6 +1,6 @@
 package phenan.prj
 
-import phenan.prj.state.{Config, FoundFile, FoundResource}
+import phenan.prj.state.{Config, FoundResource}
 import java.io.File
 
 import org.slf4j.LoggerFactory

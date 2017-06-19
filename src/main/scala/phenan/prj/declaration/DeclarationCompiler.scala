@@ -15,12 +15,3 @@ trait DeclarationCompiler {
     DeclarationParsers.tryParse(DeclarationParsers.compilationUnit, new BufferedReader(reader), file).map(cu => IRFile(cu, file))
   }
 }
-
-/*
-class DeclarationCompiler (compiler: JCompiler) {
-  import DeclarationParsers._
-
-
-  val root: RootResolver = NameResolver.root(compiler)
-}
-*/
