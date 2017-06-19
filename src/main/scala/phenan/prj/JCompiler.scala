@@ -4,7 +4,8 @@ import java.io._
 
 import phenan.prj.body._
 import phenan.prj.declaration.DeclarationCompiler
-import phenan.prj.generator.{JavaClassFileGenerator, JavaReprGenerator}
+import phenan.prj.exception.InitializationFailedException
+import phenan.prj.generator._
 import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.signature._
@@ -48,5 +49,7 @@ object JCompiler {
     with IRs with IRStatements with IRExpressions with IRAnnotationReader with SignatureParser with DescriptorParser
     with Syntax with JModules with JMembers with JErasedTypes with Application
 
-  def apply (config: Config): JCompilerImpl = JCompilerImpl(config)
+  def init (config: Config): Either[InitializationFailedException, JCompilerImpl] = try {
+    Right(JCompilerImpl(config))
+  } catch { case e: InitializationFailedException => Left(e) }
 }

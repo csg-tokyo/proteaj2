@@ -146,8 +146,6 @@ trait JModules {
       else this
     }
 
-    def boxed: Option[JRefType]
-
     def isSubtypeOf(that: JType): Boolean
 
     def <:<(t: JType): Boolean = this.isSubtypeOf(t)
@@ -159,9 +157,7 @@ trait JModules {
     def findMethod(name: String, from: JClass, receiverIsThis: Boolean): List[JMethod]
   }
 
-  sealed trait JRefType extends JType with MetaArgument {
-    def boxed = Some(this)
-  }
+  sealed trait JRefType extends JType with MetaArgument
 
   case class JObjectType(erase: JClass, env: Map[String, MetaArgument]) extends JRefType {
     def name: String = {
@@ -300,8 +296,6 @@ trait JModules {
     def findMethod(name: String, from: JClass, receiverIsThis: Boolean): List[JMethod] = Nil
 
     def isSubtypeOf(that: JType): Boolean = this == that
-
-    lazy val boxed: Option[JRefType] = clazz.wrapperClass.flatMap(_.objectType(Nil))
   }
 
   case class JArrayType(componentType: JType) extends JRefType {

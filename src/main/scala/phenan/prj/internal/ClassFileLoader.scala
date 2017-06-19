@@ -69,7 +69,7 @@ trait ClassFileLoader {
 
     def priorityConstraints: List[List[JPriority]] = annotations.dsl.map(_.constraints).getOrElse(Nil)
 
-    lazy val withDSLs: List[JClass] = annotations.dsl.map(_.withDSLs.flatMap(erase_PE)).getOrElse(Nil)
+    lazy val withDSLs: List[JClass] = annotations.dsl.map(_.withDSLs.flatMap(t => erase_NoFail(t))).getOrElse(Nil)
 
     lazy val annotations: JClassAnnotations = classAnnotations(attributes.annotations)
 

@@ -8,7 +8,7 @@ import phenan.prj._
 import phenan.prj.state._
 
 class EnvironmentTest extends FunSuite with Matchers {
-  val compiler = JCompiler(Config())
+  val compiler: JCompiler.JCompilerImpl = JCompiler.init(Config()).right.get
 
   import compiler._
 

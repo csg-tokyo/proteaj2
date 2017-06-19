@@ -10,3 +10,4 @@ case class ParseException (msg: String) extends Exception(msg)
 
 case class InvalidASTException (msg: String) extends Exception(msg)
 
+case class InitializationFailedException (cause: Throwable) extends Exception(cause)

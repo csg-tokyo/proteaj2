@@ -7,6 +7,9 @@ import phenan.prj.state.Config
   */
 object Main {
   def main (args: Array[String]): Unit = Config.configure(args).foreach { config =>
-    JCompiler(config).compile()
+    JCompiler.init(config) match {
+      case Right(c) => c.compile()
+      case Left(e)  => Console.err.println(e.getMessage)
+    }
   }
 }

@@ -19,10 +19,10 @@ trait JTypeLoader {
     }
   }
 
-  lazy val typeType: Option[JObjectType]     = typeClass.objectType(Nil)
-  lazy val objectType: Option[JObjectType]   = objectClass.flatMap(_.objectType(Nil))
-  lazy val stringType: Option[JObjectType]   = stringClass.flatMap(_.objectType(Nil))
-  lazy val anyClassType: Option[JObjectType] = classClass.flatMap(_.objectType(List(JWildcard(None, None))))
+  lazy val typeType: Option[JObjectType]     = getObjectType(typeClass, Nil)
+  lazy val objectType: Option[JObjectType]   = getObjectType(objectClass, Nil)
+  lazy val stringType: Option[JObjectType]   = getObjectType(stringClass, Nil)
+  lazy val anyClassType: Option[JObjectType] = getObjectType(classClass, List(JWildcard(None, None)))
 
   lazy val byteType: JPrimitiveType    = byteClass.primitiveType
   lazy val charType: JPrimitiveType    = charClass.primitiveType
@@ -34,27 +34,42 @@ trait JTypeLoader {
   lazy val booleanType: JPrimitiveType = booleanClass.primitiveType
   lazy val voidType: JPrimitiveType    = voidClass.primitiveType
 
+  lazy val boxedByteType: Option[JObjectType]    = getObjectType(boxedByteClass, Nil)
+  lazy val boxedCharType: Option[JObjectType]    = getObjectType(boxedCharClass, Nil)
+  lazy val boxedDoubleType: Option[JObjectType]  = getObjectType(boxedDoubleClass, Nil)
+  lazy val boxedFloatType: Option[JObjectType]   = getObjectType(boxedFloatClass, Nil)
+  lazy val boxedIntType: Option[JObjectType]     = getObjectType(boxedIntClass, Nil)
+  lazy val boxedLongType: Option[JObjectType]    = getObjectType(boxedLongClass, Nil)
+  lazy val boxedShortType: Option[JObjectType]   = getObjectType(boxedShortClass, Nil)
+  lazy val boxedBooleanType: Option[JObjectType] = getObjectType(boxedBooleanClass, Nil)
+  lazy val boxedVoidType: Option[JObjectType]    = getObjectType(boxedVoidClass, Nil)
+
+  lazy val boxedPrimitiveTypes: Map[JPrimitiveType, Option[JObjectType]] = Map(
+    byteType -> boxedByteType, charType -> boxedCharType, doubleType -> boxedDoubleType,
+    floatType -> boxedFloatType, intType -> boxedIntType, longType -> boxedLongType,
+    shortType -> boxedShortType, booleanType -> boxedBooleanType, voidType -> boxedVoidType
+  )
+
   lazy val superTypesOfArray: List[JObjectType] = CommonNames.superClassesOfArray.flatMap { name =>
-    loadClass_PE(name).flatMap(_.objectType(Nil))
+    loadClass_NoFail(name).flatMap(getObjectType(_, Nil))
   }
 
-  lazy val runtimeExceptionType: Option[JObjectType] = runtimeExceptionClass.flatMap(_.objectType(Nil))
-  lazy val errorType: Option[JObjectType] = errorClass.flatMap(_.objectType(Nil))
+  lazy val runtimeExceptionType: Option[JObjectType] = getObjectType(runtimeExceptionClass, Nil)
+  lazy val errorType: Option[JObjectType] = getObjectType(errorClass, Nil)
 
   lazy val uncheckedExceptionTypes: List[JObjectType] = (runtimeExceptionType ++ errorType).toList
 
-  def iterableOf (arg: JRefType): Option[JObjectType] = iterableClass.flatMap(_.objectType(List(arg)))
-  def classTypeOf (arg: JType): Option[JObjectType] = boxing(arg).flatMap(t => classClass.flatMap(_.objectType(List(t))))
+  def iterableOf (arg: JType): Option[JObjectType] = boxing(arg).flatMap(t => getObjectType(iterableClass, List(t)))
+  def classTypeOf (arg: JType): Option[JObjectType] = boxing(arg).flatMap(t => getObjectType(classClass, List(t)))
   def functionTypeOf (from: JType, to: JType): Option[JObjectType] = for {
     f <- boxing(from)
     t <- boxing(to)
-    func <- functionClass
-    r <- func.objectType(List(f, t))
+    r <- getObjectType(functionClass, List(f, t))
   } yield r
 
   def boxing (t: JType): Option[JRefType] = t match {
     case ref: JRefType       => Some(ref)
-    case prm: JPrimitiveType => prm.boxed
+    case prm: JPrimitiveType => boxedPrimitiveTypes(prm)
   }
 
   def fromTypeSignature (sig: JTypeSignature, env: Map[String, MetaArgument]): Option[JType] = sig match {
@@ -75,7 +90,7 @@ trait JTypeLoader {
   def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaArgument]): Option[JObjectType] = sig match {
     case JTypeSignature.typeTypeSig => typeType
     case SimpleClassTypeSignature(className, typeArgs) => for {
-      clazz <- loadClass_PE(className)
+      clazz <- loadClass_NoFail(className)
       args  <- fromTypeArguments(typeArgs, env)
     } yield getLoadedObjectType(clazz, args)
     case MemberClassTypeSignature(_, _, _) => ???    // not supported yet

@@ -4,13 +4,17 @@ import org.scalatest._
 import phenan.prj.state.Config
 
 class UnificationTest extends FunSuite with Matchers {
-  val compiler = JCompiler(Config())
+  val compiler: JCompiler.JCompilerImpl = JCompiler.init(Config()).right.get
 
   import compiler._
 
+  private def load (name: String, args: MetaArgument*): JObjectType = {
+    getObjectType(loadClass(name).get, args.toList).get
+  }
+
   test ("List<String> <=< List<T> ") {
-    val stringType = loadClass("java/lang/String").get.objectType(Nil).get
-    val stringListType = loadClass("java/util/List").get.objectType(List(stringType)).get
+    val stringType = load("java/lang/String")
+    val stringListType = load("java/util/List", stringType)
     val listSig = SimpleClassTypeSignature("java/util/List", List(JTypeVariableSignature("T")))
     val map = stringListType <=< JGenericType(listSig, Map.empty)
 
@@ -18,8 +22,8 @@ class UnificationTest extends FunSuite with Matchers {
   }
 
   test ("List<String> <=< ArrayList<T>") {
-    val stringType = loadClass("java/lang/String").get.objectType(Nil).get
-    val stringListType = loadClass("java/util/List").get.objectType(List(stringType)).get
+    val stringType = load("java/lang/String")
+    val stringListType = load("java/util/List", stringType)
     val listSig = SimpleClassTypeSignature("java/util/ArrayList", List(JTypeVariableSignature("T")))
     val map = stringListType <=< JGenericType(listSig, Map.empty)
 
@@ -27,7 +31,7 @@ class UnificationTest extends FunSuite with Matchers {
   }
 
   test ("List<?> <=< ArrayList<T>") {
-    val anyListType = loadClass("java/util/List").get.objectType(List(JWildcard(None, None))).get
+    val anyListType = load("java/util/List", JWildcard(None, None))
     val listSig = SimpleClassTypeSignature("java/util/ArrayList", List(JTypeVariableSignature("T")))
     val map = anyListType <=< JGenericType(listSig, Map.empty)
 
@@ -35,14 +39,14 @@ class UnificationTest extends FunSuite with Matchers {
   }
 
   test ("Map<String, String> m; Set<Map.Entry<String, String>> set = m.entrySet();") {
-    val stringType = loadClass("java/lang/String").get.objectType(Nil).get
-    val ssMap = loadClass("java/util/Map").get.objectType(List(stringType, stringType)).get
+    val stringType = load("java/lang/String")
+    val ssMap = load("java/util/Map", stringType, stringType)
     ssMap.findMethod("entrySet", ssMap.erase, true) should have size 1
 
     val entrySetMethod = ssMap.findMethod("entrySet", ssMap.erase, true).head
 
-    val ssMapEntryType = loadClass(s"java/util/Map$$Entry").get.objectType(List(stringType, stringType)).get
-    val setOfssMapEntryType = loadClass("java/util/Set").get.objectType(List(ssMapEntryType)).get
+    val ssMapEntryType = load(s"java/util/Map$$Entry", stringType, stringType)
+    val setOfssMapEntryType = load("java/util/Set", ssMapEntryType)
 
     val map = setOfssMapEntryType <=< entrySetMethod.returnType
 
@@ -50,14 +54,14 @@ class UnificationTest extends FunSuite with Matchers {
   }
 
   test ("Stream<String> s; Stream<List<String>> list = s.map(...);") {
-    val stringType = loadClass("java/lang/String").get.objectType(Nil).get
-    val sStream = loadClass("java/util/stream/Stream").get.objectType(List(stringType)).get
+    val stringType = load("java/lang/String")
+    val sStream = load("java/util/stream/Stream", stringType)
     sStream.findMethod("map", sStream.erase, true) should have size 1
 
     val mapMethod = sStream.findMethod("map", sStream.erase, true).head
 
-    val stringListType = loadClass("java/util/List").get.objectType(List(stringType)).get
-    val sListStream = loadClass("java/util/stream/Stream").get.objectType(List(stringListType)).get
+    val stringListType = load("java/util/List", stringType)
+    val sListStream = load("java/util/stream/Stream", stringListType)
 
     val map = sListStream <=< mapMethod.returnType
 
@@ -65,10 +69,10 @@ class UnificationTest extends FunSuite with Matchers {
   }
 
   test ("Map<String, A> <=< Map<T, T>") {
-    val stringType = loadClass("java/lang/String").get.objectType(Nil).get
+    val stringType = load("java/lang/String")
     val unbound = JUnboundTypeVariable("A", objectType.toList)
 
-    val saMap = loadClass("java/util/Map").get.objectType(List(stringType, unbound)).get
+    val saMap = load("java/util/Map", stringType, unbound)
     val ttMap = SimpleClassTypeSignature("java/util/Map", List(JTypeVariableSignature("T"), JTypeVariableSignature("T")))
 
     val map = saMap <=< JGenericType(ttMap, Map.empty)
@@ -88,7 +92,7 @@ class UnificationTest extends FunSuite with Matchers {
     val unbound1 = JUnboundTypeVariable("S", objectType.toList)
     val unbound2 = JUnboundTypeVariable("A", objectType.toList)
 
-    val saMap = loadClass("java/util/Map").get.objectType(List(unbound1, unbound2)).get
+    val saMap = load("java/util/Map", unbound1, unbound2)
     val stMap = SimpleClassTypeSignature("java/util/Map", List(SimpleClassTypeSignature("java/lang/String", Nil), JTypeVariableSignature("T")))
 
     val map = saMap <=< JGenericType(stMap, Map.empty)
@@ -97,7 +101,7 @@ class UnificationTest extends FunSuite with Matchers {
   }
 
   test ("String <=< T (T = A = unbound) ") {
-    val string = loadClass("java/lang/String").get.objectType(Nil).get
+    val string = load("java/lang/String")
     val unbound = JUnboundTypeVariable("A", objectType.toList)
     val tv = JTypeVariableSignature("T")
 

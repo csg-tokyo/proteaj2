@@ -13,52 +13,35 @@ class JClassLoaderTest extends FunSuite with Matchers {
   private val testClassPath = classPath + "../test-classes"
   private val testSourcePath = classPath + "../../../src/test/java"
 
-  val defaultCompiler = JCompiler(Config())
-  val compiler2 = JCompiler(Config().copy(sourcePath = Stream(DirectoryPath(new File(testSourcePath)))))
-  val compiler3 = JCompiler(Config().copy(classPath = Stream(DirectoryPath(new File(testClassPath)))))
+  val defaultCompiler: JCompiler.JCompilerImpl = JCompiler.init(Config()).right.get
+  val compiler2: JCompiler.JCompilerImpl = JCompiler.init(Config().copy(sourcePath = Stream(DirectoryPath(new File(testSourcePath))))).right.get
+  val compiler3: JCompiler.JCompilerImpl = JCompiler.init(Config().copy(classPath = Stream(DirectoryPath(new File(testClassPath))))).right.get
 
   test ("String 型をロード") {
     import defaultCompiler._
 
-    val clazz = load("java/lang/String")
+    val clazz = loadClass("java/lang/String")
     clazz shouldBe a [Success[_]]
-    clazz.get shouldBe a [JClass]
   }
 
   test ("proteaj/impl/DSL をロード") {
     import defaultCompiler._
 
-    val clazz = load("proteaj/impl/DSL")
+    val clazz = loadClass("proteaj/impl/DSL")
     clazz shouldBe a [Success[_]]
-    clazz.get shouldBe a [JClass]
   }
 
   test ("proteaj/lang/Type はロードできない") {
     import defaultCompiler._
 
-    val clazz = load("proteaj/lang/Type")
+    val clazz = loadClass("proteaj/lang/Type")
     clazz shouldBe a [Failure[_]]
-  }
-
-  test ("配列型をロード") {
-    import defaultCompiler._
-
-    val o = load("java/lang/Object")
-    val os = load("[Ljava/lang/Object;")
-    val oss = load("[[Ljava/lang/Object;")
-
-    o shouldBe a [Success[_]]
-    os shouldBe a [Success[_]]
-    oss shouldBe a [Success[_]]
-
-    arrayClassOf(o.get) shouldBe os.get
-    arrayClassOf(os.get) shouldBe oss.get
   }
 
   test("ソースをJClassLoader経由でコンパイル") {
     import compiler2._
 
-    val clazz = load("test/Hello")
+    val clazz = loadClass("test/Hello")
     clazz shouldBe a [Success[_]]
     clazz.get shouldBe a [IRModule]
 
@@ -67,11 +50,10 @@ class JClassLoaderTest extends FunSuite with Matchers {
   test("ClassSigが読めるか") {
     import compiler3._
 
-    val clazz = load("test/Var")
+    val clazz = loadClass("test/Var")
     clazz shouldBe a [Success[_]]
-    clazz.get shouldBe a [JClass]
 
-    val varClass = clazz.get.asInstanceOf[JClass]
+    val varClass = clazz.get
 
     varClass.signature shouldBe
       JClassSignature(List(FormalMetaParameter("T", JTypeSignature.typeTypeSig, Nil), FormalMetaParameter("id", SimpleClassTypeSignature("proteaj/lang/Identifier", Nil), Nil)), JTypeSignature.objectTypeSig, Nil)
@@ -80,11 +62,10 @@ class JClassLoaderTest extends FunSuite with Matchers {
   test("Operatorが読めるか") {
     import compiler3._
 
-    val clazz = load("test/Var")
+    val clazz = loadClass("test/Var")
     clazz shouldBe a [Success[_]]
-    clazz.get shouldBe a [JClass]
 
-    val cl = clazz.get.asInstanceOf[JClass]
+    val cl = clazz.get
     val setterMethod = cl.methods.find(_.name == "setter")
 
     setterMethod shouldBe a [Some[_]]

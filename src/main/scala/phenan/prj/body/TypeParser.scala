@@ -46,7 +46,7 @@ trait TypeParser {
       lazy val componentType: HParser[JType] = primitiveTypeName | objectType
       lazy val refType: HParser[JRefType] = arrayType | typeVariable | objectType
       lazy val objectType: HParser[JObjectType] = className ~ metaArguments ^^? {
-        case clazz ~ args => clazz.objectType(args)
+        case clazz ~ args => getObjectType(clazz, args)
       }
       lazy val packageName: HParser[List[String]] = (identifier <~ '.').*! { names =>
         !rootResolver.isKnownPackage(names) && resolver.resolve(names).isSuccess
@@ -56,7 +56,7 @@ trait TypeParser {
         case pack ~ name => resolver.resolve(pack :+ name).toOption
       }
       lazy val innerClassName: HParser[JClass] = className ~ ('.' ~> identifier) ^^? {
-        case name ~ id => name.innerClasses.get(id).flatMap(loadClass_PE)
+        case name ~ id => name.innerClasses.get(id).flatMap(loadClass_NoFail)
       }
       lazy val typeVariable: HParser[JTypeVariable] = identifier ^^? resolver.typeVariable
       lazy val metaVariable: HParser[MetaVariableRef] = identifier ^^? resolver.metaVariable

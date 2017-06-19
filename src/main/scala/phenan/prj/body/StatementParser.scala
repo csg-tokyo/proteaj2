@@ -132,9 +132,10 @@ trait StatementParser {
       lazy val statementExpression: HParser[IRExpression] = expression(voidType)
 
 
-      def collection(elemType: JType): HParser[IRExpression] =
-        someOrError(elemType.boxed.flatMap(iterableOf).map(expression).map(_ | expression(elemType.array)),
+      def collection(elemType: JType): HParser[IRExpression] = {
+        someOrError(iterableOf(elemType).map(expression).map(_ | expression(elemType.array)),
           "cannot get type object Iterable<" + elemType.name + ">", expression(elemType.array))
+      }
 
 
       def expression(expected: JType): HParser[IRExpression] = getExpressionParser(expected, env)

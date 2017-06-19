@@ -10,7 +10,7 @@ import phenan.prj.state._
 import scala.util._
 
 class BodyParsersTest extends FunSuite with Matchers {
-  val compiler = JCompiler(Config())
+  val compiler: JCompiler.JCompilerImpl = JCompiler.init(Config()).right.get
 
   import compiler._
 
@@ -135,12 +135,12 @@ class BodyParsersTest extends FunSuite with Matchers {
     val result = parsers.parse(parsers.getStatementParsers(voidType, mainMethod.environment).block, body)
     result shouldBe a [Success[_]]
 
-    val outField = loadClass_PE("java/lang/System").flatMap(_.classModule.findField("out", test0))
+    val outField = loadClass("java/lang/System").toOption.flatMap(_.classModule.findField("out", test0))
 
-    val printMethods = loadClass_PE("java/io/PrintStream").flatMap(_.objectType(Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
+    val printMethods = loadClass("java/io/PrintStream").toOption.flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
     val printMethod = printMethods.find { m =>
       m.erasedParameterTypes.headOption.exists { param =>
-        loadClass_PE("java/lang/String").contains(param)
+        loadClass("java/lang/String").toOption.contains(param)
       }
     }
     val expected = IRBlock(List(IRExpressionStatement(IRInstanceMethodCall(IRStaticFieldAccess(outField.get), Map.empty, printMethod.get, List(IRStringLiteral("Hello, world!")), Nil))))
@@ -163,12 +163,12 @@ class BodyParsersTest extends FunSuite with Matchers {
     val test0 = file.modules.head
     val mainMethod = test0.procedures.head
 
-    val outField = loadClass_PE("java/lang/System").flatMap(_.classModule.findField("out", test0))
+    val outField = loadClass("java/lang/System").toOption.flatMap(_.classModule.findField("out", test0))
 
-    val printMethods = loadClass_PE("java/io/PrintStream").flatMap(_.objectType(Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
+    val printMethods = loadClass("java/io/PrintStream").toOption.flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
     val printMethod = printMethods.find { m =>
       m.erasedParameterTypes.headOption.exists { param =>
-        loadClass_PE("java/lang/String").contains(param)
+        loadClass("java/lang/String").toOption.contains(param)
       }
     }
 

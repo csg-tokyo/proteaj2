@@ -37,7 +37,7 @@ trait ExpressionOperandParser {
       expectedType <- inferExpectedType(param, binding, procedure)
       contexts     <- inferContexts(param.contexts, binding, procedure)
     } yield {
-      if (voidType.boxed.contains(expectedType) && contexts.nonEmpty) {
+      if (boxedVoidType.contains(expectedType) && contexts.nonEmpty) {
         val boxed = getExpressionParser(expectedType, env.withContexts(contexts), env.getPriority(pri, procedure)) ^^ {
           _.withContexts(contexts)
         }

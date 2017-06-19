@@ -10,21 +10,21 @@ import phenan.prj.state.Config
 import scala.util._
 
 class NameResolverTest extends FunSuite with Matchers {
-  val compiler = JCompiler(Config())
+  val compiler: JCompiler.JCompilerImpl = JCompiler.init(Config()).right.get
 
   import compiler._
 
   test ("完全修飾名によるロード") {
     rootResolver.resolve(List("java", "util", "ArrayList")) shouldBe a [Success[_]]
-    rootResolver.resolve(List("java", "util", "ArrayList")).get shouldBe load("java/util/ArrayList").get
+    rootResolver.resolve(List("java", "util", "ArrayList")).get shouldBe loadClass("java/util/ArrayList").get
 
     rootResolver.resolve(List("java", "util", "Map", "Entry")) shouldBe a [Success[_]]
-    rootResolver.resolve(List("java", "util", "Map", "Entry")).get shouldBe load(s"java/util/Map$$Entry").get
+    rootResolver.resolve(List("java", "util", "Map", "Entry")).get shouldBe loadClass(s"java/util/Map$$Entry").get
   }
 
   test ("短縮名称によるロード") {
     rootResolver.resolve(List("System")) shouldBe a [Success[_]]
-    rootResolver.resolve(List("System")).get shouldBe load("java/lang/System").get
+    rootResolver.resolve(List("System")).get shouldBe loadClass("java/lang/System").get
   }
 
   test ("パッケージ、インポート") {
@@ -40,21 +40,21 @@ class NameResolverTest extends FunSuite with Matchers {
     val resolver = file.get.resolver
 
     resolver.resolve(List("Color")) shouldBe a [Success[_]]
-    resolver.resolve(List("Color")).get shouldBe load("java/awt/Color").get
+    resolver.resolve(List("Color")).get shouldBe loadClass("java/awt/Color").get
 
     resolver.resolve(List("List")) shouldBe a [Success[_]]
-    resolver.resolve(List("List")).get shouldBe load("java/awt/List").get
+    resolver.resolve(List("List")).get shouldBe loadClass("java/awt/List").get
 
     resolver.resolve(List("File")) shouldBe a [Success[_]]
-    resolver.resolve(List("File")).get shouldBe load("java/io/File").get
+    resolver.resolve(List("File")).get shouldBe loadClass("java/io/File").get
 
     resolver.resolve(List("Reader")) shouldBe a [Failure[_]]
 
     resolver.resolve(List("ArrayList")) shouldBe a [Success[_]]
-    resolver.resolve(List("ArrayList")).get shouldBe load("java/util/ArrayList").get
+    resolver.resolve(List("ArrayList")).get shouldBe loadClass("java/util/ArrayList").get
 
     resolver.resolve(List("Map", "Entry")) shouldBe a [Success[_]]
-    resolver.resolve(List("Map", "Entry")).get shouldBe load(s"java/util/Map$$Entry").get
+    resolver.resolve(List("Map", "Entry")).get shouldBe loadClass(s"java/util/Map$$Entry").get
   }
 
   test ("クラス内") {

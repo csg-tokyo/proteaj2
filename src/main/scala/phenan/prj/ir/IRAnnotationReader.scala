@@ -166,11 +166,11 @@ trait IRAnnotationReader {
     }
 
     private def annotationElement (arg: AnnotationElement, annType: JErasedType): Option[IRAnnotationElement] = annType match {
-      case arr: JArrayClass                => annotationElement_Array(arg, arr.component)
-      case enm: JClass if enm.isEnum       => annotationElement_EnumConstant(arg, enm)
-      case ann: JClass if ann.isAnnotation => annotationElement_Annotation(arg, ann)
-      case prm: JPrimitiveClass                     => evaluate(arg, prm.primitiveType)
-      case str: JClass if stringClass.contains(str) => stringType.flatMap(evaluate(arg, _))
+      case arr: JArrayClass                  => annotationElement_Array(arg, arr.component)
+      case enm: JClass if enm.isEnum         => annotationElement_EnumConstant(arg, enm)
+      case ann: JClass if ann.isAnnotation   => annotationElement_Annotation(arg, ann)
+      case prm: JPrimitiveClass              => evaluate(arg, prm.primitiveType)
+      case str: JClass if stringClass == str => stringType.flatMap(evaluate(arg, _))
     }
 
     private def annotationElement_Array (arg: AnnotationElement, component: JErasedType): Option[IRAnnotationElementArray] = arg match {

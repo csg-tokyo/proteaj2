@@ -3,7 +3,7 @@ package phenan.prj
 import CommonNames._
 
 trait JErasedTypes {
-  this: JModules with JClassLoader with JTypeLoader =>
+  this: JModules with JClassLoader =>
 
   sealed trait JErasedType {
     def name: String
@@ -38,16 +38,14 @@ trait JErasedTypes {
 
     lazy val priorities: Set[JPriority] = declaredPriorities ++ memberPriorities
 
-    lazy val superClass: Option[JClass] = erase_PE(signature.superClass)
-    lazy val interfaces: List[JClass] = signature.interfaces.flatMap(erase_PE)
+    lazy val superClass: Option[JClass] = erase_NoFail(signature.superClass)
+    lazy val interfaces: List[JClass] = signature.interfaces.flatMap(t => erase_NoFail(t))
 
     def isSubclassOf(that: JErasedType): Boolean = {
       this == that || superClass.exists(sup => sup != this && sup.isSubclassOf(that)) || interfaces.exists(_.isSubclassOf(that))
     }
 
     def classModule: JClassModule = JClassModule(this)
-
-    def objectType (typeArgs: List[MetaArgument]): Option[JObjectType] = getObjectType(this, typeArgs)
 
     lazy val classInitializer: Option[JMethodDef] = methods.find(_.isClassInitializer)
     lazy val constructors: List[JMethodDef] = methods.filter(_.isConstructor)
@@ -63,10 +61,9 @@ trait JErasedTypes {
     def isAnnotation: Boolean = mod.check(JModifier.accAnnotation)
   }
 
-  case class JPrimitiveClass (name: String, wrapperName: String) extends JErasedType {
+  case class JPrimitiveClass (name: String) extends JErasedType {
     def isSubclassOf(that: JErasedType): Boolean = this == that
 
-    lazy val wrapperClass: Option[JClass] = loadClass_PE(wrapperName)
     lazy val primitiveType: JPrimitiveType = JPrimitiveType(this)
   }
 
@@ -129,8 +126,8 @@ trait JErasedTypes {
 
     def syntax: Option[JSyntaxDef]
 
-    lazy val erasedReturnType: JErasedType = erase_Force(signature.returnType, signature.metaParams)
-    lazy val erasedParameterTypes: List[JErasedType] = signature.parameters.map(param => erase_Force(param.actualTypeSignature, signature.metaParams))
+    lazy val erasedReturnType: JErasedType = erase_NoFail(signature.returnType, signature.metaParams).getOrElse(objectClass)
+    lazy val erasedParameterTypes: List[JErasedType] = signature.parameters.map(param => erase_NoFail(param.actualTypeSignature, signature.metaParams).getOrElse(objectClass))
 
     def isStatic: Boolean = mod.check(JModifier.accStatic)
 

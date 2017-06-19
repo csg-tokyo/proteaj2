@@ -25,7 +25,7 @@ trait FileEnvironments {
     }
 
     private def collectDSLs(names: List[QualifiedName]): Set[JClassModule] = {
-      collectDSLs(names, predefOperatorsClass.map(_.classModule).toSet)
+      collectDSLs(names, Set(predefOperatorsClass.classModule))
     }
 
     private def collectDSLs(names: List[QualifiedName], ds: Set[JClassModule]): Set[JClassModule] = names match {

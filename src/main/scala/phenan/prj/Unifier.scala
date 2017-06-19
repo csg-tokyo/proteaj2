@@ -11,7 +11,7 @@ trait Unifier {
 
   def bindTypeArgs (param: JParameter, argType: JType, binding: Map[String, MetaArgument]): Map[String, MetaArgument] = binding ++ inferType(argType, param.genericType).getOrElse(Map.empty)
 
-  implicit class JTypeOps (t1: JType) {
+  implicit class JTypeUnifierOps (t1: JType) {
     def <=< (t2: JGenericType): Option[Map[String, MetaArgument]] = unifyType(t1, t2)
     def >=> (t2: JGenericType): Option[Map[String, MetaArgument]] = inferType(t1, t2)
   }
@@ -341,7 +341,7 @@ trait Unifier {
 
     private def directSuperTypes (signature: JClassTypeSignature): List[JClassTypeSignature] = signature match {
       case JTypeSignature.objectTypeSig => Nil
-      case SimpleClassTypeSignature(clazz, args) => loadClass_PE(clazz) match {
+      case SimpleClassTypeSignature(clazz, args) => loadClass_NoFail(clazz) match {
         case Some(cls) if cls.signature.metaParams.size == args.size =>
           (cls.signature.superClass :: cls.signature.interfaces).map(assign(_, cls.signature.metaParams.map(_.name).zip(args).toMap))
         case None => Nil

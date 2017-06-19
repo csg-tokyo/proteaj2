@@ -180,11 +180,11 @@ trait IRExpressions {
   sealed trait IRClassLiteral extends IRJavaLiteral
 
   case class IRObjectClassLiteral(clazz: JClass, dim: Int) extends IRClassLiteral {
-    def staticType: Option[JObjectType] = clazz.objectType(Nil).map(_.array(dim)).flatMap(classTypeOf)
+    def staticType: Option[JObjectType] = getObjectType(clazz, Nil).map(_.array(dim)).flatMap(classTypeOf)
   }
 
-  case class IRPrimitiveClassLiteral(primitiveClass: JPrimitiveType, dim: Int) extends IRClassLiteral {
-    def staticType: Option[JObjectType] = primitiveClass.boxed.map(_.array(dim)).flatMap(classTypeOf)
+  case class IRPrimitiveClassLiteral(primitiveType: JPrimitiveType, dim: Int) extends IRClassLiteral {
+    def staticType: Option[JObjectType] = boxedPrimitiveTypes(primitiveType).map(_.array(dim)).flatMap(classTypeOf)
   }
 
   case class IRCharLiteral(value: Char) extends IRJavaLiteral {

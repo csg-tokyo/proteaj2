@@ -144,7 +144,7 @@ trait IRs {
       case None => constructResolver(metaParametersAST, Nil, staticResolver)
     }
 
-    lazy val thisType: Option[JObjectType] = metaParametersRef.flatMap(objectType)
+    lazy val thisType: Option[JObjectType] = metaParametersRef.flatMap(getObjectType(this, _))
 
     lazy val metaParameters: Map[String, MetaArgument] = metaParametersRef.map(args => signature.metaParams.map(_.name).zip(args).toMap).getOrElse {
       error("invalid meta parameters")
