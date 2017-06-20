@@ -5,8 +5,12 @@ import dsl FileRead;
 
 public class Main {
   public static void main (String[] args) throws IOException {
-    open "file.txt" {
-      while (has next) { System.out.println(read line); }
+    open "README.md" {
+      while (has next) { System.out.println(readLine()); }
     };
+  }
+
+  static FileRead |- String readLine() {
+    return read line;
   }
 }

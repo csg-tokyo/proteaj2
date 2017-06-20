@@ -7,11 +7,6 @@ dsl FileRead {
     BufferedReader reader = new BufferedReader(new FileReader(fileName));
     body.apply(new FileRead(reader));
     reader.close();
-    try {
-      body.apply(new FileRead(reader));
-    } finally {
-      if (reader != null) reader.close();
-    }
   }
   String "read" "line" () { 
     String res = nextLine;

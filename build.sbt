@@ -29,4 +29,6 @@ scalacOptions ++= Seq(
   "-Ywarn-value-discard"
 )
 
-mainClass in (Compile, run) := Some("phenan.prj.JCompiler")
+mainClass in (Compile, run) := Some("phenan.prj.Main")
+
+fork in run := true

@@ -389,7 +389,7 @@ trait JavaReprGenerator {
   private def statementExpression (e: IRStatementExpression, contexts: List[IRContextRef]): Expression = {
     val lam = Union[Expression](lambda(objectClassSig, typeSig(JTypeSignature.boxedVoidTypeSig), Nil, Nil, Block(List(singleStatement(e.stmt, contexts ++ e.contexts, Nil), returnStatement(Union[Expression](Union[JavaLiteral](NullLiteral)))))))
     val app = Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", Nil))
-    contextualArgument(e.contexts, app, voidType, Nil, e.contexts ++ contexts)
+    contextualArgument(e.contexts, app, boxedVoidType.get, Nil, e.contexts ++ contexts)
   }
 
   private def contextRef (e: IRContextRef, contexts: List[IRContextRef]): LocalRef = {

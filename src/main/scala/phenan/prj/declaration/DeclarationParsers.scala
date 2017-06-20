@@ -98,8 +98,8 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val staticInitializer: HParser[StaticInitializer] = "static" ~> block ^^ StaticInitializer
 
-  lazy val methodDeclaration: HParser[MethodDeclaration] = modifiers ~ metaParameters ~ typeName ~ identifier ~ formalParameters ~ clause.* ~ methodBody ^^ {
-    case mods ~ mps ~ ret ~ name ~ params ~ clauses ~ body => MethodDeclaration(mods, mps, ret, name, params, clauses, body)
+  lazy val methodDeclaration: HParser[MethodDeclaration] = modifiers ~ metaParameters ~ requires_Turnstile.? ~ typeName ~ identifier ~ formalParameters ~ clause.* ~ methodBody ^^ {
+    case mods ~ mps ~ req ~ ret ~ name ~ params ~ clauses ~ body => MethodDeclaration(mods, mps, ret, name, params, clauses ++ req, body)
   }
 
   lazy val fieldDeclaration: HParser[FieldDeclaration] = modifiers ~ typeName ~ declarator.+(',') <~ ';' ^^ {
@@ -110,8 +110,8 @@ object DeclarationParsers extends TwoLevelParsers {
     case mods ~ tn ~ name ~ dim ~ default => AnnotationElementDeclaration(mods, tn, name, dim, default)
   }
 
-  lazy val operatorDeclaration: HParser[OperatorDeclaration] = ( identifier <~ ':' ).? ~ modifiers ~ metaParameters ~ typeName ~ returnBound.* ~ priority ~ syntaxElement.+ ~ formalParameters ~ clause.* ~ methodBody ^^ {
-    case label ~ mods ~ mps ~ tn ~ bounds ~ pri ~ syn ~ params ~ clauses ~ body => OperatorDeclaration(label, mods, mps, tn, bounds, pri, syn, params, clauses, body)
+  lazy val operatorDeclaration: HParser[OperatorDeclaration] = ( identifier <~ ':' ).? ~ modifiers ~ metaParameters ~ requires_Turnstile.? ~ typeName ~ returnBound.* ~ priority ~ syntaxElement.+ ~ formalParameters ~ clause.* ~ methodBody ^^ {
+    case label ~ mods ~ mps ~ req ~ tn ~ bounds ~ pri ~ syn ~ params ~ clauses ~ body => OperatorDeclaration(label, mods, mps, tn, bounds, pri, syn, params, clauses ++ req, body)
   }
 
   lazy val prioritiesDeclaration: HParser[PrioritiesDeclaration] = ("priority" | "priorities") ~> identifier.*(',') ~ ( '{' ~> constraint.*(';') <~ '}' ) ^^ {
@@ -177,6 +177,12 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val requiresClause: HParser[RequiresClause] = "requires" ~> typeName.+(',') ^^ RequiresClause
 
+  lazy val requires_Turnstile: HParser[RequiresClause] = ( multipleTypeNames | typeName ^^ { List(_) } ) <~ turnstileSymbol.^ ^^ RequiresClause
+
+  lazy val multipleTypeNames: HParser[List[TypeName]] = '{' ~> typeName.+(',') <~ '}'
+
+  lazy val turnstileSymbol: LParser[_] = elem('|') ~> elem('-')
+
   lazy val methodBody: HParser[Option[BlockSnippet]] = block ^^ { Some(_) } | ';' ^^^ None
 
   case class ClassMemberParsers (className: String) {
@@ -208,7 +214,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val parameterType: HParser[ParameterType] = contextualType | typeName
 
-  lazy val contextualType: HParser[ContextualType] = ( typeName <~ ( elem('|') ~> elem('-') ).^ ) ~ parameterType ^^ {
+  lazy val contextualType: HParser[ContextualType] = ( typeName <~ turnstileSymbol.^ ) ~ parameterType ^^ {
     case ct ~ pt => ContextualType(ct, pt)
   }
 

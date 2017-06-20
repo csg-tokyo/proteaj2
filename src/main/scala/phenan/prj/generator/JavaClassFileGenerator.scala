@@ -18,6 +18,7 @@ trait JavaClassFileGenerator {
     else {
       val compileOptions = List("-d", config.destination.getAbsolutePath, "-cp", config.getClassPathString)
       val compilationUnits = files.flatMap(createJavaSourceObject)
+      if (config.displayJavaSources) compilationUnits.foreach(source => println(source.getSource))
       val res = compiler.getTask(null, null, null, compileOptions.asJava, null, compilationUnits.asJava).call()
       info("compile status : " + res)
     }
@@ -44,6 +45,7 @@ trait JavaClassFileGenerator {
 
   private class JavaSourceObject (uri: URI, src: String) extends SimpleJavaFileObject (uri, JavaFileObject.Kind.SOURCE) {
     override def getCharContent(ignoreEncodingErrors: Boolean): CharSequence = src
+    def getSource: String = src
   }
 }
 

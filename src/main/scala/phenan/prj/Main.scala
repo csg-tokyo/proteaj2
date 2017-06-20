@@ -7,7 +7,8 @@ import phenan.prj.state.Config
   */
 object Main {
   def main (args: Array[String]): Unit = Config.configure(args).foreach { config =>
-    JCompiler.init(config) match {
+    if (config.files.isEmpty) Config.showUsage()
+    else JCompiler.init(config) match {
       case Right(c) => c.compile()
       case Left(e)  => Console.err.println(e.getMessage)
     }

@@ -12,7 +12,7 @@ case class Config
   destination: File = new File("."),
   classPath: Stream[SearchPathEntry] = Stream(DirectoryPath(new File("."))),
   sourcePath: Stream[SearchPathEntry] = Stream.empty,
-  helpFlag: Boolean = false,
+  displayJavaSources: Boolean = false,
   files: List[File] = Nil
 )
 {
@@ -43,9 +43,21 @@ case class Config
 }
 
 object Config {
-  def configure (args: Array[String]): Option[Config] = parser.parse(args, Config())
+  def configure (args: Array[String]): Option[Config] = {
+    parser.parse(args, Config())
+  }
 
-  private val parser = new scopt.OptionParser[Config] ("ProteaJ Compiler") {
+  def showUsage (): Unit = parser.showUsage()
+
+  private implicit val searchPathReader: scopt.Read[Stream[SearchPathEntry]] = scopt.Read.reads { str =>
+    str.split(File.pathSeparator).map(scopt.Read.fileRead.reads).map {
+      case dir if dir.isDirectory => DirectoryPath(dir)
+      case jar if jar.getName.endsWith(".jar") || jar.getName.endsWith(".zip") => JarPath(new JarFile(jar))
+      case els => throw new IllegalArgumentException("'" + els + "' is not a search path entry.")
+    } (collection.breakOut)
+  }
+
+  private val parser = new scopt.OptionParser[Config] ("<sbt run>") {
     head("ProteaJ Compiler")
 
     opt[File]("javahome").
@@ -70,19 +82,17 @@ object Config {
       action((path, config) => config.copy(sourcePath = path)).
       text("specify where to find user source files")
 
-    help("help").text("prints this usage text")
+    opt[Unit]("printsources").
+      action((_, config) => config.copy(displayJavaSources = true)).
+      text("print generated Java source programs")
+
+    help("help").abbr("h").text("prints this usage text")
 
     arg[File]("<file>...").unbounded().optional().
       validate(file => Either.cond(file.isFile && file.canRead, (), s"${file.getPath} is not readable file")).
       action((file, config) => config.copy(files = config.files :+ file))
-  }
 
-  private implicit val searchPathReader: scopt.Read[Stream[SearchPathEntry]] = scopt.Read.reads { str =>
-    str.split(File.pathSeparator).map(scopt.Read.fileRead.reads).map {
-      case dir if dir.isDirectory => DirectoryPath(dir)
-      case jar if jar.getName.endsWith(".jar") || jar.getName.endsWith(".zip") => JarPath(new JarFile(jar))
-      case els => throw new IllegalArgumentException("'" + els + "' is not a search path entry.")
-    } (collection.breakOut)
+    override def showUsageOnError = true
   }
 }
 
