@@ -58,7 +58,6 @@ trait TwoLevelParsers {
     def ? : HParser[Option[T]]
     def & : HParser[T]
     def ! : HParser[Unit]
-    def ! (f: T => Boolean): HParser[T]
     def * : HParser[List[T]]
     def + : HParser[List[T]]
 
@@ -70,8 +69,6 @@ trait TwoLevelParsers {
     def map [R] (f: T => R): HParser[R]
     def mapOption [R] (f: T => Option[R]): HParser[R]
     def flatMap [R] (f: T => HParser[R]): HParser[R]
-
-    def into [R] (f: T => HParser[R]): HParser[R] = flatMap(f)
 
     def ^? [R] (f: PartialFunction[T, R]): HParser[R]
     def ^^ [R] (f: T => R): HParser[R] = map(f)
@@ -108,8 +105,6 @@ trait TwoLevelParsers {
     def mapOption [R] (f: T => Option[R]): LParser[R]
     def flatMap [R] (f: T => LParser[R]): LParser[R]
 
-    def into [R] (f: T => LParser[R]): LParser[R] = flatMap(f)
-
     def ^? [R] (f: PartialFunction[T, R]): LParser[R]
     def ^^ [R] (f: T => R): LParser[R] = map(f)
     def ^^? [R] (f: T => Option[R]): LParser[R] = mapOption(f)
@@ -137,7 +132,6 @@ trait TwoLevelParsers {
       def ? : HParser[Option[T]] = HParserImpl(parser.?)
       def & : HParser[T] = HParserImpl(guard(parser))
       def ! : HParser[Unit] = HParserImpl(not(parser))
-      def ! (f: T => Boolean): HParser[T] = HParserImpl(parser ^? { case r if ! f(r) => r })
       def * : HParser[List[T]] = HParserImpl(repsep(parser, delimiter.parser))
       def + : HParser[List[T]] = HParserImpl(rep1sep(parser, delimiter.parser))
       def * [U] (sep: => HParser[U]): HParser[List[T]] = HParserImpl(repsep(parser, delimiter.parser ~> sep.parser ~> delimiter.parser))
