@@ -14,8 +14,6 @@ class TypeParsersTest extends FunSuite with Matchers {
 
   import compiler._
 
-  private val bp = BodyParsers
-
   test ("className") {
     val program =
       """import java.io.Reader;
@@ -27,7 +25,7 @@ class TypeParsersTest extends FunSuite with Matchers {
     file shouldBe a [Success[_]]
     val resolver = file.get.resolver
 
-    val parsers = bp.getTypeParsers(resolver)
+    val parsers = new BodyParsers(resolver).typeParsers
 
     val r1 = parsers.className(src("Reader"))
     r1.successful shouldBe true
@@ -57,7 +55,7 @@ class TypeParsersTest extends FunSuite with Matchers {
     file shouldBe a [Success[_]]
     val resolver = file.get.resolver
 
-    val parsers = bp.getTypeParsers(resolver)
+    val parsers = new BodyParsers(resolver).typeParsers
 
     val r1 = parsers.typeName(src("JarFile"))
     val ans1 = getObjectType(loadClass("java/util/jar/JarFile").get, Nil).get

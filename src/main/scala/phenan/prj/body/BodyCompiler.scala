@@ -6,13 +6,21 @@ import phenan.prj.ir._
 import scala.util.Try
 
 trait BodyCompiler {
-  this: BodyParser with StatementParser with ExpressionParser with JTypeLoader with Environments with IRStatements with IRExpressions with JModules =>
+  this: BodyParser with StatementParsersModule with ExpressionParsersModule with ContextSensitiveParsersModule with JTypeLoader with Environments with IRStatements with IRExpressions with JModules =>
 
-  def parseMethodBody (code: String, expected: JType, env: Environment): Try[IRMethodBody] = BodyParsers.parse(BodyParsers.getStatementParsers(expected, env).methodBody, code)
+  def parseMethodBody (code: String, expected: JType, env: ProcedureEnvironment): Try[IRMethodBody] = {
+    new BodyParsers(env.resolver).getStatementParsers(expected).methodBody(code, env)
+  }
 
-  def parseConstructorBody (code: String, env: Environment): Try[IRConstructorBody] = BodyParsers.parse(BodyParsers.getStatementParsers(voidType, env).constructorBody, code)
+  def parseConstructorBody (code: String, env: ProcedureEnvironment): Try[IRConstructorBody] = {
+    new BodyParsers(env.resolver).getStatementParsers(voidType).constructorBody(code, env)
+  }
 
-  def parseInitializerBody (code: String, env: Environment): Try[IRInitializerBody] = BodyParsers.parse(BodyParsers.getStatementParsers(voidType, env).initializerBody, code)
+  def parseInitializerBody (code: String, env: ProcedureEnvironment): Try[IRInitializerBody] = {
+    new BodyParsers(env.resolver).getStatementParsers(voidType).initializerBody(code, env)
+  }
 
-  def parseExpression (code: String, expected: JType, env: Environment): Try[IRExpression] = BodyParsers.parse(BodyParsers.getExpressionParser(expected, env), code)
+  def parseExpression (code: String, expected: JType, env: ModuleEnvironment): Try[IRExpression] = {
+    new BodyParsers(env.resolver).getExpressionParser(expected)(code, env)
+  }
 }

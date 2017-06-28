@@ -45,7 +45,7 @@ trait JErasedTypes {
       this == that || superClass.exists(sup => sup != this && sup.isSubclassOf(that)) || interfaces.exists(_.isSubclassOf(that))
     }
 
-    def classModule: JClassModule = JClassModule(this)
+    lazy val classModule: JClassModule = JClassModule(this)
 
     lazy val classInitializer: Option[JMethodDef] = methods.find(_.isClassInitializer)
     lazy val constructors: List[JMethodDef] = methods.filter(_.isConstructor)

@@ -558,7 +558,7 @@ trait IRs {
 
     lazy val exceptions: List[JRefType] = signature.throwTypes.flatMap(fromTypeSignature_RefType(_, metaParameters))
 
-    def environment: Environment = {
+    def environment: ProcedureEnvironment = {
       if (isStatic) declaringClass.staticEnvironment.procedureEnvironment(this)
       else declaringClass.instanceEnvironment.procedureEnvironment(this)
     }

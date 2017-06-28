@@ -3,8 +3,6 @@ package phenan.prj
 trait Unifier {
   this: JTypeLoader with JClassLoader with JModules with JMembers with Application =>
 
-  type MetaArgs = Map[String, MetaArgument]
-
   def unifyType (t: JType, gt: JGenericType): Option[MetaArgs] = TypeUnifier.check(t, gt.signature, gt.env)
   def inferType (t: JType, gt: JGenericType): Option[MetaArgs] = TypeInferencer.check(t, gt.signature, gt.env)
   def inferType (t: JType, gt: JGenericType, e: MetaArgs): Option[MetaArgs] = TypeInferencer.check(t, gt.signature, gt.env ++ e)

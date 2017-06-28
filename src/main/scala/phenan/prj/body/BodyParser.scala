@@ -1,10 +1,13 @@
 package phenan.prj.body
 
-trait BodyParser {
-  this: StatementParser with ExpressionParser with ExpressionOperatorParser with ExpressionOperandParser with JavaExpressionParser with ArgumentParser
-    with LiteralParser with LiteralOperatorParser with LiteralOperandParser with JavaLiteralParser with TypeParser =>
+import phenan.prj.ir.NameResolvers
 
-  object BodyParsers
+trait BodyParser {
+  this: StatementParsersModule with ExpressionParsersModule with ExpressionOperatorParsersModule with ExpressionOperandParsersModule with JavaExpressionParsersModule
+    with ArgumentParsersModule with LiteralParsersModule with LiteralOperatorParsersModule with LiteralOperandParsersModule with JavaLiteralParsersModule
+    with TypeParsersModule with CommonParsersModule with ContextSensitiveParsersModule with NameResolvers =>
+
+  class BodyParsers (val resolver: NameResolver)
     extends StatementParsers with ExpressionParsers with ExpressionOperatorParsers with ExpressionOperandParsers with JavaExpressionParsers with ArgumentParsers
-      with LiteralParsers with LiteralOperatorParsers with LiteralOperandParsers with JavaLiteralParsers with TypeParsers with CommonParsers
+      with LiteralParsers with LiteralOperatorParsers with LiteralOperandParsers with JavaLiteralParsers with TypeParsers with CommonParsers with ContextSensitiveParsers
 }

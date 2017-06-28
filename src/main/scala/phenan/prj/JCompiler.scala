@@ -41,11 +41,12 @@ trait JCompiler {
 object JCompiler {
   case class JCompilerImpl (config: Config) extends JCompiler
     with BodyCompiler with BodyParser with DeclarationCompiler with JavaClassFileGenerator with JavaReprGenerator
-    with StatementParser with ExpressionParser with ExpressionOperatorParser with ExpressionOperandParser with JavaExpressionParser with ArgumentParser
-    with LiteralParser with LiteralOperatorParser with LiteralOperandParser with JavaLiteralParser with TypeParser
+    with StatementParsersModule with ExpressionParsersModule with ExpressionOperatorParsersModule with ExpressionOperandParsersModule
+    with JavaExpressionParsersModule with ArgumentParsersModule with LiteralParsersModule with LiteralOperatorParsersModule
+    with LiteralOperandParsersModule with JavaLiteralParsersModule with TypeParsersModule with CommonParsersModule with ContextSensitiveParsersModule
     with Unifier with ExpectedTypeInferencer with MethodContextInferencer with NameResolvers with OperatorPool
     with ClassFileLoader with ClassFileAnalyzer with ClassFileParser
-    with JTypeLoader with JClassLoader with Environments with DSLEnvironments with FileEnvironments
+    with JTypeLoader with JClassLoader with Environments with DSLEnvironments with FileEnvironments with EnvModifyStrategy
     with IRs with IRStatements with IRExpressions with IRAnnotationReader with SignatureParser with DescriptorParser
     with Syntax with JModules with JMembers with JErasedTypes with Application
 

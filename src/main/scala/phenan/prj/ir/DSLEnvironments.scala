@@ -5,7 +5,7 @@ import phenan.prj._
 import scalaz.Memo._
 
 trait DSLEnvironments {
-  this: MethodContextInferencer with OperatorPool with IRExpressions with Syntax with JModules with JMembers =>
+  this: MethodContextInferencer with OperatorPool with IRExpressions with Syntax with JModules with JMembers with JErasedTypes =>
 
   class DSLEnvironment(dsls: List[JClassModule], contexts: List[IRContextRef]) {
     def changeContext(activated: List[IRContextRef], deactivated: List[IRContextRef]): DSLEnvironment = {
@@ -53,8 +53,12 @@ trait DSLEnvironments {
     }
   }
 
-  case class ExpressionOperator(syntax: JExpressionSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression)
+  case class ExpressionOperator(syntax: JExpressionSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression) {
+    def declaringClassModule: JClassModule = method.declaringClass.classModule
+  }
 
-  case class LiteralOperator(syntax: JLiteralSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression)
+  case class LiteralOperator(syntax: JLiteralSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression) {
+    def declaringClassModule: JClassModule = method.declaringClass.classModule
+  }
 
 }

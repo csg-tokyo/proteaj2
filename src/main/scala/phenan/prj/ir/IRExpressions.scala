@@ -22,6 +22,8 @@ trait IRExpressions {
     }
   }
 
+  type ParsedArgumentList = (Map[String, MetaArgument], List[IRExpression])
+
   sealed trait IRLeftHandSide extends IRExpression
 
   sealed trait IRAssignmentExpression extends IRExpression {
@@ -50,7 +52,12 @@ trait IRExpressions {
     lazy val throws: List[JType] = constructor.exceptionTypes.flatMap(_.bind(metaArgs))
   }
 
-  case class IRAnonymousClass(metaArgs: Map[String, MetaArgument], baseType: JObjectType, args: List[IRExpression], requiredContexts: List[IRContextRef], members: List[IRClassMember])
+  case class IRAnonymousClass(metaArgs: Map[String, MetaArgument], baseType: JObjectType, args: List[IRExpression], requiredContexts: List[IRContextRef], members: List[IRClassMember]) extends IRExpression {
+    // TODO: staticType should be a sub-type of baseType
+    override def staticType: Option[JType] = Some(baseType)
+    override def activates: List[IRContextRef] = Nil
+    override def deactivates: List[IRContextRef] = Nil
+  }
 
   sealed trait IRExplicitConstructorCall
 
@@ -245,7 +252,7 @@ trait IRExpressions {
 
   case class IREnumConstantRef(field: JFieldDef) extends IRAnnotationElement
 
-  case class IRStatementExpression(stmt: IRStatement, contexts: List[IRContextRef]) extends IRExpression {
+  case class IRStatementExpression(stmt: IRStatement) extends IRExpression {
     def staticType: Option[JType] = Some(voidType)
 
     def activates: List[IRContextRef] = Nil

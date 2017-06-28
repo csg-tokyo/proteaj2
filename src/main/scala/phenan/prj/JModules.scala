@@ -11,6 +11,8 @@ trait JModules {
     def matches(v: MetaArgument): Boolean
   }
 
+  type MetaArgs = Map[String, MetaArgument]
+
   sealed trait MetaValue extends MetaArgument {
     def valueType: JType
   }
@@ -44,16 +46,16 @@ trait JModules {
     }
   }
 
-  case class JGenericType(signature: JTypeSignature, env: Map[String, MetaArgument]) {
-    def bind(args: Map[String, MetaArgument]): Option[JType] = {
+  case class JGenericType(signature: JTypeSignature, env: MetaArgs) {
+    def bind(args: MetaArgs): Option[JType] = {
       fromTypeSignature(signature, env ++ args)
     }
 
-    def unbound(args: Map[String, MetaArgument]): Set[String] = unbound(signature, args, Set.empty[String])
+    def unbound(args: MetaArgs): Set[String] = unbound(signature, args, Set.empty[String])
 
     override def toString: String = signature.toString + env.map { case (s, m) => s + " = " + m.name }.mkString("<", ",", ">")
 
-    private def unbound(sig: JTypeSignature, args: Map[String, MetaArgument], result: Set[String]): Set[String] = sig match {
+    private def unbound(sig: JTypeSignature, args: MetaArgs, result: Set[String]): Set[String] = sig match {
       case JTypeVariableSignature(name) if args.contains(name) || env.contains(name) => result
       case JTypeVariableSignature(name) => result + name
       case SimpleClassTypeSignature(_, as) => as.foldLeft(result) { (r, a) => unbound(a, args, r) }
@@ -63,7 +65,7 @@ trait JModules {
       case _: JPrimitiveTypeSignature => result
     }
 
-    private def unbound(sig: JTypeArgument, args: Map[String, MetaArgument], result: Set[String]): Set[String] = sig match {
+    private def unbound(sig: JTypeArgument, args: MetaArgs, result: Set[String]): Set[String] = sig match {
       case MetaVariableSignature(name) if args.contains(name) || env.contains(name) => result
       case MetaVariableSignature(name) => result + name
       case sig: JTypeSignature => unbound(sig, args, result)
@@ -159,7 +161,7 @@ trait JModules {
 
   sealed trait JRefType extends JType with MetaArgument
 
-  case class JObjectType(erase: JClass, env: Map[String, MetaArgument]) extends JRefType {
+  case class JObjectType(erase: JClass, env: MetaArgs) extends JRefType {
     def name: String = {
       if (env.isEmpty) erase.name
       else erase.name + env.map(kv => kv._1 + "=" + kv._2.name).mkString("<", ",", ">")
@@ -281,7 +283,7 @@ trait JModules {
       }
     }
 
-    private def matchTypeArgs(args: Map[String, MetaArgument]): Boolean = env.forall { case (key, value) =>
+    private def matchTypeArgs(args: MetaArgs): Boolean = env.forall { case (key, value) =>
       args.get(key).exists { arg => arg.matches(value) }
     }
   }

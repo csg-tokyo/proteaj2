@@ -3,7 +3,7 @@ package phenan.prj.ir
 import phenan.prj._
 
 trait IRStatements {
-  this: IRExpressions with JModules =>
+  this: Environments with IRExpressions with JModules =>
 
   case class IRMethodBody(block: IRBlock)
 
@@ -11,12 +11,17 @@ trait IRStatements {
 
   case class IRInitializerBody(block: IRBlock)
 
-  sealed trait IRStatement
+  sealed trait IRStatement {
+    def modifyEnv (env: Environment): Environment
+  }
 
-  case class IRBlock(statements: List[IRStatement]) extends IRStatement
+  case class IRBlock(statements: List[IRStatement]) extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = env
+  }
 
   case class IRLocalDeclarationStatement(declaration: IRLocalDeclaration) extends IRStatement {
     override def toString: String = declaration.toString + ';'
+    override def modifyEnv(env: Environment): Environment = env.defineLocals(declaration)
   }
 
   case class IRLocalDeclaration(localType: JType, declarators: List[IRVariableDeclarator]) {
@@ -29,32 +34,52 @@ trait IRStatements {
     override def toString: String = typeName + init.map(e => " " + e.toString).getOrElse("")
   }
 
-  case class IRIfStatement(condition: IRExpression, thenStatement: IRStatement, elseStatement: Option[IRStatement]) extends IRStatement
+  case class IRIfStatement(condition: IRExpression, thenStatement: IRStatement, elseStatement: Option[IRStatement]) extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = env
+  }
 
-  case class IRWhileStatement(condition: IRExpression, statement: IRStatement) extends IRStatement
+  case class IRWhileStatement(condition: IRExpression, statement: IRStatement) extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = env
+  }
 
-  sealed trait IRForStatement extends IRStatement
+  sealed trait IRForStatement extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = env
+  }
 
   case class IRNormalForStatement(local: IRLocalDeclaration, condition: Option[IRExpression], update: List[IRExpression], statement: IRStatement) extends IRForStatement
 
   case class IRAncientForStatement(init: List[IRExpression], condition: Option[IRExpression], update: List[IRExpression], statement: IRStatement) extends IRForStatement
 
-  case class IREnhancedForStatement(elementType: JType, name: String, dim: Int, iterable: IRExpression, statement: IRStatement) extends IRForStatement
+  case class IREnhancedForStatement(header: IREnhancedForHeader, statement: IRStatement) extends IRForStatement
 
-  case class IRTryStatement(tryBlock: IRBlock, catchBlocks: List[IRExceptionHandler], finallyBlock: Option[IRBlock]) extends IRStatement
+  case class IREnhancedForHeader(elementType: JType, name: String, dim: Int, iterable: IRExpression)
 
-  case class IRExceptionHandler(exceptionType: JType, name: String, catchBlock: IRBlock)
+  case class IRTryStatement(tryBlock: IRBlock, catchBlocks: List[IRExceptionHandler], finallyBlock: Option[IRBlock]) extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = env
+  }
 
-  case class IRActivateStatement(expression: IRExpression) extends IRStatement
+  case class IRExceptionHandler (header: IRExceptionHandlerHeader, catchBlock: IRBlock)
 
-  case class IRThrowStatement(expression: IRExpression) extends IRStatement
+  case class IRExceptionHandlerHeader (exceptionType: JType, name: String)
 
-  case class IRReturnStatement(expression: IRExpression) extends IRStatement
+  case class IRActivateStatement(expression: IRExpression) extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = env
+  }
+
+  case class IRThrowStatement(expression: IRExpression) extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = env
+  }
+
+  case class IRReturnStatement(expression: IRExpression) extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = env
+  }
 
   case class IRExpressionStatement(expression: IRExpression) extends IRStatement {
     def activates: List[IRContextRef] = expression.activates
 
     def deactivates: List[IRContextRef] = expression.deactivates
+
+    override def modifyEnv(env: Environment): Environment = env.withContexts(activates, deactivates)
   }
 
 }

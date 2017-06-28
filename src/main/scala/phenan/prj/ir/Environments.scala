@@ -20,8 +20,6 @@ trait Environments {
 
     def dslEnvironment: DSLEnvironment
 
-    def resolver: NameResolver
-
     def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = dslEnvironment.expressionOperators(expected, priority)
 
     def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = dslEnvironment.literalOperators(expected, priority)
@@ -32,21 +30,17 @@ trait Environments {
 
     def nextPriority(priority: JPriority): Option[JPriority] = nextPriorities.get(priority)
 
-    def getPriority(pri: Option[JPriority], procedure: JProcedure): Option[JPriority] = {
-      pri.orElse(procedure.syntax.flatMap(syntax => nextPriority(syntax.priority)))
-    }
-
     def localVariable(name: String): Option[IRLocalVariableRef] = locals.get(name)
 
     def defineLocal(localType: JType, name: String): Environment = Environment_LocalVariables(List((localType, name)), this)
 
-    def modifyContext(statement: IRExpressionStatement): Environment = {
-      if (statement.activates.nonEmpty || statement.deactivates.nonEmpty) Environment_LocalContexts(statement.activates, statement.deactivates, this)
+    def modifyContext (expression: IRExpression): Environment = {
+      if (expression.activates.nonEmpty || expression.deactivates.nonEmpty) Environment_LocalContexts(expression.activates, expression.deactivates, this)
       else this
     }
 
-    def withContexts(contexts: List[IRContextRef]): Environment = {
-      if (contexts.nonEmpty) Environment_LocalContexts(contexts, Nil, this)
+    def withContexts (activates: List[IRContextRef], deactivates: List[IRContextRef]): Environment = {
+      if (activates.nonEmpty || deactivates.nonEmpty) Environment_LocalContexts(activates, deactivates, this)
       else this
     }
 
@@ -56,7 +50,7 @@ trait Environments {
   }
 
   sealed trait ModuleEnvironment extends Environment {
-    def procedureEnvironment(procedure: IRProcedure): Environment = Environment_Method(procedure, this)
+    def procedureEnvironment(procedure: IRProcedure): ProcedureEnvironment = ProcedureEnvironment(procedure, this)
 
     def contexts: List[IRContextRef] = Nil
 
@@ -67,6 +61,8 @@ trait Environments {
     def exceptions: List[JRefType] = Nil
 
     val dslEnvironment = new DSLEnvironment(fileEnvironment.dsls, contexts)
+
+    def resolver: NameResolver
   }
 
   class Environment_Instance(val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
@@ -105,7 +101,7 @@ trait Environments {
     val dslEnvironment: DSLEnvironment = parent.dslEnvironment.changeContext(activated, deactivated)
   }
 
-  case class Environment_Method(procedure: IRProcedure, parent: Environment) extends Environment_Variables with Environment_Contexts {
+  case class ProcedureEnvironment (procedure: IRProcedure, parent: Environment) extends Environment_Variables with Environment_Contexts {
     def variables: List[(JType, String)] = procedure.parameterVariables
 
     def activated: List[IRContextRef] = procedure.requiresContexts
@@ -125,8 +121,6 @@ trait Environments {
     def activateTypes: List[JRefType] = parent.activateTypes
 
     def exceptions: List[JRefType] = parent.exceptions
-
-    def resolver: NameResolver = parent.resolver
   }
 
   case class Environment_LocalContexts(activated: List[IRContextRef], deactivated: List[IRContextRef], parent: Environment) extends Environment_Contexts {
@@ -135,7 +129,5 @@ trait Environments {
     def activateTypes: List[JRefType] = parent.activateTypes
 
     def exceptions: List[JRefType] = parent.exceptions
-
-    def resolver: NameResolver = parent.resolver
   }
 }

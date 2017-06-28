@@ -239,10 +239,10 @@ trait JavaReprGenerator {
     NormalForStatement (Union[ForInit](stmt.init.map(expression(_, contexts))), stmt.condition.map(expression(_, contexts)), stmt.update.map(expression(_, contexts)), singleStatement(stmt.statement, contexts, activates))
 
   private def enhancedForStatement (stmt: IREnhancedForStatement, contexts: List[IRContextRef], activates: List[JRefType]): EnhancedForStatement =
-    EnhancedForStatement (typeToSig(stmt.elementType), stmt.name, stmt.dim, expression(stmt.iterable, contexts), singleStatement(stmt.statement, contexts, activates))
+    EnhancedForStatement (typeToSig(stmt.header.elementType), stmt.header.name, stmt.header.dim, expression(stmt.header.iterable, contexts), singleStatement(stmt.statement, contexts, activates))
 
   private def tryStatement (stmt: IRTryStatement, contexts: List[IRContextRef], activates: List[JRefType]): TryStatement =
-    TryStatement (block(stmt.tryBlock, contexts, activates), stmt.catchBlocks.map(e => ExceptionHandler(typeToSig(e.exceptionType), e.name, block(e.catchBlock, contexts, activates))), stmt.finallyBlock.map(block(_, contexts, activates)))
+    TryStatement (block(stmt.tryBlock, contexts, activates), stmt.catchBlocks.map(e => ExceptionHandler(typeToSig(e.header.exceptionType), e.header.name, block(e.catchBlock, contexts, activates))), stmt.finallyBlock.map(block(_, contexts, activates)))
 
   private def throwStatement (stmt: IRThrowStatement, contexts: List[IRContextRef]): ThrowStatement = ThrowStatement(expression(stmt.expression, contexts))
 
@@ -387,9 +387,8 @@ trait JavaReprGenerator {
   }
 
   private def statementExpression (e: IRStatementExpression, contexts: List[IRContextRef]): Expression = {
-    val lam = Union[Expression](lambda(objectClassSig, typeSig(JTypeSignature.boxedVoidTypeSig), Nil, Nil, Block(List(singleStatement(e.stmt, contexts ++ e.contexts, Nil), returnStatement(Union[Expression](Union[JavaLiteral](NullLiteral)))))))
-    val app = Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", Nil))
-    contextualArgument(e.contexts, app, boxedVoidType.get, Nil, e.contexts ++ contexts)
+    val lam = Union[Expression](lambda(objectClassSig, typeSig(JTypeSignature.boxedVoidTypeSig), Nil, Nil, Block(List(singleStatement(e.stmt, contexts, Nil), returnStatement(Union[Expression](Union[JavaLiteral](NullLiteral)))))))
+    Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", Nil))
   }
 
   private def contextRef (e: IRContextRef, contexts: List[IRContextRef]): LocalRef = {

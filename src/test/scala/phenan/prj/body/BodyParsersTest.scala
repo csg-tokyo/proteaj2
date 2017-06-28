@@ -14,7 +14,7 @@ class BodyParsersTest extends FunSuite with Matchers {
 
   import compiler._
 
-  private val parsers = BodyParsers
+  private val parsers = new BodyParsers(rootResolver)
 
   def makeIR (src: String): IRFile = {
     val file = compileDeclaration(new StringReader(src), "testsrc.java").get
@@ -132,7 +132,7 @@ class BodyParsersTest extends FunSuite with Matchers {
         |}
       """.stripMargin
 
-    val result = parsers.parse(parsers.getStatementParsers(voidType, mainMethod.environment).block, body)
+    val result = parsers.getStatementParsers(voidType).block(body, mainMethod.environment)
     result shouldBe a [Success[_]]
 
     val outField = loadClass("java/lang/System").toOption.flatMap(_.classModule.findField("out", test0))
@@ -228,5 +228,35 @@ class BodyParsersTest extends FunSuite with Matchers {
     body shouldBe Some(expected)
   }
 
+  test ("変数宣言") {
+    val src =
+      """package test;
+        |public class Test0 <T> {
+        |  public void test () {
+        |    String s = "hello, world";
+        |    System.out.println(s);
+        |  }
+        |}
+      """.stripMargin
 
+    val file = makeIR(src)
+    val test0 = file.modules.head
+    val method = test0.procedures.head
+
+    val body = method.asInstanceOf[IRMethod].methodBody
+
+    val outField = loadClass("java/lang/System").toOption.flatMap(_.classModule.findField("out", test0))
+    val printMethods = loadClass("java/io/PrintStream").toOption.flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
+    val printMethod = printMethods.find { m =>
+      m.erasedParameterTypes.headOption.exists { param =>
+        loadClass("java/lang/String").toOption.contains(param)
+      }
+    }
+
+    val expected = IRMethodBody(IRBlock(List(
+      IRLocalDeclarationStatement(IRLocalDeclaration(stringType.get, List(IRVariableDeclarator("s", 0, Some(IRStringLiteral("hello, world")))))),
+      IRExpressionStatement(IRInstanceMethodCall(IRStaticFieldAccess(outField.get), Map.empty, printMethod.get, List(IRLocalVariableRef(stringType.get, "s")), Nil)))))
+
+    body shouldBe Some(expected)
+  }
 }
