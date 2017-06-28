@@ -26,12 +26,6 @@ case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSi
     val target = if (varArgs) JArrayTypeSignature(typeSig) else typeSig
     contexts.foldRight(target)(JTypeSignature.functionTypeSig)
   }
-  override def toString: String = {
-    val cs = contexts.map('@' + _.toString).mkString
-    val da = defaultArg.map('?' + _).mkString
-    if(varArgs) cs + typeSig.toString + '*' + da
-    else cs + typeSig.toString + da
-  }
 }
 
 case class FormalMetaParameter (name: String, metaType: JTypeSignature, bounds: List[JTypeSignature]) {
@@ -51,6 +45,7 @@ object JTypeSignature {
   lazy val boxedVoidTypeSig = SimpleClassTypeSignature(CommonNames.boxedVoidClassName, Nil)
 
   def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature(CommonNames.functionClassName, List(from, to))
+  def consumerTypeSig (arg: JTypeArgument): JTypeSignature = SimpleClassTypeSignature(CommonNames.consumerClassName, List(arg))
   def enumTypeSig (e: JTypeArgument): JClassTypeSignature = SimpleClassTypeSignature(CommonNames.enumClassName, List(e))
 
   def arraySig (typeSig: JTypeSignature, dim: Int): JTypeSignature = {
@@ -61,63 +56,36 @@ object JTypeSignature {
 
 sealed trait JClassTypeSignature extends JTypeSignature {
   def internalName: String
-  def signatureString: String
-  override def toString: String = 'L' + signatureString + ';'
 }
 
 case class SimpleClassTypeSignature (clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature {
   def internalName: String = clazz
-  def signatureString: String = {
-    if (args.isEmpty) clazz
-    else clazz + args.mkString("<", "", ">")
-  }
 }
 
 case class MemberClassTypeSignature (outer: JClassTypeSignature, clazz: String, args: List[JTypeArgument]) extends JClassTypeSignature {
   def internalName: String = outer.internalName + '$' + clazz
-  def signatureString: String = {
-    if (args.isEmpty) outer.signatureString + '.' + clazz
-    else outer.signatureString + '.' + clazz + args.mkString("<", "", ">")
-  }
 }
 
-sealed trait JPrimitiveTypeSignature extends JTypeSignature {
-  def symbol: Char
-  override def toString: String = symbol.toString
-}
+sealed trait JPrimitiveTypeSignature extends JTypeSignature
 
-case object ByteTypeSignature extends JPrimitiveTypeSignature { def symbol = 'B' }
-case object CharTypeSignature extends JPrimitiveTypeSignature { def symbol = 'C' }
-case object DoubleTypeSignature extends JPrimitiveTypeSignature { def symbol = 'D' }
-case object FloatTypeSignature extends JPrimitiveTypeSignature { def symbol = 'F' }
-case object IntTypeSignature extends JPrimitiveTypeSignature { def symbol = 'I' }
-case object LongTypeSignature extends JPrimitiveTypeSignature { def symbol = 'J' }
-case object ShortTypeSignature extends JPrimitiveTypeSignature { def symbol = 'S' }
-case object BoolTypeSignature extends JPrimitiveTypeSignature { def symbol = 'Z' }
-case object VoidTypeSignature extends JPrimitiveTypeSignature { def symbol = 'V' }
+case object ByteTypeSignature extends JPrimitiveTypeSignature
+case object CharTypeSignature extends JPrimitiveTypeSignature
+case object DoubleTypeSignature extends JPrimitiveTypeSignature
+case object FloatTypeSignature extends JPrimitiveTypeSignature
+case object IntTypeSignature extends JPrimitiveTypeSignature
+case object LongTypeSignature extends JPrimitiveTypeSignature
+case object ShortTypeSignature extends JPrimitiveTypeSignature
+case object BoolTypeSignature extends JPrimitiveTypeSignature
+case object VoidTypeSignature extends JPrimitiveTypeSignature
 
-case class JArrayTypeSignature (component: JTypeSignature) extends JTypeSignature {
-  override def toString: String = '[' + component.toString
-}
+case class JArrayTypeSignature (component: JTypeSignature) extends JTypeSignature
 
-case class JTypeVariableSignature (name: String) extends JTypeSignature {
-  override def toString: String = 'T' + name + ';'
-}
+case class JTypeVariableSignature (name: String) extends JTypeSignature
 
 case class JCapturedWildcardSignature (upperBound: Option[JTypeSignature], lowerBound: Option[JTypeSignature]) extends JTypeSignature
 
-sealed trait JTypeArgument {
-  def toString: String
-}
+sealed trait JTypeArgument
 
 case class MetaVariableSignature (name: String) extends JTypeArgument
 
-case class WildcardArgument (upperBound: Option[JTypeSignature], lowerBound: Option[JTypeSignature]) extends JTypeArgument {
-  override def toString: String = upperBound match {
-    case Some(ub) => '+' + ub.toString
-    case None => lowerBound match {
-      case Some(lb) => '-' + lb.toString
-      case None => "*"
-    }
-  }
-}
+case class WildcardArgument (upperBound: Option[JTypeSignature], lowerBound: Option[JTypeSignature]) extends JTypeArgument

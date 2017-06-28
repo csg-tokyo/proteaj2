@@ -62,7 +62,7 @@ trait ClassFileAnalyzer {
 
     private lazy val methodSignature: BAnnotation =?> JMethodSignature = for {
       metaParams  <- array("metaParameters")(elementAnnotation(CommonNames.metaParamClassName, metaParameter))
-      retType     <- required("returnType")(typeSignature)
+      retType     <- required("returnType")(returnTypeSignature)
       retBounds   <- array("returnBounds")(typeSignature)
       parameters  <- array("parameters")(parameterSignature)
       exceptions  <- array("throwsTypes")(typeSignature)
@@ -171,6 +171,8 @@ trait ClassFileAnalyzer {
     }
 
     private lazy val typeSignature: BAnnotationElement =?> JTypeSignature = string >==> parseTypeSignature
+
+    private lazy val returnTypeSignature: BAnnotationElement =?> JTypeSignature = string >==> parseReturnTypeSignature
 
     private lazy val classTypeSignature: BAnnotationElement =?> JClassTypeSignature = string >==> parseClassTypeSignature
 

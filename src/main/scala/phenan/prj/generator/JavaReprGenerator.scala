@@ -9,7 +9,7 @@ import CommonNames._
 import JavaRepr._
 
 trait JavaReprGenerator {
-  this: JTypeLoader with IRs with IRStatements with IRExpressions with JModules with JMembers with JErasedTypes =>
+  this: JTypeLoader with IRs with IRStatements with IRExpressions with JModules with JMembers with JErasedTypes with Application =>
 
   /* AST transformation : ProteaJ IR ==> Java AST */
 
@@ -381,13 +381,14 @@ trait JavaReprGenerator {
   private def contextualArgument (cs: List[IRContextRef], e: Expression, t: JType, throws: List[TypeSig], contexts: List[IRContextRef]): Expression = cs match {
     case c :: rest =>
       val functionType = functionTypeOf(c.contextType, t).getOrElse(throw InvalidASTException("invalid context type"))
-      contextualArgument(rest, Union[Expression](lambda(objectType(functionType), typeToSig(t),
+      contextualArgument(rest, Union[Expression](lambda(objectType(functionType), typeToSig(boxing(t).get), "apply",
         List(parameter(c.contextType, contextName(contexts.size - 1))), throws, Block(List(returnStatement(e))))), functionType, throws, contexts.tail)
     case Nil       => e
   }
 
   private def statementExpression (e: IRStatementExpression, contexts: List[IRContextRef]): Expression = {
-    val lam = Union[Expression](lambda(objectClassSig, typeSig(JTypeSignature.boxedVoidTypeSig), Nil, Nil, Block(List(singleStatement(e.stmt, contexts, Nil), returnStatement(Union[Expression](Union[JavaLiteral](NullLiteral)))))))
+    val lam = Union[Expression](lambda(objectClassSig, typeSig(JTypeSignature.boxedVoidTypeSig), "apply", Nil, Nil,
+      Block(List(singleStatement(e.stmt, contexts, Nil), returnStatement(Union[Expression](Union[JavaLiteral](NullLiteral)))))))
     Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", Nil))
   }
 
@@ -424,7 +425,7 @@ trait JavaReprGenerator {
       Union[Expression](NewExpression(typeArgs, objectType(returnType), argTypes.indices.map(i => localRefExpression("arg" + i)).toList)))
 
   private def functionWrapper (returnType: JType, params: List[Param], throws: List[JType], required: List[IRContextRef], contexts: List[IRContextRef], application: Expression): Expression = Union[Expression](lambda (
-    objectClassSig, typeToSig(returnType), params, throws.map(typeToSig), Block { sendRequiredContexts(required, contexts) :+ returnStatement(application) }
+    objectClassSig, typeToSig(returnType), "apply", params, throws.map(typeToSig), Block { sendRequiredContexts(required, contexts) :+ returnStatement(application) }
   ))
   
   private def returnStatement (e: Expression): Statement = Union[Statement](ReturnStatement(e))
@@ -439,15 +440,15 @@ trait JavaReprGenerator {
     Union[Statement](activateContext(Union[Expression](contextRef(c, contexts)), i))
   }
 
-  private def lambda (baseClassSig: ClassSig, retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): AnonymousClass =
-    AnonymousClass(baseClassSig, Nil, List(Union[ClassMember](lambdaMethodDef(retType, params, exceptions, block))))
+  private def lambda (baseClassSig: ClassSig, retType: TypeSig, name: String, params: List[Param], exceptions: List[TypeSig], block: Block): AnonymousClass =
+    AnonymousClass(baseClassSig, Nil, List(Union[ClassMember](lambdaMethodDef(retType, name, params, exceptions, block))))
 
-  private def lambdaMethodDef (retType: TypeSig, params: List[Param], exceptions: List[TypeSig], block: Block): MethodDef = new MethodDef {
+  private def lambdaMethodDef (retType: TypeSig, methodName: String, params: List[Param], exceptions: List[TypeSig], block: Block): MethodDef = new MethodDef {
     def annotations: List[JavaAnnotation] = Nil
     def modifiers: JModifier = JModifier(JModifier.accPublic)
     def typeParameters: List[TypeParam] = Nil
     def returnType: TypeSig = retType
-    def name: String = "apply"
+    def name: String = methodName
     def parameters: List[Param] = params
     def throws: List[TypeSig] = exceptions
     def body = Some(block)
@@ -607,26 +608,26 @@ trait JavaReprGenerator {
     private def classSignatureAnnotation (sig: JClassSignature): JavaAnnotation = {
       mkAnnotation(classSigClassName) (
         "metaParameters" -> array(sig.metaParams.map(metaParameterAnnotation).map(elementAnnotation)),
-        "superType" -> strLit(sig.superClass.toString),
-        "interfaces" -> array(sig.interfaces.map(cts => strLit(cts.toString)))
+        "superType" -> strLit(typeSigString(sig.superClass)),
+        "interfaces" -> array(sig.interfaces.map(cts => strLit(typeSigString(cts))))
       )
     }
 
     private def methodSignatureAnnotation (sig: JMethodSignature): JavaAnnotation = {
       mkAnnotation(methodSigClassName) (
         "metaParameters" -> array(sig.metaParams.map(metaParameterAnnotation).map(elementAnnotation)),
-        "returnType" -> strLit(sig.returnType.toString),
-        "returnBounds" -> array(sig.returnBounds.map(s => strLit(s.toString))),
-        "parameters" -> array(sig.parameters.map(p => strLit(p.toString))),
-        "throwsTypes" -> array(sig.throwTypes.map(s => strLit(s.toString))),
-        "activates" -> array(sig.activates.map(s => strLit(s.toString))),
-        "deactivates" -> array(sig.deactivates.map(s => strLit(s.toString))),
-        "requires" -> array(sig.requires.map(s => strLit(s.toString)))
+        "returnType" -> strLit(typeSigString(sig.returnType)),
+        "returnBounds" -> array(sig.returnBounds.map(s => strLit(typeSigString(s)))),
+        "parameters" -> array(sig.parameters.map(p => strLit(parameterSigString(p)))),
+        "throwsTypes" -> array(sig.throwTypes.map(s => strLit(typeSigString(s)))),
+        "activates" -> array(sig.activates.map(s => strLit(typeSigString(s)))),
+        "deactivates" -> array(sig.deactivates.map(s => strLit(typeSigString(s)))),
+        "requires" -> array(sig.requires.map(s => strLit(typeSigString(s))))
       )
     }
 
     private def fieldSignatureAnnotation (sig: JTypeSignature): JavaAnnotation = {
-      mkAnnotation(fieldSigClassName) ("value" -> strLit(sig.toString))
+      mkAnnotation(fieldSigClassName) ("value" -> strLit(typeSigString(sig)))
     }
 
     private def dslAnnotation (declaredPriorities: Set[JPriority], priorityConstraints: List[List[JPriority]], withDSLs: List[JClass]): JavaAnnotation = {
@@ -654,8 +655,8 @@ trait JavaReprGenerator {
     private def metaParameterAnnotation (fmp: FormalMetaParameter): JavaAnnotation = {
       mkAnnotation(metaParamClassName)(
         "name" -> strLit(fmp.name),
-        "type" -> strLit(fmp.metaType.toString),
-        "bounds" -> array(fmp.bounds.map(sig => strLit(sig.toString))))
+        "type" -> strLit(typeSigString(fmp.metaType)),
+        "bounds" -> array(fmp.bounds.map(sig => strLit(typeSigString(sig)))))
     }
 
     private def constraintAnnotation (constraint: List[JPriority]): JavaAnnotation = {
@@ -663,7 +664,7 @@ trait JavaReprGenerator {
     }
 
     private def priorityAnnotation (priority: JPriority): JavaAnnotation = {
-      mkAnnotation(priorityClassName)("dsl" -> strLit(priority.clazz.toString), "name" -> strLit(priority.name))
+      mkAnnotation(priorityClassName)("dsl" -> strLit(typeSigString(priority.clazz)), "name" -> strLit(priority.name))
     }
 
     private def operatorElementAnnotation (elem: JSyntaxElementDef): JavaAnnotation = elem match {
@@ -673,13 +674,57 @@ trait JavaReprGenerator {
       case JRepetition0Def(p)        => operatorElementAnnotation("Star", "", p)
       case JRepetition1Def(p)        => operatorElementAnnotation("Plus", "", p)
       case JOptionalOperandDef(p)    => operatorElementAnnotation("Optional", "", p)
-      case JAndPredicateDef(sig, p)  => operatorElementAnnotation("AndPredicate", sig.toString, p)
-      case JNotPredicateDef(sig, p)  => operatorElementAnnotation("NotPredicate", sig.toString, p)
+      case JAndPredicateDef(sig, p)  => operatorElementAnnotation("AndPredicate", typeSigString(sig), p)
+      case JNotPredicateDef(sig, p)  => operatorElementAnnotation("NotPredicate", typeSigString(sig), p)
       case JMetaValueRefDef(name, p) => operatorElementAnnotation("Reference", name, p)
     }
 
     private def operatorElementAnnotation (name: String, value: String, priority: Option[JPriority]): JavaAnnotation = {
       mkAnnotation(opElemClassName) ( "kind" -> enumConst(opElemTypeClassName, name), "name" -> strLit(value), "priority" -> array(priority.map(priorityAnnotation).map(elementAnnotation).toList) )
+    }
+
+    private def parameterSigString (sig: JParameterSignature): String = {
+      val cs = sig.contexts.map('@' + typeSigString(_)).mkString
+      val da = sig.defaultArg.map('?' + _).mkString
+      if(sig.varArgs) cs + typeSigString(sig.typeSig) + '*' + da
+      else cs + typeSigString(sig.typeSig) + da
+    }
+
+    private def typeArgString (sig: JTypeArgument): String = sig match {
+      case typeSig: JTypeSignature        => typeSigString(typeSig)
+      case WildcardArgument(upper, lower) => upper.map('+' + typeSigString(_)) orElse lower.map('-' + typeSigString(_)) getOrElse "*"
+      case MetaVariableSignature(name)    => s"P$name;"
+    }
+
+    private def typeSigString (sig: JTypeSignature): String = sig match {
+      case JArrayTypeSignature(component) => s"[${typeSigString(component)}"
+      case JTypeVariableSignature(name)   => s"T$name;"
+      case classTypeSig: JClassTypeSignature     => s"L${classTypeSignatureStringBody(classTypeSig)};"
+      case primitiveSig: JPrimitiveTypeSignature => primitiveTypeSignatureString(primitiveSig)
+      case JCapturedWildcardSignature(_, _)      =>
+        error("captured wildcard is found in the type signature")
+        s"#captured#"
+    }
+
+    private def classTypeSignatureStringBody (sig: JClassTypeSignature): String = sig match {
+      case SimpleClassTypeSignature(clazz, args) =>
+        if (args.isEmpty) clazz
+        else clazz + args.map(typeArgString).mkString("<", "", ">")
+      case MemberClassTypeSignature(outer, clazz, args) =>
+        if (args.isEmpty) classTypeSignatureStringBody(outer) + '.' + clazz
+        else classTypeSignatureStringBody(outer) + '.' + clazz + args.map(typeArgString).mkString("<", "", ">")
+    }
+
+    private def primitiveTypeSignatureString (sig: JPrimitiveTypeSignature): String = sig match {
+      case ByteTypeSignature   => "B"
+      case CharTypeSignature   => "C"
+      case DoubleTypeSignature => "D"
+      case FloatTypeSignature  => "F"
+      case IntTypeSignature    => "I"
+      case LongTypeSignature   => "J"
+      case ShortTypeSignature  => "S"
+      case BoolTypeSignature   => "Z"
+      case VoidTypeSignature   => "V"
     }
 
     private def mkAnnotation (annName: String)(args: (String, AnnotationElement)*): JavaAnnotation = JavaAnnotation(annName.replace('/', '.'), args.toMap)

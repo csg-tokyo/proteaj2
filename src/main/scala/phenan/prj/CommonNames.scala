@@ -33,6 +33,7 @@ object CommonNames {
   val errorClassName          = "java/lang/Error"
   val runtimeExceptionName    = "java/lang/RuntimeException"
   val functionClassName       = "java/util/function/Function"
+  val consumerClassName       = "java/util/function/Consumer"
   val superClassesOfArray     = List(objectClassName, "java/io/Serializable", "java/lang/Cloneable")
   val constructorName         = "<init>"
   val classInitializerName    = "<clinit>"

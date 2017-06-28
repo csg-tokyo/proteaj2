@@ -65,6 +65,7 @@ trait JClassLoader {
   lazy val iterableClass: JClass = loadClass_Unsafe(iterableClassName)
   lazy val errorClass: JClass    = loadClass_Unsafe(errorClassName)
   lazy val functionClass: JClass = loadClass_Unsafe(functionClassName)
+  lazy val consumerClass: JClass = loadClass_Unsafe(consumerClassName)
 
   lazy val runtimeExceptionClass: JClass = loadClass_Unsafe(runtimeExceptionName)
   lazy val predefOperatorsClass: JClass  = loadClass_Unsafe(predefOperatorsName)

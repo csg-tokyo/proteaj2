@@ -96,6 +96,7 @@ trait SignatureParser {
   def parseFieldSignature(sig: String): Option[JTypeSignature] = parse(sig, "field signature", fieldType)
   def parseMethodSignature(sig: String): Option[JMethodSignature] = parse(sig, "method signature", methodSignature)
   def parseTypeSignature(sig: String): Option[JTypeSignature] = parse(sig, "type signature", typeSignature)
+  def parseReturnTypeSignature(sig: String): Option[JTypeSignature] = parse(sig, "return type signature", returnType)
   def parseClassTypeSignature(sig: String): Option[JClassTypeSignature] = parse(sig, "class type signature", classType)
   def parseParameterSignature(sig: String): Option[JParameterSignature] = parse(sig, "parameter signature", parameterSignature)
 }

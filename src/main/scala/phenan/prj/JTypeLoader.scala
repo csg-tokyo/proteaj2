@@ -67,6 +67,8 @@ trait JTypeLoader {
     r <- getObjectType(functionClass, List(f, t))
   } yield r
 
+  def consumerTypeOf (arg: JType): Option[JObjectType] = boxing(arg).flatMap(t => getObjectType(consumerClass, List(t)))
+
   def boxing (t: JType): Option[JRefType] = t match {
     case ref: JRefType       => Some(ref)
     case prm: JPrimitiveType => boxedPrimitiveTypes(prm)
