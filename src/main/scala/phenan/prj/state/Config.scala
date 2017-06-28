@@ -12,6 +12,7 @@ case class Config
   destination: File = new File("."),
   classPath: Stream[SearchPathEntry] = Stream(DirectoryPath(new File("."))),
   sourcePath: Stream[SearchPathEntry] = Stream.empty,
+  displayLoadedClassFiles: Boolean = false,
   displayJavaSources: Boolean = false,
   files: List[File] = Nil
 )
@@ -85,6 +86,10 @@ object Config {
     opt[Unit]("printsources").
       action((_, config) => config.copy(displayJavaSources = true)).
       text("print generated Java source programs")
+
+    opt[Unit]("printloadedclasses").
+      action((_, config) => config.copy(displayLoadedClassFiles = true)).
+      text("print loaded class file names [for debugging the compiler]")
 
     help("help").abbr("h").text("prints this usage text")
 

@@ -25,7 +25,7 @@ trait ClassFileLoader {
 
   private def findAndLoadClassFile (name: String): Option[Try[JClass]] = {
     findClassFile(name).map { resource =>
-      info(s"load $name")
+      if (config.displayLoadedClassFiles) info(s"load $name")
       parseClassFile(resource.openInputStream).map(JLoadedClass)
     }
   }

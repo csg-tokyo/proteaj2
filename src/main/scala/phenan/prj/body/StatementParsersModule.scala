@@ -104,7 +104,6 @@ trait StatementParsersModule {
       lazy val returnStatement: ContextSensitiveParser[IRReturnStatement] = "return" ~> expression(returnType) <~ ';' ^^ IRReturnStatement
 
       lazy val localDeclarationStatement: ContextSensitiveParser[IRLocalDeclarationStatement] = localDeclaration <~ ';' ^^ { local =>
-        info("ir local declaration : " + local.localType.name + " " + local.declarators.map(d => d.name).mkString(", "))
         IRLocalDeclarationStatement(local)
       }
 
