@@ -28,10 +28,10 @@ trait ExpressionParsersModule {
     private val cached: JType => ExpressionParsersInterface = mutableHashMapMemo { new ExpressionParsersImpl(_) }
 
     private class ExpressionParsersImpl (expected: JType) extends ExpressionParsersInterface {
-      def expression: ContextSensitiveParser[IRExpression] = ContextSensitiveParser(_.highestPriority.map(expression_cached).getOrElse(hostExpression))
+      def expression: ContextSensitiveParser[IRExpression] = highestPriority.map(expression_cached).getOrElse(hostExpression)
 
-      def expression (parameterPriority: Option[JPriority], enclosingPriority: JPriority): ContextSensitiveParser[IRExpression] = ContextSensitiveParser { env =>
-        parameterPriority.orElse(env.nextPriority(enclosingPriority)) match {
+      def expression (parameterPriority: Option[JPriority], enclosingPriority: JPriority): ContextSensitiveParser[IRExpression] = {
+        parameterPriority.orElse(nextPriority(enclosingPriority)) match {
           case Some(p) => expression_cached(p)
           case None    => hostExpression
         }
@@ -49,8 +49,8 @@ trait ExpressionParsersModule {
 
       private def createExpressionParser(p: JPriority): ContextSensitiveParser[IRExpression] = ContextSensitiveParser { env =>
         env.expressionOperators(expected, p).map(getExpressionOperatorParser).reduceOption(_ ||| _) match {
-          case Some(parser) => parser | env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
-          case None => env.nextPriority(p).map(expression_cached).getOrElse(hostExpression)
+          case Some(parser) => parser | nextPriority(p).map(expression_cached).getOrElse(hostExpression)
+          case None => nextPriority(p).map(expression_cached).getOrElse(hostExpression)
         }
       }
     }

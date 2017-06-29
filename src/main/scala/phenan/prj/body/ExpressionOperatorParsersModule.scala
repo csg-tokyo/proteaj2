@@ -28,7 +28,9 @@ trait ExpressionOperatorParsersModule {
         case JOperand(param, p) :: rest => getExpressionOperandParser(param, p, binding, eop) >> { arg =>
           constructParser(rest, bind(param, arg, binding), arg :: operands)
         }
-        case JOptionalOperand(param, p) :: rest => (getExpressionOperandParser(param, p, binding, eop) | defaultArgument(param)) >> { arg =>
+        case JOptionalOperand(param, p) :: rest =>
+          (getExpressionOperandParser(param, p, binding, eop) |
+            defaultArgument(param).fold(ContextSensitiveParser.failure[IRExpression]("default argument is not found"))(ContextSensitiveParser.success(_))) >> { arg =>
           constructParser(rest, bind(param, arg, binding), arg :: operands)
         }
         case JRepetition0(param, p) :: rest => rep0(param, p, binding, Nil) >> {
@@ -61,8 +63,8 @@ trait ExpressionOperatorParsersModule {
         case None => binding
       }
 
-      private def defaultArgument (param: JParameter): ContextSensitiveParser[IRDefaultArgument] = parserEnvironment ^^? { env =>
-        param.defaultArg.flatMap(name => eop.declaringClassModule.findMethod(name, env.clazz).find(_.erasedParameterTypes == Nil)).map(IRDefaultArgument)
+      private def defaultArgument (param: JParameter): Option[IRDefaultArgument] = {
+        param.defaultArg.flatMap(name => eop.declaringClassModule.findMethod(name, declaringModule).find(_.erasedParameterTypes == Nil)).map(IRDefaultArgument)
       }
     }
   }

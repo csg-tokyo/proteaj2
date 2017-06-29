@@ -49,13 +49,12 @@ trait JavaExpressionParsersModule {
           '{' ~> getExpressionParser(componentType.array(dim - 1)).*(',') <~ ','.? <~ '}' ^^ { IRArrayInitializer(componentType, dim, _) }
       }
 
-      lazy val primary: ContextSensitiveParser[IRExpression] = methodCall | fieldAccess | arrayAccess | newExpression | abbreviatedMethodCall | classLiteral.^# | variableRef | thisRef | abbreviatedFieldAccess | parenthesized
+      lazy val primary: ContextSensitiveParser[IRExpression] = methodCall | fieldAccess | arrayAccess | newExpression | abbreviatedMethodCall | classLiteral.^# | variableRef | thisRef.^# | abbreviatedFieldAccess.^# | parenthesized
 
       lazy val newExpression: ContextSensitiveParser[IRNewExpression] = ("new" ~> typeParsers.metaArguments) ~ typeParsers.objectType >># {
-        case metaArgs ~ constructType => ContextSensitiveParser { env =>
-          val ps = constructType.findConstructor(env.clazz).map(constructorCall(metaArgs, _))
+        case metaArgs ~ constructType =>
+          val ps = constructType.findConstructor(declaringModule).map(constructorCall(metaArgs, _))
           ps.foldRight(ContextSensitiveParser.failure[IRNewExpression](""))(_ | _)
-        }
       }
       /*
       lazy val anonymousClass: ContextSensitiveParser[IRAnonymousClass] = ("new" ~> typeParsers.metaArguments) ~ typeParsers.objectType >># {
@@ -85,26 +84,22 @@ trait JavaExpressionParsersModule {
       lazy val explicitConstructorCall: ContextSensitiveParser[IRExplicitConstructorCall] = thisConstructorCall | superConstructorCall
 
       lazy val thisConstructorCall: ContextSensitiveParser[IRThisConstructorCall] = typeParsers.metaArguments <~ "this" >># { metaArgs =>
-        ContextSensitiveParser { env =>
-          val ps = for {
-            self <- env.thisType.toList
-            constructor <- self.findConstructor(env.clazz)
-          } yield thisConstructorCall(metaArgs, constructor)
+        val ps = for {
+          self <- thisType.toList
+          constructor <- self.findConstructor(declaringModule)
+        } yield thisConstructorCall(metaArgs, constructor)
 
-          ps.foldRight(ContextSensitiveParser.failure[IRThisConstructorCall](""))(_ | _)
-        }
+        ps.foldRight(ContextSensitiveParser.failure[IRThisConstructorCall](""))(_ | _)
       }
 
       lazy val superConstructorCall: ContextSensitiveParser[IRSuperConstructorCall] = typeParsers.metaArguments <~ "super" >># { metaArgs =>
-        ContextSensitiveParser { env =>
-          val ps = for {
-            self <- env.thisType.toList
-            sup  <- self.superType.toList
-            constructor <- sup.findConstructor(env.clazz)
-          } yield superConstructorCall(metaArgs, constructor)
+        val ps = for {
+          self <- thisType.toList
+          sup  <- self.superType.toList
+          constructor <- sup.findConstructor(declaringModule)
+        } yield superConstructorCall(metaArgs, constructor)
 
-          ps.foldRight(ContextSensitiveParser.failure[IRSuperConstructorCall](""))(_ | _)
-        }
+        ps.foldRight(ContextSensitiveParser.failure[IRSuperConstructorCall](""))(_ | _)
       }
 
       lazy val methodCall: ContextSensitiveParser[IRMethodCall] = staticMethodCall | superMethodCall | instanceMethodCall
@@ -113,94 +108,80 @@ trait JavaExpressionParsersModule {
 
       lazy val instanceMethodCall: ContextSensitiveParser[IRInstanceMethodCall] = primary >> { instance =>
         ('.' ~> typeParsers.metaArguments) ~ identifier >># {
-          case metaArgs ~ name => ContextSensitiveParser { env =>
+          case metaArgs ~ name =>
             val ps = for {
               receiver <- instance.staticType.toList
-              method   <- receiver.findMethod(name, env.clazz, env.thisType.map(IRThisRef).contains(instance))
+              method   <- receiver.findMethod(name, declaringModule, thisType.map(IRThisRef).contains(instance))
             } yield invokeVirtual(instance, metaArgs, method)
 
             ps.foldRight(ContextSensitiveParser.failure[IRInstanceMethodCall](""))(_ | _)
-          }
         }
       }
 
       lazy val superMethodCall: ContextSensitiveParser[IRSuperMethodCall] = ("super" ~> '.' ~> typeParsers.metaArguments) ~ identifier >># {
-        case metaArgs ~ name => ContextSensitiveParser { env =>
+        case metaArgs ~ name =>
           val ps = for {
-            self   <- env.thisType.toList
+            self   <- thisType.toList
             sup    <- self.superType.toList
-            method <- sup.findMethod(name, env.clazz, true)
+            method <- sup.findMethod(name, declaringModule, true)
           } yield invokeSpecial(self, metaArgs, method)
 
           ps.foldRight(ContextSensitiveParser.failure[IRSuperMethodCall](""))(_ | _)
-        }
       }
 
       lazy val staticMethodCall: ContextSensitiveParser[IRStaticMethodCall] = typeParsers.className ~ ('.' ~> typeParsers.metaArguments) ~ identifier >># {
-        case clazz ~ metaArgs ~ name => ContextSensitiveParser { env =>
-          val methods = clazz.classModule.findMethod(name, env.clazz)
+        case clazz ~ metaArgs ~ name =>
+          val methods = clazz.classModule.findMethod(name, declaringModule)
           methods.foldRight(ContextSensitiveParser.failure[IRStaticMethodCall](""))(invokeStatic(metaArgs, _) | _)
-        }
       }
 
       lazy val thisMethodCall: ContextSensitiveParser[IRInstanceMethodCall] = identifier >># { name =>
-        ContextSensitiveParser { env =>
-          val ps = for {
-            self   <- env.thisType.toList
-            method <- self.findMethod(name, env.clazz, true)
-          } yield invokeVirtual(IRThisRef(self), method)
+        val ps = for {
+          self   <- thisType.toList
+          method <- self.findMethod(name, declaringModule, true)
+        } yield invokeVirtual(IRThisRef(self), method)
 
-          ps.foldRight(ContextSensitiveParser.failure[IRInstanceMethodCall](""))(_ | _)
-        }
+        ps.foldRight(ContextSensitiveParser.failure[IRInstanceMethodCall](""))(_ | _)
       }
 
       lazy val thisClassMethodCall: ContextSensitiveParser[IRStaticMethodCall] = identifier >># { name =>
-        ContextSensitiveParser { env =>
-          env.clazz.classModule.findMethod(name, env.clazz).map(invokeStatic).foldRight(ContextSensitiveParser.failure[IRStaticMethodCall](""))(_ | _)
-        }
+        declaringModule.classModule.findMethod(name, declaringModule).map(invokeStatic).foldRight(ContextSensitiveParser.failure[IRStaticMethodCall](""))(_ | _)
       }
 
-      lazy val fieldAccess: ContextSensitiveParser[IRFieldAccess] = staticFieldAccess | superFieldAccess | instanceFieldAccess
+      lazy val fieldAccess: ContextSensitiveParser[IRFieldAccess] = staticFieldAccess.^# | superFieldAccess.^# | instanceFieldAccess
 
-      lazy val abbreviatedFieldAccess: ContextSensitiveParser[IRFieldAccess] = thisClassFieldAccess | thisFieldAccess // | staticImported
+      lazy val abbreviatedFieldAccess: ContextFreeParser[IRFieldAccess] = thisClassFieldAccess | thisFieldAccess // | staticImported
 
       lazy val instanceFieldAccess: ContextSensitiveParser[IRInstanceFieldAccess] = primary >> { instance =>
-        ('.' ~> identifier) >># { name =>
-          parserEnvironment ^^? { env =>
-            for {
-              receiver <- instance.staticType
-              field    <- receiver.findField(name, env.clazz, env.thisType.map(IRThisRef).contains(instance))
-            } yield IRInstanceFieldAccess(instance, field)
-          }
-        }
-      }
-
-      lazy val superFieldAccess: ContextSensitiveParser[IRSuperFieldAccess] = "super" ~> ('.' ~> identifier) >># { name =>
-        parserEnvironment ^^? { env =>
+        ('.' ~> identifier).mapOption { name =>
           for {
-            self  <- env.thisType
-            sup   <- self.superType
-            field <- sup.findField(name, env.clazz, true)
-          } yield IRSuperFieldAccess(self, field)
-        }
+            receiver <- instance.staticType
+            field    <- receiver.findField(name, declaringModule, thisType.map(IRThisRef).contains(instance))
+          } yield IRInstanceFieldAccess(instance, field)
+        }.^#
       }
 
-      lazy val staticFieldAccess: ContextSensitiveParser[IRStaticFieldAccess] = typeParsers.className ~ ('.' ~> identifier) >># {
-        case clazz ~ name =>
-          parserEnvironment ^^? { env => clazz.classModule.findField(name, env.clazz).map(IRStaticFieldAccess) }
+      lazy val superFieldAccess: ContextFreeParser[IRSuperFieldAccess] = "super" ~> ('.' ~> identifier) ^^? { name =>
+        for {
+          self  <- thisType
+          sup   <- self.superType
+          field <- sup.findField(name, declaringModule, true)
+        } yield IRSuperFieldAccess(self, field)
       }
 
-      lazy val thisFieldAccess: ContextSensitiveParser[IRInstanceFieldAccess] = identifier >># { name =>
-        parserEnvironment ^^? { env =>
-          for {
-            self  <- env.thisType
-            field <- self.findField(name, env.clazz, true)
-          } yield IRInstanceFieldAccess(IRThisRef(self), field)
-        }
+      lazy val staticFieldAccess: ContextFreeParser[IRStaticFieldAccess] = typeParsers.className ~ ('.' ~> identifier) ^^? {
+        case clazz ~ name => clazz.classModule.findField(name, declaringModule).map(IRStaticFieldAccess)
       }
 
-      lazy val thisClassFieldAccess: ContextSensitiveParser[IRStaticFieldAccess] = identifier >># { name =>
-        parserEnvironment ^^? { env => env.clazz.classModule.findField(name, env.clazz).map(IRStaticFieldAccess) }
+      lazy val thisFieldAccess: ContextFreeParser[IRInstanceFieldAccess] = identifier ^^? { name =>
+        for {
+          self  <- thisType
+          field <- self.findField(name, declaringModule, true)
+        } yield IRInstanceFieldAccess(IRThisRef(self), field)
+      }
+
+      lazy val thisClassFieldAccess: ContextFreeParser[IRStaticFieldAccess] = identifier ^^? { name =>
+        declaringModule.classModule.findField(name, declaringModule).map(IRStaticFieldAccess)
       }
 
       lazy val arrayAccess: ContextSensitiveParser[IRArrayAccess] = primary ~ ('[' ~> intExpression <~ ']') ^^ {
@@ -225,7 +206,7 @@ trait JavaExpressionParsersModule {
 
       private lazy val dim_dot_class = dimension <~ '.' <~ "class"
 
-      lazy val thisRef: ContextSensitiveParser[IRThisRef] = "this" ~> parserEnvironment ^^? { _.thisType.map(IRThisRef) }
+      lazy val thisRef: ContextFreeParser[IRThisRef] = "this" ^^? { _ => thisType.map(IRThisRef) }
 
       lazy val variableRef: ContextSensitiveParser[IRLocalVariableRef] = identifier >># { name => parserEnvironment ^^? { _.localVariable(name)} }
 

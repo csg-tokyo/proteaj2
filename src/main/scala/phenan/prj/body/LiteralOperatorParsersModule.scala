@@ -28,7 +28,9 @@ trait LiteralOperatorParsersModule {
         case JOperand(param, p) :: rest => getLiteralOperandParser(param, p, binding, lop) >> { arg =>
           constructParser(rest, bind(param, arg, binding), arg :: operands)
         }
-        case JOptionalOperand(param, p) :: rest => (getLiteralOperandParser(param, p, binding, lop) | defaultArgument(param)) >> { arg =>
+        case JOptionalOperand(param, p) :: rest =>
+          (getLiteralOperandParser(param, p, binding, lop) |
+            defaultArgument(param).fold(ContextSensitiveScanner.failure[IRExpression]("default argument is not found"))(ContextSensitiveScanner.success(_))) >> { arg =>
           constructParser(rest, bind(param, arg, binding), arg :: operands)
         }
         case JRepetition0(param, p) :: rest => rep0(param, p, binding, Nil) >> {
@@ -61,8 +63,8 @@ trait LiteralOperatorParsersModule {
         case None    => binding
       }
 
-      private def defaultArgument (param: JParameter): ContextSensitiveScanner[IRDefaultArgument] = scannerEnvironment ^^? { env =>
-        param.defaultArg.flatMap(name => lop.declaringClassModule.findMethod(name, env.clazz).find(_.erasedParameterTypes == Nil)).map(IRDefaultArgument)
+      private def defaultArgument (param: JParameter): Option[IRDefaultArgument] = {
+        param.defaultArg.flatMap(name => lop.declaringClassModule.findMethod(name, declaringModule).find(_.erasedParameterTypes == Nil)).map(IRDefaultArgument)
       }
     }
   }

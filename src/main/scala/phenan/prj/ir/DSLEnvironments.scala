@@ -18,7 +18,7 @@ trait DSLEnvironments {
 
     def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = literalOperatorsMap(expected).getOrElse(priority, Nil)
 
-    def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = inferMethodContexts(procedure, bind, contexts).map(_._1)
+    def inferContexts(procedure: JProcedure, bind: MetaArgs): Option[List[IRContextRef]] = inferMethodContexts(procedure, bind, contexts).map(_._1)
 
     private val expressionOperatorsMap: JType => Map[JPriority, List[ExpressionOperator]] = mutableHashMapMemo { expected =>
       val fromDSL = for {
@@ -53,11 +53,11 @@ trait DSLEnvironments {
     }
   }
 
-  case class ExpressionOperator(syntax: JExpressionSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression) {
+  case class ExpressionOperator(syntax: JExpressionSyntax, metaArgs: MetaArgs, method: JMethod, semantics: (MetaArgs, List[IRExpression]) => IRExpression) {
     def declaringClassModule: JClassModule = method.declaringClass.classModule
   }
 
-  case class LiteralOperator(syntax: JLiteralSyntax, metaArgs: Map[String, MetaArgument], method: JMethod, semantics: (Map[String, MetaArgument], List[IRExpression]) => IRExpression) {
+  case class LiteralOperator(syntax: JLiteralSyntax, metaArgs: MetaArgs, method: JMethod, semantics: (MetaArgs, List[IRExpression]) => IRExpression) {
     def declaringClassModule: JClassModule = method.declaringClass.classModule
   }
 

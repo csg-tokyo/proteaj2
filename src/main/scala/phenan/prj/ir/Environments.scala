@@ -6,17 +6,11 @@ trait Environments {
   this: DSLEnvironments with FileEnvironments with NameResolvers with JTypeLoader with IRs with IRStatements with IRExpressions with JModules with JMembers =>
 
   trait Environment {
-    def clazz: IRModule
-
-    def thisType: Option[JObjectType]
-
     def activateTypes: List[JRefType]
 
     def locals: Map[String, IRLocalVariableRef]
 
     def exceptions: List[JRefType]
-
-    def fileEnvironment: FileEnvironment
 
     def dslEnvironment: DSLEnvironment
 
@@ -25,10 +19,6 @@ trait Environments {
     def literalOperators(expected: JType, priority: JPriority): List[LiteralOperator] = dslEnvironment.literalOperators(expected, priority)
 
     def inferContexts(procedure: JProcedure, bind: Map[String, MetaArgument]): Option[List[IRContextRef]] = dslEnvironment.inferContexts(procedure, bind)
-
-    def highestPriority: Option[JPriority] = fileEnvironment.priorities.headOption
-
-    def nextPriority(priority: JPriority): Option[JPriority] = nextPriorities.get(priority)
 
     def localVariable(name: String): Option[IRLocalVariableRef] = locals.get(name)
 
@@ -45,11 +35,20 @@ trait Environments {
     }
 
     def defineLocals(locals: IRLocalDeclaration): Environment = Environment_LocalVariables(locals.declarators.map(local => (locals.localType.array(local.dim), local.name)), this)
+  }
 
+  trait BaseEnvironment {
+    def declaringModule: IRModule
+    def thisType: Option[JObjectType]
+    def resolver: NameResolver
+    def fileEnvironment: FileEnvironment
+
+    lazy val highestPriority: Option[JPriority] = fileEnvironment.priorities.headOption
+    def nextPriority(priority: JPriority): Option[JPriority] = nextPriorities.get(priority)
     private lazy val nextPriorities: Map[JPriority, JPriority] = fileEnvironment.priorities.zip(fileEnvironment.priorities.tail).toMap
   }
 
-  sealed trait ModuleEnvironment extends Environment {
+  sealed trait ModuleEnvironment extends BaseEnvironment with Environment {
     def procedureEnvironment(procedure: IRProcedure): ProcedureEnvironment = ProcedureEnvironment(procedure, this)
 
     def contexts: List[IRContextRef] = Nil
@@ -61,39 +60,31 @@ trait Environments {
     def exceptions: List[JRefType] = Nil
 
     val dslEnvironment = new DSLEnvironment(fileEnvironment.dsls, contexts)
-
-    def resolver: NameResolver
   }
 
-  class Environment_Instance(val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
-    def thisType: Option[JObjectType] = clazz.thisType
+  class Environment_Instance(val declaringModule: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
+    def thisType: Option[JObjectType] = declaringModule.thisType
 
-    def resolver: NameResolver = clazz.resolver
+    def resolver: NameResolver = declaringModule.resolver
   }
 
-  class Environment_Static(val clazz: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
+  class Environment_Static(val declaringModule: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
     def thisType: Option[JObjectType] = None
 
-    def resolver: NameResolver = clazz.staticResolver
+    def resolver: NameResolver = declaringModule.staticResolver
   }
 
-  sealed trait ChildEnvironment extends Environment {
+  trait Environment_Variables extends Environment {
     def parent: Environment
-
-    def clazz: IRModule = parent.clazz
-
-    def thisType: Option[JObjectType] = parent.thisType
-
-    def fileEnvironment: FileEnvironment = parent.fileEnvironment
-  }
-
-  trait Environment_Variables extends ChildEnvironment {
+    
     def variables: List[(JType, String)]
 
     val locals: Map[String, IRLocalVariableRef] = parent.locals ++ variables.map { case (t, n) => n -> IRLocalVariableRef(t, n) }
   }
 
-  trait Environment_Contexts extends ChildEnvironment {
+  trait Environment_Contexts extends Environment {
+    def parent: Environment
+
     def activated: List[IRContextRef]
 
     def deactivated: List[IRContextRef]
@@ -101,7 +92,13 @@ trait Environments {
     val dslEnvironment: DSLEnvironment = parent.dslEnvironment.changeContext(activated, deactivated)
   }
 
-  case class ProcedureEnvironment (procedure: IRProcedure, parent: Environment) extends Environment_Variables with Environment_Contexts {
+  case class ProcedureEnvironment (procedure: IRProcedure, parent: ModuleEnvironment) extends Environment_Variables with Environment_Contexts with BaseEnvironment {
+    def declaringModule: IRModule = parent.declaringModule
+
+    def thisType: Option[JObjectType] = parent.thisType
+
+    def fileEnvironment: FileEnvironment = parent.fileEnvironment
+
     def variables: List[(JType, String)] = procedure.parameterVariables
 
     def activated: List[IRContextRef] = procedure.requiresContexts

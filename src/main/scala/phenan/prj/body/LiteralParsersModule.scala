@@ -28,10 +28,10 @@ trait LiteralParsersModule {
     private val cached: JType => LiteralParsersInterface = mutableHashMapMemo { new LiteralParsersImpl(_) }
 
     private class LiteralParsersImpl(expected: JType) extends LiteralParsersInterface {
-      def literal: ContextSensitiveScanner[IRExpression] = ContextSensitiveScanner(_.highestPriority.map(literal_cached).getOrElse(hostLiteral))
+      def literal: ContextSensitiveScanner[IRExpression] = highestPriority.map(literal_cached).getOrElse(hostLiteral)
 
-      def literal (parameterPriority: Option[JPriority], enclosingPriority: JPriority): ContextSensitiveScanner[IRExpression] = ContextSensitiveScanner { env =>
-        parameterPriority.orElse(env.nextPriority(enclosingPriority)) match {
+      def literal (parameterPriority: Option[JPriority], enclosingPriority: JPriority): ContextSensitiveScanner[IRExpression] = {
+        parameterPriority.orElse(nextPriority(enclosingPriority)) match {
           case Some(p) => literal_cached(p)
           case None    => hostLiteral
         }
@@ -43,8 +43,8 @@ trait LiteralParsersModule {
 
       private def createLiteralParser(p: JPriority): ContextSensitiveScanner[IRExpression] = ContextSensitiveScanner { env =>
         env.literalOperators(expected, p).map(getLiteralOperatorParser).reduceOption(_ ||| _) match {
-          case Some(parser) => parser | env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
-          case None => env.nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
+          case Some(parser) => parser | nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
+          case None => nextPriority(p).map(literal_cached).getOrElse(hostLiteral)
         }
       }
     }

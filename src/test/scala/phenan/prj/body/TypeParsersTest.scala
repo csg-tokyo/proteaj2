@@ -23,9 +23,13 @@ class TypeParsersTest extends FunSuite with Matchers {
     val file = compileDeclaration(new StringReader(program), "testsrc.java")
 
     file shouldBe a [Success[_]]
-    val resolver = file.get.resolver
 
-    val parsers = new BodyParsers(resolver).typeParsers
+    val parsers = new BodyParsers(new BaseEnvironment {
+      override def resolver: compiler.NameResolver = file.get.resolver
+      override def declaringModule: compiler.IRModule = ???
+      override def thisType: Option[compiler.JObjectType] = ???
+      override def fileEnvironment: compiler.FileEnvironment = ???
+    }).typeParsers
 
     val r1 = parsers.className(src("Reader"))
     r1.successful shouldBe true
@@ -53,9 +57,13 @@ class TypeParsersTest extends FunSuite with Matchers {
     val file = compileDeclaration(new StringReader(program), "testsrc.java")
 
     file shouldBe a [Success[_]]
-    val resolver = file.get.resolver
 
-    val parsers = new BodyParsers(resolver).typeParsers
+    val parsers = new BodyParsers(new BaseEnvironment {
+      override def resolver: compiler.NameResolver = file.get.resolver
+      override def declaringModule: compiler.IRModule = ???
+      override def thisType: Option[compiler.JObjectType] = ???
+      override def fileEnvironment: compiler.FileEnvironment = ???
+    }).typeParsers
 
     val r1 = parsers.typeName(src("JarFile"))
     val ans1 = getObjectType(loadClass("java/util/jar/JarFile").get, Nil).get

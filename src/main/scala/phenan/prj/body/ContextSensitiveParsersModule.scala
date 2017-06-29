@@ -1,5 +1,6 @@
 package phenan.prj.body
 
+import phenan.prj._
 import phenan.prj.exception.ParseException
 import phenan.prj.ir._
 
@@ -14,13 +15,19 @@ import scalaz.Memo._
   * Created by ichikawa on 2017/06/20.
   */
 trait ContextSensitiveParsersModule {
-  this: Environments with NameResolvers with EnvModifyStrategy with IRStatements with IRExpressions =>
+  this: Environments with NameResolvers with EnvModifyStrategy with IRs with IRStatements with IRExpressions with JModules =>
 
   type ~ [+A, +B] = Impl.~[A, B]
   val ~ : Impl.~.type = Impl.~
 
   trait ContextSensitiveParsers {
-    def resolver: NameResolver
+    def baseEnvironment: BaseEnvironment
+    def declaringModule: IRModule = baseEnvironment.declaringModule
+    def thisType: Option[JObjectType] = baseEnvironment.thisType
+    def resolver: NameResolver = baseEnvironment.resolver
+    def highestPriority: Option[JPriority] = baseEnvironment.highestPriority
+    def nextPriority(priority: JPriority): Option[JPriority] = baseEnvironment.nextPriority(priority)
+
     def delimiter: ContextFreeScanner[Any]
 
     def accept [T] (kind: String, f: PartialFunction[Char, T]): ContextFreeScanner[T] = new ContextFreeScanner(Impl.accept(kind, f))

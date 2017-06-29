@@ -14,8 +14,6 @@ class BodyParsersTest extends FunSuite with Matchers {
 
   import compiler._
 
-  private val parsers = new BodyParsers(rootResolver)
-
   def makeIR (src: String): IRFile = {
     val file = compileDeclaration(new StringReader(src), "testsrc.java").get
     registerIR(file)
@@ -132,6 +130,7 @@ class BodyParsersTest extends FunSuite with Matchers {
         |}
       """.stripMargin
 
+    val parsers = new BodyParsers(mainMethod.environment)
     val result = parsers.getStatementParsers(voidType).block(body, mainMethod.environment)
     result shouldBe a [Success[_]]
 
