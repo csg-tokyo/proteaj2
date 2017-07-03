@@ -23,8 +23,8 @@ trait SignatureParser {
 
     lazy val parameterSignature: PackratParser[JParameterSignature] = ('@' ~> typeSignature).* ~ typeSignature ~ ('*'.? ^^ {
       _.nonEmpty
-    }) ~ ('?' ~> identifier).? ^^ {
-      case contexts ~ sig ~ va ~ df => JParameterSignature(contexts, sig, va, df)
+    }) ~ ('?' ~> identifier).? ~ ('#' ~> typeSignature).* ^^ {
+      case contexts ~ sig ~ va ~ df ~ scope => JParameterSignature(contexts, sig, va, df, scope)
     }
 
     lazy val typeSignature: PackratParser[JTypeSignature] = fieldType | baseType

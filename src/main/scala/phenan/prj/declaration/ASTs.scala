@@ -44,7 +44,7 @@ case class AnnotationElementDeclaration (modifiers: List[Modifier], elementType:
 case class OperatorDeclaration (label: Option[String], modifiers: List[Modifier], metaParameters: List[MetaParameter], returnType: TypeName, returnBounds: List[TypeName], priority: Option[QualifiedName], syntax: List[SyntaxElement], formalParameters: List[FormalParameter], clauses: List[MethodClause], body: Option[BlockSnippet]) extends DSLMember
 case class PrioritiesDeclaration (names: List[String], constraints: List[List[QualifiedName]]) extends DSLMember
 
-case class FormalParameter (modifiers: List[Modifier], parameterType: ParameterType, varArgs: Boolean, name: String, dim: Int, initializer: Option[ExpressionSnippet])
+case class FormalParameter (modifiers: List[Modifier], parameterType: ParameterType, varArgs: Boolean, name: String, dim: Int, initializer: Option[ExpressionSnippet], scopeFor: List[TypeName])
 case class VariableDeclarator (name: String, dim: Int, initializer: Option[ExpressionSnippet])
 
 sealed trait MethodClause

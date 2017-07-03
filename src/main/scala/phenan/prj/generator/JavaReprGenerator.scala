@@ -686,8 +686,9 @@ trait JavaReprGenerator {
     private def parameterSigString (sig: JParameterSignature): String = {
       val cs = sig.contexts.map('@' + typeSigString(_)).mkString
       val da = sig.defaultArg.map('?' + _).mkString
-      if(sig.varArgs) cs + typeSigString(sig.typeSig) + '*' + da
-      else cs + typeSigString(sig.typeSig) + da
+      val sc = sig.scopes.map('#' + typeSigString(_)).mkString
+      if(sig.varArgs) cs + typeSigString(sig.typeSig) + '*' + da + sc
+      else cs + typeSigString(sig.typeSig) + da + sc
     }
 
     private def typeArgString (sig: JTypeArgument): String = sig match {

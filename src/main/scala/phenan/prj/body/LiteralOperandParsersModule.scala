@@ -4,13 +4,27 @@ import phenan.prj._
 import phenan.prj.ir._
 
 trait LiteralOperandParsersModule {
-  this: LiteralParsersModule with CommonParsersModule with ContextSensitiveParsersModule with ExpectedTypeInferencer with DSLEnvironments with EnvModifyStrategy with IRExpressions with JModules with JMembers =>
+  this: LiteralParsersModule with CommonParsersModule with ContextSensitiveParsersModule
+    with ExpectedTypeInferencer with Unifier with DSLEnvironments with EnvModifyStrategy
+    with IRExpressions with JModules with JMembers with Application =>
+
   trait LiteralOperandParsers {
     this: LiteralParsers with CommonParsers with ContextSensitiveParsers =>
 
-    def getLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], lop: LiteralOperator): ContextSensitiveScanner[IRExpression] = {
-      literalOperandOpt(param, pri, binding, lop).getOrElse(ContextSensitiveScanner.failure[IRExpression]("fail to parse argument expression"))
-    }
+    def getLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], lop: LiteralOperator): ContextSensitiveScanner[ParsedArgument] = {
+      for {
+        expectedType <- inferExpectedType(param, binding, lop.method)
+        contexts     <- inferContexts(param.contexts, binding, lop.method)
+      } yield getLiteralParser(expectedType, pri, lop.syntax.priority).withLocalContexts(contexts).map { arg =>
+        val newBinding = bind(param, arg, binding)
+        inferContexts(param.scopes, newBinding, lop.method) match {
+          case Some(scopes) => (newBinding, arg.scopeFor(scopes))
+          case None =>
+            error("")
+            (newBinding, arg)
+        }
+      }
+    }.getOrElse(ContextSensitiveScanner.failure[ParsedArgument]("fail to parse argument expression"))
 
     def getMetaLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], lop: LiteralOperator): ContextSensitiveScanner[MetaArgument] = {
       inferExpectedType(param, binding, lop.method) match {
@@ -29,11 +43,9 @@ trait LiteralOperandParsersModule {
       getLiteralParser(metaType, pri, lop.syntax.priority) ^^ { arg => ConcreteMetaValue(arg, metaType) }
     }
 
-    private def literalOperandOpt(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], lop: LiteralOperator): Option[ContextSensitiveScanner[IRExpression]] = {
-      for {
-        expectedType <- inferExpectedType(param, binding, lop.method)
-        contexts     <- inferContexts(param.contexts, binding, lop.method)
-      } yield getLiteralParser(expectedType, pri, lop.syntax.priority).withLocalContexts(contexts)
+    private def bind(param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = arg.staticType match {
+      case Some(t) => bindTypeArgs(param, t, binding)
+      case None    => binding
     }
   }
 }

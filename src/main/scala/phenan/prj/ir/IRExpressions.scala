@@ -11,30 +11,43 @@ trait IRExpressions {
 
   sealed trait IRExpression {
     def staticType: Option[JType]
-
     def activates: List[IRContextRef]
-
     def deactivates: List[IRContextRef]
 
-    def withContexts(contexts: List[IRContextRef]): IRExpression = {
+    def withContexts (contexts: List[IRContextRef]): IRExpression = {
       if (contexts.isEmpty) this
       else IRContextualArgument(this, contexts)
     }
+
+    def scopeFor (contexts: List[IRContextRef]): IRExpression = {
+      if (contexts.isEmpty) this
+      else IRScopeArgument(this, contexts)
+    }
   }
 
+  type ParsedArgument     = (Map[String, MetaArgument], IRExpression)
   type ParsedArgumentList = (Map[String, MetaArgument], List[IRExpression])
+
+  case class IRContextualArgument(argument: IRExpression, contexts: List[IRContextRef]) extends IRExpression {
+    def staticType: Option[JType] = argument.staticType
+    def activates: List[IRContextRef] = Nil
+    def deactivates: List[IRContextRef] = Nil
+  }
+
+  case class IRScopeArgument (argument: IRExpression, scopes: List[IRContextRef]) extends IRExpression {
+    override def staticType: Option[JType] = argument.staticType
+    override def activates: List[IRContextRef] = argument.activates
+    override def deactivates: List[IRContextRef] = argument.deactivates
+  }
 
   sealed trait IRLeftHandSide extends IRExpression
 
   sealed trait IRAssignmentExpression extends IRExpression {
     def left: IRLeftHandSide
-
     def right: IRExpression
 
     def staticType: Option[JType] = right.staticType
-
     def activates: List[IRContextRef] = Nil
-
     def deactivates: List[IRContextRef] = Nil
   }
 
@@ -156,14 +169,6 @@ trait IRExpressions {
 
   case class IRDefaultArgument(defaultMethod: JMethod) extends IRExpression {
     def staticType: Option[JType] = defaultMethod.returnType.bind(Map.empty)
-
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
-  }
-
-  case class IRContextualArgument(argument: IRExpression, contexts: List[IRContextRef]) extends IRExpression {
-    def staticType: Option[JType] = argument.staticType
 
     def activates: List[IRContextRef] = Nil
 

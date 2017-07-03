@@ -130,8 +130,8 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val formalParameters: HParser[List[FormalParameter]] = '(' ~> formalParameter.*(',') <~ ')'
 
-  lazy val formalParameter: HParser[FormalParameter] = modifiers ~ parameterType ~ dots ~ identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {
-    case mods ~ pt ~ ds ~ name ~ dim ~ init => FormalParameter(mods, pt, ds, name, dim, init)
+  lazy val formalParameter: HParser[FormalParameter] = modifiers ~ parameterType ~ dots ~ identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ~ ("scope" ~> "for" ~> typeName.+).? ^^ {
+    case mods ~ pt ~ ds ~ name ~ dim ~ init ~ scope => FormalParameter(mods, pt, ds, name, dim, init, scope.getOrElse(Nil))
   }
 
   lazy val declarator: HParser[VariableDeclarator] = identifier ~ emptyBrackets ~ ( '=' ~> expression ).? ^^ {

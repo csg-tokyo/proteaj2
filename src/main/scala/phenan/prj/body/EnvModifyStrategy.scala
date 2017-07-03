@@ -42,6 +42,7 @@ trait EnvModifyStrategy {
     implicit val irConstructorBodyHasEnvModify: HasEnvModify[IRConstructorBody] = (env, _) => env
     implicit val irInitializerBodyHasEnvModify: HasEnvModify[IRInitializerBody] = (env, _) => env
 
+    implicit val parsedArgumentHasEnvModify: HasEnvModify[ParsedArgument] = (env, arg) => env.modify(arg._2)
     implicit val parsedArgumentListHasEnvModify: HasEnvModify[ParsedArgumentList] = (env, argsList) => env.modify(argsList._2)
   }
 }

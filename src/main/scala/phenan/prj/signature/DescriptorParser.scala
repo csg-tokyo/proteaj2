@@ -12,7 +12,7 @@ trait DescriptorParser {
     override type Elem = Char
 
     lazy val methodDesc: PackratParser[JMethodSignature] =
-      ('(' ~> typeDesc.* <~ ')') ~ returnDesc ^^ { case paramTypes ~ retType => JMethodSignature(Nil, paramTypes.map(sig => JParameterSignature(Nil, sig, false, None)), retType, Nil, Nil, Nil, Nil, Nil) }
+      ('(' ~> typeDesc.* <~ ')') ~ returnDesc ^^ { case paramTypes ~ retType => JMethodSignature(Nil, paramTypes.map(sig => JParameterSignature(Nil, sig, false, None, Nil)), retType, Nil, Nil, Nil, Nil, Nil) }
 
     lazy val typeDesc: PackratParser[JTypeSignature] = baseDesc | objectDesc | arrayDesc
 

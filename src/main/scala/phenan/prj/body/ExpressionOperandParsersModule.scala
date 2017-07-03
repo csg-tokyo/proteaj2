@@ -6,15 +6,32 @@ import phenan.prj.ir._
 trait ExpressionOperandParsersModule {
   this: StatementParsersModule with ExpressionParsersModule with TypeParsersModule
     with CommonParsersModule with ContextSensitiveParsersModule
-    with ExpectedTypeInferencer with JTypeLoader with Environments with DSLEnvironments with EnvModifyStrategy
-    with IRStatements with IRExpressions with JModules with JMembers =>
+    with ExpectedTypeInferencer with Unifier with JTypeLoader with Environments with DSLEnvironments with EnvModifyStrategy
+    with IRStatements with IRExpressions with JModules with JMembers with Application =>
 
   trait ExpressionOperandParsers {
     this: StatementParsers with ExpressionParsers with TypeParsers with CommonParsers with ContextSensitiveParsers =>
 
-    def getExpressionOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], eop: ExpressionOperator): ContextSensitiveParser[IRExpression] = {
-      getExpressionOperandParserOpt(param, pri, binding, eop).getOrElse(ContextSensitiveParser.failure[IRExpression]("fail to parse argument expression"))
-    }
+    def getExpressionOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], eop: ExpressionOperator): ContextSensitiveParser[ParsedArgument] = {
+      for {
+        expectedType <- inferExpectedType(param, binding, eop.method)
+        contexts <- inferContexts(param.contexts, binding, eop.method)
+      } yield {
+        val parser =
+          if (boxedVoidType.contains(expectedType) && contexts.nonEmpty) getStatementExpressionParser(pri, eop.syntax.priority)
+          else getExpressionParser(expectedType, pri, eop.syntax.priority)
+
+        parser.withLocalContexts(contexts).map { arg =>
+          val newBinding = bind(param, arg, binding)
+          inferContexts(param.scopes, newBinding, eop.method) match {
+            case Some(scopes) => (newBinding, arg.scopeFor(scopes))
+            case None =>
+              error("")
+              (newBinding, arg)
+          }
+        }
+      }
+    }.getOrElse(ContextSensitiveParser.failure[ParsedArgument]("fail to parse operand expression"))
 
     def getMetaExpressionOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], eop: ExpressionOperator): ContextSensitiveParser[MetaArgument] = {
       inferExpectedType(param, binding, eop.method) match {
@@ -36,17 +53,16 @@ trait ExpressionOperandParsersModule {
       else getExpressionParser(metaType, pri, eop.syntax.priority) ^^ { arg => ConcreteMetaValue(arg, metaType) }
     }
 
-    private def getExpressionOperandParserOpt(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], eop: ExpressionOperator): Option[ContextSensitiveParser[IRExpression]] = for {
-      expectedType <- inferExpectedType(param, binding, eop.method)
-      contexts     <- inferContexts(param.contexts, binding, eop.method)
-    } yield {
-      if (boxedVoidType.contains(expectedType) && contexts.nonEmpty) {
-        val boxed = getExpressionParser(expectedType, pri, eop.syntax.priority).withLocalContexts(contexts)
-        val unboxed = ( getExpressionParser(voidType, pri, eop.syntax.priority) ^^ { e => IRStatementExpression(IRExpressionStatement(e)) } ).withLocalContexts(contexts)
-        val block = ( getStatementParsers(voidType).block ^^ IRStatementExpression ).withLocalContexts(contexts)
-        boxed | unboxed | block
-      }
-      else getExpressionParser(expectedType, pri, eop.syntax.priority).withLocalContexts(contexts)
+    private def getStatementExpressionParser (pri: Option[JPriority], enclosingPriority: JPriority): ContextSensitiveParser[IRExpression] = {
+      val boxed = getExpressionParser(boxedVoidType.get, pri, enclosingPriority)
+      val unboxed = getExpressionParser(voidType, pri, enclosingPriority) ^^ { e => IRStatementExpression(IRExpressionStatement(e)) }
+      val block = getStatementParsers(voidType).block ^^ IRStatementExpression
+      boxed | unboxed | block
+    }
+
+    private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = arg.staticType match {
+      case Some(t) => bindTypeArgs(param, t, binding)
+      case None => binding
     }
   }
 }
