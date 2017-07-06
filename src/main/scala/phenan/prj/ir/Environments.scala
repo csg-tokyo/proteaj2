@@ -24,13 +24,14 @@ trait Environments {
 
     def defineLocal(localType: JType, name: String): Environment = Environment_LocalVariables(List((localType, name)), this)
 
-    def modifyContext (expression: IRExpression): Environment = {
-      if (expression.activates.nonEmpty || expression.deactivates.nonEmpty) Environment_LocalContexts(expression.activates, expression.deactivates, this)
+    def activates (contexts: List[IRContextRef]): Environment = {
+      if (contexts.nonEmpty) Environment_LocalContexts(contexts, Nil, this)
       else this
     }
 
-    def withContexts (activates: List[IRContextRef], deactivates: List[IRContextRef]): Environment = {
-      if (activates.nonEmpty || deactivates.nonEmpty) Environment_LocalContexts(activates, deactivates, this)
+    def deactivates (contexts: List[IRContextRef]): Environment = {
+      val cs = dslEnvironment.contexts.intersect(contexts)
+      if (cs.nonEmpty) Environment_LocalContexts(Nil, cs, this)
       else this
     }
 
@@ -59,7 +60,7 @@ trait Environments {
 
     def exceptions: List[JRefType] = Nil
 
-    val dslEnvironment = new DSLEnvironment(fileEnvironment.dsls, contexts)
+    val dslEnvironment = DSLEnvironment(fileEnvironment.dsls, contexts)
   }
 
   class Environment_Instance(val declaringModule: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {

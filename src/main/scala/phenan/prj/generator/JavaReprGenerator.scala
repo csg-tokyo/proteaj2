@@ -186,7 +186,7 @@ trait JavaReprGenerator {
 
   private def blockStatements (statements: List[IRStatement], contexts: List[IRContextRef], activates: List[JRefType], result: List[Statement]): List[Statement] = statements match {
     case (l: IRLocalDeclarationStatement) :: rest => blockStatements(rest, contexts, activates, result :+ Union[Statement](localDeclarationStatement(l, contexts)))
-    case (e: IRExpressionStatement) :: rest       => blockStatements(rest, contexts ++ e.activates, activates, result ++ (Union[Statement](expressionStatement(e, contexts)) :: contextDeclarations(e.activates, contexts.size)))
+    case (e: IRExpressionStatement) :: rest       => ??? //blockStatements(rest, contexts ++ e.activates, activates, result ++ (Union[Statement](expressionStatement(e, contexts)) :: contextDeclarations(e.activates, contexts.size)))
     case single :: rest                           => blockStatements(rest, contexts, activates, result :+ singleStatement(single, contexts, activates))
     case Nil                                      => result
   }
@@ -375,14 +375,19 @@ trait JavaReprGenerator {
   }
 
   private def contextualArgument (e: IRContextualArgument, contexts: List[IRContextRef]): Expression = {
-    contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), getStaticType(e.argument), Nil, e.contexts ++ contexts)
+    contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), getStaticType(e.argument), Nil, contexts.size)
   }
 
-  private def contextualArgument (cs: List[IRContextRef], e: Expression, t: JType, throws: List[TypeSig], contexts: List[IRContextRef]): Expression = cs match {
+  private def contextualArgument (cs: List[IRContextRef], e: Expression, t: JType, throws: List[TypeSig], offset: Int): Expression = cs match {
     case c :: rest =>
       val functionType = functionTypeOf(c.contextType, t).getOrElse(throw InvalidASTException("invalid context type"))
-      contextualArgument(rest, Union[Expression](lambda(objectType(functionType), typeToSig(boxing(t).get), "apply",
-        List(parameter(c.contextType, contextName(contexts.size - 1))), throws, Block(List(returnStatement(e))))), functionType, throws, contexts.tail)
+      contextualArgument(
+        rest,
+        Union[Expression](lambda(objectType(functionType), typeToSig(boxing(t).get), "apply",
+          List(parameter(c.contextType, contextName(rest.length + offset))), throws, Block(List(returnStatement(e))))),
+        functionType,
+        throws,
+        offset)
     case Nil       => e
   }
 

@@ -1,27 +1,24 @@
 package phenan.prj.ir
 
 import phenan.prj._
+import phenan.prj.body.EnvModifyStrategy
 
 import scalaz.syntax.traverse._
 import scalaz.std.list._
 import scalaz.std.option._
 
 trait IRExpressions {
-  this: JTypeLoader with IRs with IRStatements with JModules with JMembers with JErasedTypes with Application =>
+  this: JTypeLoader with Environments with EnvModifyStrategy
+    with IRs with IRStatements with JModules with JMembers with JErasedTypes with Application =>
 
   sealed trait IRExpression {
     def staticType: Option[JType]
-    def activates: List[IRContextRef]
-    def deactivates: List[IRContextRef]
+
+    def modifyEnv (env: Environment): Environment
 
     def withContexts (contexts: List[IRContextRef]): IRExpression = {
       if (contexts.isEmpty) this
       else IRContextualArgument(this, contexts)
-    }
-
-    def scopeFor (contexts: List[IRContextRef]): IRExpression = {
-      if (contexts.isEmpty) this
-      else IRScopeArgument(this, contexts)
     }
   }
 
@@ -30,14 +27,12 @@ trait IRExpressions {
 
   case class IRContextualArgument(argument: IRExpression, contexts: List[IRContextRef]) extends IRExpression {
     def staticType: Option[JType] = argument.staticType
-    def activates: List[IRContextRef] = Nil
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv (env: Environment): Environment = argument.modifyEnv(env)
   }
 
   case class IRScopeArgument (argument: IRExpression, scopes: List[IRContextRef]) extends IRExpression {
-    override def staticType: Option[JType] = argument.staticType
-    override def activates: List[IRContextRef] = argument.activates
-    override def deactivates: List[IRContextRef] = argument.deactivates
+    def staticType: Option[JType] = argument.staticType
+    def modifyEnv (env: Environment): Environment = argument.modifyEnv(env).deactivates(scopes)
   }
 
   sealed trait IRLeftHandSide extends IRExpression
@@ -47,29 +42,18 @@ trait IRExpressions {
     def right: IRExpression
 
     def staticType: Option[JType] = right.staticType
-    def activates: List[IRContextRef] = Nil
-    def deactivates: List[IRContextRef] = Nil
+
+    // correct ?
+    def modifyEnv (env: Environment): Environment = right.modifyEnv(left.modifyEnv(env))
   }
 
   case class IRSimpleAssignmentExpression(left: IRLeftHandSide, right: IRExpression) extends IRAssignmentExpression
 
-  case class IRNewExpression(metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExpression {
-    def staticType = Some(constructor.declaring)
-
-    lazy val activates: List[IRContextRef] = constructor.activates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
-      errorAndReturn("invalid context type", Nil)
-    }
-    lazy val deactivates: List[IRContextRef] = constructor.deactivates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
-      errorAndReturn("invalid context type", Nil)
-    }
-    lazy val throws: List[JType] = constructor.exceptionTypes.flatMap(_.bind(metaArgs))
-  }
-
   case class IRAnonymousClass(metaArgs: Map[String, MetaArgument], baseType: JObjectType, args: List[IRExpression], requiredContexts: List[IRContextRef], members: List[IRClassMember]) extends IRExpression {
     // TODO: staticType should be a sub-type of baseType
-    override def staticType: Option[JType] = Some(baseType)
-    override def activates: List[IRContextRef] = Nil
-    override def deactivates: List[IRContextRef] = Nil
+    def staticType: Option[JType] = Some(baseType)
+
+    def modifyEnv(env: Environment): Environment = env.modify(args)
   }
 
   sealed trait IRExplicitConstructorCall
@@ -82,26 +66,18 @@ trait IRExpressions {
 
   case class IRNewArray(componentType: JType, length: List[IRExpression], dim: Int) extends IRArrayCreation {
     def staticType = Some(componentType.array(length.size + dim))
-
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv(env: Environment): Environment = env.modify(length)
   }
 
   case class IRArrayInitializer(componentType: JType, dim: Int, components: List[IRExpression]) extends IRArrayCreation {
     def staticType = Some(componentType.array(dim))
-
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv(env: Environment): Environment = env.modify(components)
   }
 
   case class IRCastExpression(destType: JType, expression: IRExpression) extends IRExpression {
     def staticType = Some(destType)
 
-    def activates: List[IRContextRef] = expression.activates
-
-    def deactivates: List[IRContextRef] = expression.deactivates
+    def modifyEnv(env: Environment): Environment = expression.modifyEnv(env)
   }
 
   case class IRArrayAccess(array: IRExpression, index: IRExpression) extends IRLeftHandSide {
@@ -110,47 +86,60 @@ trait IRExpressions {
       case _ => None
     }
 
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv(env: Environment): Environment = index.modifyEnv(array.modifyEnv(env))
   }
 
   sealed trait IRFieldAccess extends IRLeftHandSide {
     def field: JField
 
     def staticType = Some(field.fieldType)
-
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
   }
 
   case class IRInstanceFieldAccess(instance: IRExpression, field: JField) extends IRFieldAccess {
     override def toString: String = instance.toString + '.' + field.name
+
+    def modifyEnv (env: Environment): Environment = instance.modifyEnv(env)
   }
 
-  case class IRSuperFieldAccess(thisType: JObjectType, field: JField) extends IRFieldAccess
+  case class IRSuperFieldAccess (thisType: JObjectType, field: JField) extends IRFieldAccess {
+    def modifyEnv (env: Environment): Environment = env
+  }
 
-  case class IRStaticFieldAccess(field: JField) extends IRFieldAccess
+  case class IRStaticFieldAccess (field: JField) extends IRFieldAccess {
+    def modifyEnv (env: Environment): Environment = env
+  }
 
-  sealed trait IRMethodCall extends IRExpression {
+  sealed trait IRProcedureCall extends IRExpression {
     def metaArgs: Map[String, MetaArgument]
-
-    def method: JMethod
-
+    def procedure: JProcedure
     def args: List[IRExpression]
-
     def requiredContexts: List[IRContextRef]
 
-    lazy val staticType: Option[JType] = method.returnType.bind(metaArgs)
+    def modifyEnv (env: Environment): Environment = {
+      env.modify(args).activates(activates).deactivates(deactivates)
+    }
 
-    lazy val activates: List[IRContextRef] = method.activates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
+    lazy val activates: List[IRContextRef] = procedure.activates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
       errorAndReturn("invalid context type", Nil)
     }
-    lazy val deactivates: List[IRContextRef] = method.deactivates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
+
+    lazy val deactivates: List[IRContextRef] = procedure.deactivates.traverse(_.bind(metaArgs).collect { case obj: JObjectType => IRContextRef(obj) }).getOrElse {
       errorAndReturn("invalid context type", Nil)
     }
-    lazy val throws: List[JType] = method.exceptionTypes.flatMap(_.bind(metaArgs))
+
+    lazy val throws: List[JType] = procedure.exceptionTypes.flatMap(_.bind(metaArgs))
+  }
+
+  case class IRNewExpression(metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRProcedureCall {
+    def procedure: JProcedure = constructor
+    def staticType = Some(constructor.declaring)
+  }
+
+  sealed trait IRMethodCall extends IRProcedureCall {
+    def method: JMethod
+    def procedure: JProcedure = method
+
+    lazy val staticType: Option[JType] = method.returnType.bind(metaArgs)
   }
 
   case class IRInstanceMethodCall(instance: IRExpression, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
@@ -169,37 +158,29 @@ trait IRExpressions {
 
   case class IRDefaultArgument(defaultMethod: JMethod) extends IRExpression {
     def staticType: Option[JType] = defaultMethod.returnType.bind(Map.empty)
-
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv (env: Environment): Environment = env
   }
 
   case class IRVariableArguments(args: List[IRExpression], componentType: Option[JType]) extends IRExpression {
     def staticType: Option[JType] = componentType.map(_.array)
-
-    def activates: List[IRContextRef] = args.flatMap(_.activates)
-
-    def deactivates: List[IRContextRef] = args.flatMap(_.deactivates)
+    def modifyEnv(env: Environment): Environment = env.modify(args)
   }
 
   sealed trait IRJavaLiteral extends IRExpression with IRAnnotationElement {
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv (env: Environment): Environment = env
   }
 
   sealed trait IRClassLiteral extends IRJavaLiteral
 
-  case class IRObjectClassLiteral(clazz: JClass, dim: Int) extends IRClassLiteral {
+  case class IRObjectClassLiteral (clazz: JClass, dim: Int) extends IRClassLiteral {
     def staticType: Option[JObjectType] = getObjectType(clazz, Nil).map(_.array(dim)).flatMap(classTypeOf)
   }
 
-  case class IRPrimitiveClassLiteral(primitiveType: JPrimitiveType, dim: Int) extends IRClassLiteral {
+  case class IRPrimitiveClassLiteral (primitiveType: JPrimitiveType, dim: Int) extends IRClassLiteral {
     def staticType: Option[JObjectType] = boxedPrimitiveTypes(primitiveType).map(_.array(dim)).flatMap(classTypeOf)
   }
 
-  case class IRCharLiteral(value: Char) extends IRJavaLiteral {
+  case class IRCharLiteral (value: Char) extends IRJavaLiteral {
     def staticType = Some(charType)
   }
 
@@ -226,27 +207,19 @@ trait IRExpressions {
   case class IRThisRef(thisType: JObjectType) extends IRExpression {
     def staticType = Some(thisType)
 
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv (env: Environment): Environment = env
 
     override def toString: String = thisType.name + '.' + "this"
   }
 
   case class IRLocalVariableRef(localType: JType, name: String) extends IRLeftHandSide {
     def staticType = Some(localType)
-
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv (env: Environment): Environment = env
   }
 
   case class IRContextRef(contextType: JObjectType) extends IRExpression {
     def staticType = Some(contextType)
-
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def modifyEnv (env: Environment): Environment = env
   }
 
   sealed trait IRAnnotationElement
@@ -258,10 +231,7 @@ trait IRExpressions {
   case class IREnumConstantRef(field: JFieldDef) extends IRAnnotationElement
 
   case class IRStatementExpression(stmt: IRStatement) extends IRExpression {
-    def staticType: Option[JType] = Some(voidType)
-
-    def activates: List[IRContextRef] = Nil
-
-    def deactivates: List[IRContextRef] = Nil
+    def staticType: Option[JType] = boxedVoidType
+    def modifyEnv (env: Environment): Environment = stmt.modifyEnv(env)
   }
 }

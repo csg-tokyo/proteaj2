@@ -9,13 +9,18 @@ import scala.util._
 import scala.util.matching.Regex
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
+
+import scalaz.syntax.traverse._
+import scalaz.std.list._
+import scalaz.std.option._
 import scalaz.Memo._
 
 /**
   * Created by ichikawa on 2017/06/20.
   */
 trait ContextSensitiveParsersModule {
-  this: Environments with NameResolvers with EnvModifyStrategy with IRs with IRStatements with IRExpressions with JModules =>
+  this: Unifier with Environments with DSLEnvironments with NameResolvers with EnvModifyStrategy
+    with IRs with IRStatements with IRExpressions with JModules with JMembers =>
 
   type ~ [+A, +B] = Impl.~[A, B]
   val ~ : Impl.~.type = Impl.~
@@ -126,8 +131,22 @@ trait ContextSensitiveParsersModule {
 
     implicit class ContextSensitiveParser_IRExpression (parser: ContextSensitiveParser[IRExpression]) {
       def withLocalContexts (contexts: List[IRContextRef]): ContextSensitiveParser[IRExpression] = new ContextSensitiveParser ( env =>
-        parser.parser(env.withContexts(contexts, Nil)) ^^ { _.withContexts(contexts) }
+        parser.parser(env.activates(contexts)) ^^ { _.withContexts(contexts) }
       )
+
+      def argumentFor (param: JParameter, binding: MetaArgs): ContextSensitiveParser[ParsedArgument] = {
+        new ContextSensitiveParser ( env => parser.parser(env) >> { argument =>
+          val newBinding = bind(param, argument, binding)
+          param.scopes.traverse(_.bind(newBinding).collect { case obj: JObjectType => IRContextRef(obj) }) match {
+            case Some(scopes) =>
+              val newEnv = argument.modifyEnv(env)
+              val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts)
+              ContextFreeParser.success((newBinding, IRScopeArgument(argument, diff.filter(scopes.contains(_)))))
+            case None =>
+              ContextFreeParser.failure("")
+          }
+        })
+      }
     }
 
     implicit class ContextSensitiveParser_IRStatement [T <: IRStatement] (parser: ContextSensitiveParser[T]) {
@@ -248,8 +267,22 @@ trait ContextSensitiveParsersModule {
 
     implicit class ContextSensitiveScanner_IRExpression (scanner: ContextSensitiveScanner[IRExpression]) {
       def withLocalContexts(contexts: List[IRContextRef]): ContextSensitiveScanner[IRExpression] = new ContextSensitiveScanner (env =>
-        scanner.parser(env.withContexts(contexts, Nil)) ^^ { _.withContexts(contexts) }
+        scanner.parser(env.activates(contexts)) ^^ { _.withContexts(contexts) }
       )
+
+      def argumentFor (param: JParameter, binding: MetaArgs): ContextSensitiveScanner[ParsedArgument] = {
+        new ContextSensitiveScanner ( env => scanner.parser(env) >> { argument =>
+          val newBinding = bind(param, argument, binding)
+          param.scopes.traverse(_.bind(newBinding).collect { case obj: JObjectType => IRContextRef(obj) }) match {
+            case Some(scopes) =>
+              val newEnv = argument.modifyEnv(env)
+              val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts)
+              ContextFreeScanner.success((newBinding, IRScopeArgument(argument, diff.filter(scopes.contains(_)))))
+            case None =>
+              ContextFreeScanner.failure("")
+          }
+        })
+      }
     }
 
     class ContextFreeScanner[+T] private[ContextSensitiveParsers] (getParser: => Impl.PackratParser[T]) {
@@ -298,5 +331,10 @@ trait ContextSensitiveParsersModule {
 
   protected object Impl extends RegexParsers with PackratParsers {
     override def skipWhitespace: Boolean = false
+  }
+
+  private def bind (param: JParameter, arg: IRExpression, binding: MetaArgs) = arg.staticType match {
+    case Some(t) => bindTypeArgs(param, t, binding)
+    case None    => binding
   }
 }

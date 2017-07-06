@@ -75,11 +75,7 @@ trait IRStatements {
   }
 
   case class IRExpressionStatement(expression: IRExpression) extends IRStatement {
-    def activates: List[IRContextRef] = expression.activates
-
-    def deactivates: List[IRContextRef] = expression.deactivates
-
-    override def modifyEnv(env: Environment): Environment = env.withContexts(activates, deactivates)
+    override def modifyEnv(env: Environment): Environment = expression.modifyEnv(env)
   }
 
 }

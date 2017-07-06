@@ -28,7 +28,7 @@ trait EnvModifyStrategy {
     implicit val metaArgumentHasEnvModify: HasEnvModify[MetaArgument] = (env, _) => env
     implicit val metaArgsHasEnvModify: HasEnvModify[MetaArgs] = (env, _) => env
 
-    implicit val irExpressionHasEnvModify: HasEnvModify[IRExpression] = (env, expr) => env.modifyContext(expr)
+    implicit val irExpressionHasEnvModify: HasEnvModify[IRExpression] = (env, expr) => expr.modifyEnv(env)
     implicit val irStatementHasEnvModify: HasEnvModify[IRStatement] = (env, stmt) => stmt.modifyEnv(env)
 
     implicit val irVariableDeclaratorHasEnvModify: HasEnvModify[IRVariableDeclarator] = (env, _) => env

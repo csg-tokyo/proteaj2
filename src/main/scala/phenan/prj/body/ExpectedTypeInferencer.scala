@@ -17,14 +17,8 @@ trait ExpectedTypeInferencer {
     unbound(genType.unbound(binding).toList, binding, procedure).flatMap(genType.bind)
   }
 
-  def inferContexts (cts: List[JGenericType], binding: Map[String, MetaArgument], procedure: JProcedure): Option[List[IRContextRef]] = contexts(cts, binding, procedure, Nil)
-
-  private def contexts (cts: List[JGenericType], binding: Map[String, MetaArgument], procedure: JProcedure, cs: List[IRContextRef]): Option[List[IRContextRef]] = cts match {
-    case ct :: rest => inferExpectedType(ct, binding, procedure) match {
-      case Some(t: JObjectType) => contexts(rest, binding, procedure, IRContextRef(t) :: cs)
-      case _                    => None
-    }
-    case Nil => Some(cs.reverse)
+  def inferContexts (cts: List[JGenericType], binding: Map[String, MetaArgument], procedure: JProcedure): Option[List[IRContextRef]] = {
+    cts.traverse(ct => inferExpectedType(ct, binding, procedure).collect { case t: JObjectType => IRContextRef(t) })
   }
 
   private def unbound (names: List[String], binding: Map[String, MetaArgument], procedure: JProcedure): Option[Map[String, MetaArgument]] = names match {

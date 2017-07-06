@@ -4,6 +4,10 @@ version := "1.0"
 
 scalaVersion := "2.12.2"
 
+resolvers += Resolver.sonatypeRepo("releases")
+
+addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4")
+
 libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-reflect" % "2.12.2",
   "org.scala-lang.modules" %% "scala-xml" %  "1.0.6",

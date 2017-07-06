@@ -6,8 +6,8 @@ import phenan.prj.ir._
 trait ExpressionOperandParsersModule {
   this: StatementParsersModule with ExpressionParsersModule with TypeParsersModule
     with CommonParsersModule with ContextSensitiveParsersModule
-    with ExpectedTypeInferencer with Unifier with JTypeLoader with Environments with DSLEnvironments with EnvModifyStrategy
-    with IRStatements with IRExpressions with JModules with JMembers with Application =>
+    with ExpectedTypeInferencer with JTypeLoader with Environments with DSLEnvironments with EnvModifyStrategy
+    with IRStatements with IRExpressions with JModules with JMembers =>
 
   trait ExpressionOperandParsers {
     this: StatementParsers with ExpressionParsers with TypeParsers with CommonParsers with ContextSensitiveParsers =>
@@ -21,15 +21,7 @@ trait ExpressionOperandParsersModule {
           if (boxedVoidType.contains(expectedType) && contexts.nonEmpty) getStatementExpressionParser(pri, eop.syntax.priority)
           else getExpressionParser(expectedType, pri, eop.syntax.priority)
 
-        parser.withLocalContexts(contexts).map { arg =>
-          val newBinding = bind(param, arg, binding)
-          inferContexts(param.scopes, newBinding, eop.method) match {
-            case Some(scopes) => (newBinding, arg.scopeFor(scopes))
-            case None =>
-              error("")
-              (newBinding, arg)
-          }
-        }
+        parser.withLocalContexts(contexts).argumentFor(param, binding)
       }
     }.getOrElse(ContextSensitiveParser.failure[ParsedArgument]("fail to parse operand expression"))
 
@@ -58,11 +50,6 @@ trait ExpressionOperandParsersModule {
       val unboxed = getExpressionParser(voidType, pri, enclosingPriority) ^^ { e => IRStatementExpression(IRExpressionStatement(e)) }
       val block = getStatementParsers(voidType).block ^^ IRStatementExpression
       boxed | unboxed | block
-    }
-
-    private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = arg.staticType match {
-      case Some(t) => bindTypeArgs(param, t, binding)
-      case None => binding
     }
   }
 }

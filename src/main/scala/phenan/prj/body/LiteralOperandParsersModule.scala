@@ -5,8 +5,8 @@ import phenan.prj.ir._
 
 trait LiteralOperandParsersModule {
   this: LiteralParsersModule with CommonParsersModule with ContextSensitiveParsersModule
-    with ExpectedTypeInferencer with Unifier with DSLEnvironments with EnvModifyStrategy
-    with IRExpressions with JModules with JMembers with Application =>
+    with ExpectedTypeInferencer with DSLEnvironments with EnvModifyStrategy
+    with IRExpressions with JModules with JMembers =>
 
   trait LiteralOperandParsers {
     this: LiteralParsers with CommonParsers with ContextSensitiveParsers =>
@@ -15,15 +15,7 @@ trait LiteralOperandParsersModule {
       for {
         expectedType <- inferExpectedType(param, binding, lop.method)
         contexts     <- inferContexts(param.contexts, binding, lop.method)
-      } yield getLiteralParser(expectedType, pri, lop.syntax.priority).withLocalContexts(contexts).map { arg =>
-        val newBinding = bind(param, arg, binding)
-        inferContexts(param.scopes, newBinding, lop.method) match {
-          case Some(scopes) => (newBinding, arg.scopeFor(scopes))
-          case None =>
-            error("")
-            (newBinding, arg)
-        }
-      }
+      } yield getLiteralParser(expectedType, pri, lop.syntax.priority).withLocalContexts(contexts).argumentFor(param, binding)
     }.getOrElse(ContextSensitiveScanner.failure[ParsedArgument]("fail to parse argument expression"))
 
     def getMetaLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], lop: LiteralOperator): ContextSensitiveScanner[MetaArgument] = {
@@ -41,11 +33,6 @@ trait LiteralOperandParsersModule {
 
     private def getMetaArgumentParser(metaType: JType, pri: Option[JPriority], lop: LiteralOperator): ContextSensitiveScanner[MetaArgument] = {
       getLiteralParser(metaType, pri, lop.syntax.priority) ^^ { arg => ConcreteMetaValue(arg, metaType) }
-    }
-
-    private def bind(param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = arg.staticType match {
-      case Some(t) => bindTypeArgs(param, t, binding)
-      case None    => binding
     }
   }
 }

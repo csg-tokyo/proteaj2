@@ -9,8 +9,8 @@ import scalaz.std.option._
 
 trait ArgumentParsersModule {
   this: ExpressionParsersModule with CommonParsersModule with ContextSensitiveParsersModule
-    with ExpectedTypeInferencer with Unifier with Environments with EnvModifyStrategy
-    with JMembers with JModules with IRExpressions with Application =>
+    with ExpectedTypeInferencer with Environments with EnvModifyStrategy
+    with JMembers with JModules with IRExpressions =>
 
   trait ArgumentParsers {
     this: ExpressionParsers with CommonParsers with ContextSensitiveParsers =>
@@ -45,39 +45,18 @@ trait ArgumentParsersModule {
       val parser = for {
         expectedType <- inferExpectedType(param, binding, procedure)
         contexts     <- inferContexts(param.contexts, binding, procedure)
-      } yield getExpressionParser(expectedType).withLocalContexts(contexts)
+      } yield getExpressionParser(expectedType).withLocalContexts(contexts).argumentFor(param, binding)
 
-      parser.getOrElse(ContextSensitiveParser.failure[IRExpression]("fail to parse argument expression")) ^^ { arg =>
-        val newBinding = bind(param, arg, binding)
-        inferContexts(param.scopes, newBinding, procedure) match {
-          case Some(scopes) => (newBinding, arg.scopeFor(scopes))
-          case None         =>
-            error("")
-            (newBinding, arg)
-        }
-      }
+      parser.getOrElse(ContextSensitiveParser.failure[ParsedArgument]("fail to parse argument expression"))
     }
 
     private def argument_canonical(param: JParameter, binding: Map[String, MetaArgument]): ContextSensitiveParser[ParsedArgument] = {
       val parser = for {
         expectedType <- param.genericType.bind(binding)
         contexts     <- param.contexts.traverse(_.bind(binding).collect { case obj: JObjectType => IRContextRef(obj) })
-      } yield getExpressionParser(expectedType).withLocalContexts(contexts)
+      } yield getExpressionParser(expectedType).withLocalContexts(contexts).argumentFor(param, binding)
 
-      parser.getOrElse(ContextSensitiveParser.failure[IRExpression]("fail to parse argument expression")) ^^ { arg =>
-        val newBinding = bind(param, arg, binding)
-        param.scopes.traverse(_.bind(newBinding).collect { case obj: JObjectType => IRContextRef(obj) }) match {
-          case Some(scopes) => (newBinding, arg.scopeFor(scopes))
-          case None         =>
-            error("")
-            (newBinding, arg)
-        }
-      }
-    }
-
-    private def bind (param: JParameter, arg: IRExpression, binding: Map[String, MetaArgument]) = arg.staticType match {
-      case Some(t) => bindTypeArgs(param, t, binding)
-      case None    => binding
+      parser.getOrElse(ContextSensitiveParser.failure[ParsedArgument]("fail to parse argument expression"))
     }
   }
 }

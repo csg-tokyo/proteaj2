@@ -7,11 +7,11 @@ import scalaz.Memo._
 trait DSLEnvironments {
   this: MethodContextInferencer with OperatorPool with IRExpressions with Syntax with JModules with JMembers with JErasedTypes =>
 
-  class DSLEnvironment(dsls: List[JClassModule], contexts: List[IRContextRef]) {
+  case class DSLEnvironment (dsls: List[JClassModule], contexts: List[IRContextRef]) {
     def changeContext(activated: List[IRContextRef], deactivated: List[IRContextRef]): DSLEnvironment = {
       val cs = activated ++ contexts.diff(deactivated)
       if (cs == contexts) this
-      else new DSLEnvironment(dsls, cs)
+      else DSLEnvironment(dsls, cs)
     }
 
     def expressionOperators(expected: JType, priority: JPriority): List[ExpressionOperator] = expressionOperatorsMap(expected).getOrElse(priority, Nil)
