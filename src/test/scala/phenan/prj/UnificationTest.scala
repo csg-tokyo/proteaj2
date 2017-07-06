@@ -70,7 +70,7 @@ class UnificationTest extends FunSuite with Matchers {
 
   test ("Map<String, A> <=< Map<T, T>") {
     val stringType = load("java/lang/String")
-    val unbound = JUnboundTypeVariable("A", objectType.toList)
+    val unbound = JUnboundTypeVariable("A", List(objectType))
 
     val saMap = load("java/util/Map", stringType, unbound)
     val ttMap = SimpleClassTypeSignature("java/util/Map", List(JTypeVariableSignature("T"), JTypeVariableSignature("T")))
@@ -81,7 +81,7 @@ class UnificationTest extends FunSuite with Matchers {
   }
 
   test ("unbound <=< type parameter") {
-    val unbound = JUnboundTypeVariable("S", objectType.toList)
+    val unbound = JUnboundTypeVariable("S", List(objectType))
     val sig = JTypeVariableSignature("T")
     val map = MetaArgumentUnifier.check(unbound, sig, Map.empty[String, MetaArgument])
 
@@ -89,8 +89,8 @@ class UnificationTest extends FunSuite with Matchers {
   }
 
   test ("Map<S, A> <=< Map<String, T>") {
-    val unbound1 = JUnboundTypeVariable("S", objectType.toList)
-    val unbound2 = JUnboundTypeVariable("A", objectType.toList)
+    val unbound1 = JUnboundTypeVariable("S", List(objectType))
+    val unbound2 = JUnboundTypeVariable("A", List(objectType))
 
     val saMap = load("java/util/Map", unbound1, unbound2)
     val stMap = SimpleClassTypeSignature("java/util/Map", List(SimpleClassTypeSignature("java/lang/String", Nil), JTypeVariableSignature("T")))
@@ -102,7 +102,7 @@ class UnificationTest extends FunSuite with Matchers {
 
   test ("String <=< T (T = A = unbound) ") {
     val string = load("java/lang/String")
-    val unbound = JUnboundTypeVariable("A", objectType.toList)
+    val unbound = JUnboundTypeVariable("A", List(objectType))
     val tv = JTypeVariableSignature("T")
 
     val map = string <=< JGenericType(tv, Map("T" -> unbound))

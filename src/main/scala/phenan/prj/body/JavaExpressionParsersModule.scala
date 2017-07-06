@@ -28,10 +28,7 @@ trait JavaExpressionParsersModule {
       lazy val assignment: ContextSensitiveParser[IRAssignmentExpression] = simpleAssignment // | += | -= | ...
 
       lazy val simpleAssignment: ContextSensitiveParser[IRSimpleAssignmentExpression] = leftHandSide <~ '=' >> { left =>
-        left.staticType match {
-          case Some(t) => getExpressionParser(t) ^^ { right => IRSimpleAssignmentExpression(left, right) }
-          case None => ContextSensitiveParser.failure[IRSimpleAssignmentExpression]("type error")
-        }
+        getExpressionParser(left.staticType) ^^ { right => IRSimpleAssignmentExpression(left, right) }
       }
 
       lazy val leftHandSide: ContextSensitiveParser[IRLeftHandSide] = primary ^? { case e: IRLeftHandSide => e }
@@ -107,14 +104,9 @@ trait JavaExpressionParsersModule {
       lazy val abbreviatedMethodCall: ContextSensitiveParser[IRMethodCall] = thisClassMethodCall | thisMethodCall
 
       lazy val instanceMethodCall: ContextSensitiveParser[IRInstanceMethodCall] = primary >> { instance =>
-        ('.' ~> typeParsers.metaArguments) ~ identifier >># {
-          case metaArgs ~ name =>
-            val ps = for {
-              receiver <- instance.staticType.toList
-              method   <- receiver.findMethod(name, declaringModule, thisType.map(IRThisRef).contains(instance))
-            } yield invokeVirtual(instance, metaArgs, method)
-
-            ps.foldRight(ContextSensitiveParser.failure[IRInstanceMethodCall](""))(_ | _)
+        ('.' ~> typeParsers.metaArguments) ~ identifier >># { case metaArgs ~ name =>
+          val methods = instance.staticType.findMethod(name, declaringModule, thisType.map(IRThisRef).contains(instance))
+          methods.map(method => invokeVirtual(instance, metaArgs, method)).foldRight(ContextSensitiveParser.failure[IRInstanceMethodCall](""))(_ | _)
         }
       }
 
@@ -154,10 +146,8 @@ trait JavaExpressionParsersModule {
 
       lazy val instanceFieldAccess: ContextSensitiveParser[IRInstanceFieldAccess] = primary >> { instance =>
         ('.' ~> identifier).mapOption { name =>
-          for {
-            receiver <- instance.staticType
-            field    <- receiver.findField(name, declaringModule, thisType.map(IRThisRef).contains(instance))
-          } yield IRInstanceFieldAccess(instance, field)
+          val field = instance.staticType.findField(name, declaringModule, thisType.map(IRThisRef).contains(instance))
+          field.map(IRInstanceFieldAccess(instance, _))
         }.^#
       }
 
@@ -184,8 +174,8 @@ trait JavaExpressionParsersModule {
         declaringModule.classModule.findField(name, declaringModule).map(IRStaticFieldAccess)
       }
 
-      lazy val arrayAccess: ContextSensitiveParser[IRArrayAccess] = primary ~ ('[' ~> intExpression <~ ']') ^^ {
-        case array ~ index => IRArrayAccess(array, index)
+      lazy val arrayAccess: ContextSensitiveParser[IRArrayAccess] = primary ~ ('[' ~> intExpression <~ ']') ^? {
+        case array ~ index if array.staticType.isInstanceOf[JArrayType] => IRArrayAccess(array, index)
       }
 
       lazy val cast: ContextSensitiveParser[IRCastExpression] = ('(' ~> typeParsers.typeName <~ ')') >># { dest =>

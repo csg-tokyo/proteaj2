@@ -39,7 +39,7 @@ trait ExpressionParsersModule {
 
       lazy val hostExpression: ContextSensitiveParser[IRExpression] = javaExpression | parenthesized | literal
 
-      lazy val javaExpression: ContextSensitiveParser[IRExpression] = javaExpressionParser ^? { case e if e.staticType.exists(_ <:< expected) || expected == voidType => e }
+      lazy val javaExpression: ContextSensitiveParser[IRExpression] = javaExpressionParser.filter(_.staticType <:< expected || expected == voidType)
 
       lazy val parenthesized: ContextSensitiveParser[IRExpression] = '(' ~> expression <~ ')'
 

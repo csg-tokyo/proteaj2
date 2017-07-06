@@ -1,5 +1,7 @@
 package phenan.prj
 
+import phenan.prj.exception._
+
 import scalaz.Memo._
 import scalaz.syntax.traverse._
 import scalaz.std.list._
@@ -19,10 +21,16 @@ trait JTypeLoader {
     }
   }
 
-  lazy val typeType: Option[JObjectType]     = getObjectType(typeClass, Nil)
-  lazy val objectType: Option[JObjectType]   = getObjectType(objectClass, Nil)
-  lazy val stringType: Option[JObjectType]   = getObjectType(stringClass, Nil)
-  lazy val anyClassType: Option[JObjectType] = getObjectType(classClass, List(JWildcard(None, None)))
+  def getObjectType_Unsafe (clazz: JClass, args: List[MetaArgument]): JObjectType = {
+    val result = getLoadedObjectType(clazz, args)
+    if (validTypeArgs(clazz.signature.metaParams, args, result.env)) result
+    else throw InvalidTypeException(s"type ${clazz.name}${args.map(_.name).mkString("<", ",", ">")} is not found")
+  }
+
+  lazy val typeType: JObjectType     = getObjectType_Unsafe(typeClass, Nil)
+  lazy val objectType: JObjectType   = getObjectType_Unsafe(objectClass, Nil)
+  lazy val stringType: JObjectType   = getObjectType_Unsafe(stringClass, Nil)
+  // lazy val anyClassType: JObjectType = getObjectType_Unsafe(classClass, List(JWildcard(None, None)))
 
   lazy val byteType: JPrimitiveType    = byteClass.primitiveType
   lazy val charType: JPrimitiveType    = charClass.primitiveType
@@ -34,17 +42,17 @@ trait JTypeLoader {
   lazy val booleanType: JPrimitiveType = booleanClass.primitiveType
   lazy val voidType: JPrimitiveType    = voidClass.primitiveType
 
-  lazy val boxedByteType: Option[JObjectType]    = getObjectType(boxedByteClass, Nil)
-  lazy val boxedCharType: Option[JObjectType]    = getObjectType(boxedCharClass, Nil)
-  lazy val boxedDoubleType: Option[JObjectType]  = getObjectType(boxedDoubleClass, Nil)
-  lazy val boxedFloatType: Option[JObjectType]   = getObjectType(boxedFloatClass, Nil)
-  lazy val boxedIntType: Option[JObjectType]     = getObjectType(boxedIntClass, Nil)
-  lazy val boxedLongType: Option[JObjectType]    = getObjectType(boxedLongClass, Nil)
-  lazy val boxedShortType: Option[JObjectType]   = getObjectType(boxedShortClass, Nil)
-  lazy val boxedBooleanType: Option[JObjectType] = getObjectType(boxedBooleanClass, Nil)
-  lazy val boxedVoidType: Option[JObjectType]    = getObjectType(boxedVoidClass, Nil)
+  lazy val boxedByteType: JObjectType    = getObjectType_Unsafe(boxedByteClass, Nil)
+  lazy val boxedCharType: JObjectType    = getObjectType_Unsafe(boxedCharClass, Nil)
+  lazy val boxedDoubleType: JObjectType  = getObjectType_Unsafe(boxedDoubleClass, Nil)
+  lazy val boxedFloatType: JObjectType   = getObjectType_Unsafe(boxedFloatClass, Nil)
+  lazy val boxedIntType: JObjectType     = getObjectType_Unsafe(boxedIntClass, Nil)
+  lazy val boxedLongType: JObjectType    = getObjectType_Unsafe(boxedLongClass, Nil)
+  lazy val boxedShortType: JObjectType   = getObjectType_Unsafe(boxedShortClass, Nil)
+  lazy val boxedBooleanType: JObjectType = getObjectType_Unsafe(boxedBooleanClass, Nil)
+  lazy val boxedVoidType: JObjectType    = getObjectType_Unsafe(boxedVoidClass, Nil)
 
-  lazy val boxedPrimitiveTypes: Map[JPrimitiveType, Option[JObjectType]] = Map(
+  lazy val boxedPrimitiveTypes: Map[JPrimitiveType, JObjectType] = Map(
     byteType -> boxedByteType, charType -> boxedCharType, doubleType -> boxedDoubleType,
     floatType -> boxedFloatType, intType -> boxedIntType, longType -> boxedLongType,
     shortType -> boxedShortType, booleanType -> boxedBooleanType, voidType -> boxedVoidType
@@ -54,23 +62,19 @@ trait JTypeLoader {
     loadClass_NoFail(name).flatMap(getObjectType(_, Nil))
   }
 
-  lazy val runtimeExceptionType: Option[JObjectType] = getObjectType(runtimeExceptionClass, Nil)
-  lazy val errorType: Option[JObjectType] = getObjectType(errorClass, Nil)
+  lazy val runtimeExceptionType: JObjectType = getObjectType_Unsafe(runtimeExceptionClass, Nil)
+  lazy val errorType: JObjectType = getObjectType_Unsafe(errorClass, Nil)
 
-  lazy val uncheckedExceptionTypes: List[JObjectType] = (runtimeExceptionType ++ errorType).toList
+  lazy val uncheckedExceptionTypes: List[JObjectType] = List(runtimeExceptionType, errorType)
 
-  def iterableOf (arg: JType): Option[JObjectType] = boxing(arg).flatMap(t => getObjectType(iterableClass, List(t)))
-  def classTypeOf (arg: JType): Option[JObjectType] = boxing(arg).flatMap(t => getObjectType(classClass, List(t)))
-  def functionTypeOf (from: JType, to: JType): Option[JObjectType] = for {
-    f <- boxing(from)
-    t <- boxing(to)
-    r <- getObjectType(functionClass, List(f, t))
-  } yield r
+  def iterableOf (arg: JType): JObjectType = getObjectType_Unsafe(iterableClass, List(boxing(arg)))
+  def classTypeOf (arg: JType): JObjectType = getObjectType_Unsafe(classClass, List(boxing(arg)))
 
-  def consumerTypeOf (arg: JType): Option[JObjectType] = boxing(arg).flatMap(t => getObjectType(consumerClass, List(t)))
+  def functionTypeOf (from: JType, to: JType): JObjectType = getObjectType_Unsafe(functionClass, List(boxing(from), boxing(to)))
+  def consumerTypeOf (arg: JType): JObjectType = getObjectType_Unsafe(consumerClass, List(boxing(arg)))
 
-  def boxing (t: JType): Option[JRefType] = t match {
-    case ref: JRefType       => Some(ref)
+  def boxing (t: JType): JRefType = t match {
+    case ref: JRefType       => ref
     case prm: JPrimitiveType => boxedPrimitiveTypes(prm)
   }
 
@@ -83,14 +87,14 @@ trait JTypeLoader {
     case cts: JClassTypeSignature        => fromClassTypeSignature(cts, env)
     case tvs: JTypeVariableSignature     => fromTypeVariableSignature(tvs, env)
     case JArrayTypeSignature(component)  => fromTypeSignature(component, env).map(_.array)
-    case cap: JCapturedWildcardSignature => fromCapturedWildcardSignature(cap, env)
+    case cap: JCapturedWildcardSignature => Some(fromCapturedWildcardSignature(cap, env))
     case prm: JPrimitiveTypeSignature    =>
       error("do not use this method for primitive type signature : " + prm)
       None
   }
 
   def fromClassTypeSignature (sig: JClassTypeSignature, env: Map[String, MetaArgument]): Option[JObjectType] = sig match {
-    case JTypeSignature.typeTypeSig => typeType
+    case JTypeSignature.typeTypeSig => Some(typeType)
     case SimpleClassTypeSignature(className, typeArgs) => for {
       clazz <- loadClass_NoFail(className)
       args  <- fromTypeArguments(typeArgs, env)
@@ -100,23 +104,23 @@ trait JTypeLoader {
 
   def fromTypeVariableSignature (sig: JTypeVariableSignature, env: Map[String, MetaArgument]): Option[JRefType] = env.get(sig.name).flatMap {
     case t: JRefType  => Some(t)
-    case w: JWildcard => w.upperBound.orElse(objectType).map(ub => JCapturedWildcardType(ub, w.lowerBound))
+    case w: JWildcard => Some(JCapturedWildcardType(w.upperBound.getOrElse(objectType), w.lowerBound))
     case _: MetaValue =>
       error("invalid type variable : " + sig.name)
       None
   }
 
-  def fromCapturedWildcardSignature (sig: JCapturedWildcardSignature, env: Map[String, MetaArgument]): Option[JCapturedWildcardType] = {
-    sig.upperBound.flatMap(ub => fromTypeSignature_RefType(ub, env)).orElse(objectType).map { ub =>
-      JCapturedWildcardType(ub, sig.lowerBound.flatMap(lb => fromTypeSignature_RefType(lb, env)))
-    }
+  def fromCapturedWildcardSignature (sig: JCapturedWildcardSignature, env: Map[String, MetaArgument]): JCapturedWildcardType = {
+    JCapturedWildcardType(
+      sig.upperBound.flatMap(ub => fromTypeSignature_RefType(ub, env)).getOrElse(objectType),
+      sig.lowerBound.flatMap(lb => fromTypeSignature_RefType(lb, env)))
   }
 
   def fromPrimitiveSignature (p: JPrimitiveTypeSignature): JPrimitiveType = erase(p).primitiveType
 
   def fromTypeArguments (args: List[JTypeArgument], env: Map[String, MetaArgument]): Option[List[MetaArgument]] = args.traverse {
     case sig: JTypeSignature            => fromTypeSignature_RefType(sig, env)
-    case WildcardArgument(upper, lower) => Some(JWildcard(upper.flatMap(fromTypeSignature_RefType(_, env)).filterNot(objectType.contains), lower.flatMap(fromTypeSignature_RefType(_, env))))
+    case WildcardArgument(upper, lower) => Some(JWildcard(upper.flatMap(fromTypeSignature_RefType(_, env)).filterNot(_ == objectType), lower.flatMap(fromTypeSignature_RefType(_, env))))
     case MetaVariableSignature(name)    => env.get(name)
   }
 
@@ -129,7 +133,7 @@ trait JTypeLoader {
   private def validTypeArg (param: FormalMetaParameter, arg: MetaArgument, env: Map[String, MetaArgument]): Boolean = arg match {
     case arg: JRefType => param.bounds.forall(withinBound(_, arg, env))
     case pv: MetaValue => fromTypeSignature(param.metaType, env).exists(pv.valueType <:< _)
-    case wc: JWildcard => param.bounds.forall(bound => wc.upperBound.orElse(objectType).exists(upper => withinBound(bound, upper, env)))
+    case wc: JWildcard => param.bounds.forall(bound => withinBound(bound, wc.upperBound.getOrElse(objectType), env))
   }
 
   private def withinBound (bound: JTypeSignature, arg: JRefType, env: Map[String, MetaArgument]): Boolean = {

@@ -136,8 +136,10 @@ trait ContextSensitiveParsersModule {
 
       def argumentFor (param: JParameter, binding: MetaArgs): ContextSensitiveParser[ParsedArgument] = {
         new ContextSensitiveParser ( env => parser.parser(env) >> { argument =>
-          val newBinding = bind(param, argument, binding)
+          val newBinding = bindTypeArgs(param, argument.staticType, binding)
           param.scopes.traverse(_.bind(newBinding).collect { case obj: JObjectType => IRContextRef(obj) }) match {
+            case Some(Nil) =>
+              ContextFreeParser.success((newBinding, argument))
             case Some(scopes) =>
               val newEnv = argument.modifyEnv(env)
               val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts)
@@ -272,8 +274,10 @@ trait ContextSensitiveParsersModule {
 
       def argumentFor (param: JParameter, binding: MetaArgs): ContextSensitiveScanner[ParsedArgument] = {
         new ContextSensitiveScanner ( env => scanner.parser(env) >> { argument =>
-          val newBinding = bind(param, argument, binding)
+          val newBinding = bindTypeArgs(param, argument.staticType, binding)
           param.scopes.traverse(_.bind(newBinding).collect { case obj: JObjectType => IRContextRef(obj) }) match {
+            case Some(Nil) =>
+              ContextFreeScanner.success((newBinding, argument))
             case Some(scopes) =>
               val newEnv = argument.modifyEnv(env)
               val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts)
@@ -331,10 +335,5 @@ trait ContextSensitiveParsersModule {
 
   protected object Impl extends RegexParsers with PackratParsers {
     override def skipWhitespace: Boolean = false
-  }
-
-  private def bind (param: JParameter, arg: IRExpression, binding: MetaArgs) = arg.staticType match {
-    case Some(t) => bindTypeArgs(param, t, binding)
-    case None    => binding
   }
 }

@@ -15,7 +15,7 @@ trait JavaLiteralParsersModule {
     object JavaLiteralParsersImpl {
       def literal(expected: JType): ContextFreeScanner[IRExpression] = expected match {
         case prm: JPrimitiveType => primitiveTypeLiterals.getOrElse(prm, ContextFreeScanner.failure("not implemented"))
-        case _ if stringType.exists(_ <:< expected) => stringLiteral | nullLiteral(expected)
+        case _ if stringType <:< expected => stringLiteral | nullLiteral(expected)
         case _ => nullLiteral(expected)
       }
 

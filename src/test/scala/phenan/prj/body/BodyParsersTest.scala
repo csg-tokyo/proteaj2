@@ -169,7 +169,7 @@ class BodyParsersTest extends FunSuite with Matchers {
 
     val result = mainMethod.asInstanceOf[IRMethod].methodBody
 
-    val arrayOfString = stringType.map(_.array).get
+    val arrayOfString = stringType.array
 
     val expected = IRMethodBody(IRBlock(List(IRExpressionStatement(IRInstanceMethodCall(IRStaticFieldAccess(outField.get), Map.empty, printMethod.get, List(IRArrayAccess(IRLocalVariableRef(arrayOfString, "args"), IRIntLiteral(0))), Nil)))))
 
@@ -247,8 +247,8 @@ class BodyParsersTest extends FunSuite with Matchers {
     }
 
     val expected = IRMethodBody(IRBlock(List(
-      IRLocalDeclarationStatement(IRLocalDeclaration(stringType.get, List(IRVariableDeclarator("s", 0, Some(IRStringLiteral("hello, world")))))),
-      IRExpressionStatement(IRInstanceMethodCall(IRStaticFieldAccess(outField.get), Map.empty, printMethod.get, List(IRLocalVariableRef(stringType.get, "s")), Nil)))))
+      IRLocalDeclarationStatement(IRLocalDeclaration(stringType, List(IRVariableDeclarator("s", 0, Some(IRStringLiteral("hello, world")))))),
+      IRExpressionStatement(IRInstanceMethodCall(IRStaticFieldAccess(outField.get), Map.empty, printMethod.get, List(IRLocalVariableRef(stringType, "s")), Nil)))))
 
     body shouldBe Some(expected)
   }

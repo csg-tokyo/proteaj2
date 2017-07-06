@@ -2,6 +2,7 @@ package phenan.prj.ir
 
 import phenan.prj._
 import phenan.prj.body.EnvModifyStrategy
+import phenan.prj.exception.InvalidASTException
 
 import scalaz.syntax.traverse._
 import scalaz.std.list._
@@ -12,7 +13,7 @@ trait IRExpressions {
     with IRs with IRStatements with JModules with JMembers with JErasedTypes with Application =>
 
   sealed trait IRExpression {
-    def staticType: Option[JType]
+    def staticType: JType
 
     def modifyEnv (env: Environment): Environment
 
@@ -26,12 +27,12 @@ trait IRExpressions {
   type ParsedArgumentList = (Map[String, MetaArgument], List[IRExpression])
 
   case class IRContextualArgument(argument: IRExpression, contexts: List[IRContextRef]) extends IRExpression {
-    def staticType: Option[JType] = argument.staticType
+    def staticType: JType = argument.staticType
     def modifyEnv (env: Environment): Environment = argument.modifyEnv(env)
   }
 
   case class IRScopeArgument (argument: IRExpression, scopes: List[IRContextRef]) extends IRExpression {
-    def staticType: Option[JType] = argument.staticType
+    def staticType: JType = argument.staticType
     def modifyEnv (env: Environment): Environment = argument.modifyEnv(env).deactivates(scopes)
   }
 
@@ -41,7 +42,7 @@ trait IRExpressions {
     def left: IRLeftHandSide
     def right: IRExpression
 
-    def staticType: Option[JType] = right.staticType
+    def staticType: JType = right.staticType
 
     // correct ?
     def modifyEnv (env: Environment): Environment = right.modifyEnv(left.modifyEnv(env))
@@ -51,7 +52,7 @@ trait IRExpressions {
 
   case class IRAnonymousClass(metaArgs: Map[String, MetaArgument], baseType: JObjectType, args: List[IRExpression], requiredContexts: List[IRContextRef], members: List[IRClassMember]) extends IRExpression {
     // TODO: staticType should be a sub-type of baseType
-    def staticType: Option[JType] = Some(baseType)
+    def staticType: JType = baseType
 
     def modifyEnv(env: Environment): Environment = env.modify(args)
   }
@@ -65,25 +66,25 @@ trait IRExpressions {
   sealed trait IRArrayCreation extends IRExpression
 
   case class IRNewArray(componentType: JType, length: List[IRExpression], dim: Int) extends IRArrayCreation {
-    def staticType = Some(componentType.array(length.size + dim))
+    def staticType: JType = componentType.array(length.size + dim)
     def modifyEnv(env: Environment): Environment = env.modify(length)
   }
 
   case class IRArrayInitializer(componentType: JType, dim: Int, components: List[IRExpression]) extends IRArrayCreation {
-    def staticType = Some(componentType.array(dim))
+    def staticType: JType = componentType.array(dim)
     def modifyEnv(env: Environment): Environment = env.modify(components)
   }
 
   case class IRCastExpression(destType: JType, expression: IRExpression) extends IRExpression {
-    def staticType = Some(destType)
+    def staticType: JType = destType
 
     def modifyEnv(env: Environment): Environment = expression.modifyEnv(env)
   }
 
   case class IRArrayAccess(array: IRExpression, index: IRExpression) extends IRLeftHandSide {
-    def staticType: Option[JType] = array.staticType match {
-      case Some(JArrayType(component)) => Some(component)
-      case _ => None
+    def staticType: JType = array.staticType match {
+      case JArrayType(component) => component
+      case _ => throw InvalidASTException("not array type")
     }
 
     def modifyEnv(env: Environment): Environment = index.modifyEnv(array.modifyEnv(env))
@@ -92,7 +93,7 @@ trait IRExpressions {
   sealed trait IRFieldAccess extends IRLeftHandSide {
     def field: JField
 
-    def staticType = Some(field.fieldType)
+    def staticType: JType = field.fieldType
   }
 
   case class IRInstanceFieldAccess(instance: IRExpression, field: JField) extends IRFieldAccess {
@@ -132,14 +133,16 @@ trait IRExpressions {
 
   case class IRNewExpression(metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRProcedureCall {
     def procedure: JProcedure = constructor
-    def staticType = Some(constructor.declaring)
+    def staticType: JObjectType = constructor.declaring
   }
 
   sealed trait IRMethodCall extends IRProcedureCall {
     def method: JMethod
     def procedure: JProcedure = method
 
-    lazy val staticType: Option[JType] = method.returnType.bind(metaArgs)
+    lazy val staticType: JType = method.returnType.bind(metaArgs).getOrElse {
+      throw InvalidASTException("return type is invalid type")
+    }
   }
 
   case class IRInstanceMethodCall(instance: IRExpression, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
@@ -157,12 +160,14 @@ trait IRExpressions {
   }
 
   case class IRDefaultArgument(defaultMethod: JMethod) extends IRExpression {
-    def staticType: Option[JType] = defaultMethod.returnType.bind(Map.empty)
+    def staticType: JType = defaultMethod.returnType.bind(Map.empty).getOrElse {
+      throw InvalidASTException("default argument type is invalid type")
+    }
     def modifyEnv (env: Environment): Environment = env
   }
 
-  case class IRVariableArguments(args: List[IRExpression], componentType: Option[JType]) extends IRExpression {
-    def staticType: Option[JType] = componentType.map(_.array)
+  case class IRVariableArguments(args: List[IRExpression], componentType: JType) extends IRExpression {
+    def staticType: JArrayType = componentType.array
     def modifyEnv(env: Environment): Environment = env.modify(args)
   }
 
@@ -173,39 +178,41 @@ trait IRExpressions {
   sealed trait IRClassLiteral extends IRJavaLiteral
 
   case class IRObjectClassLiteral (clazz: JClass, dim: Int) extends IRClassLiteral {
-    def staticType: Option[JObjectType] = getObjectType(clazz, Nil).map(_.array(dim)).flatMap(classTypeOf)
+    def staticType: JObjectType = getObjectType(clazz, Nil).map(_.array(dim)).map(classTypeOf).getOrElse {
+      throw InvalidASTException("invalid object class literal type")
+    }
   }
 
   case class IRPrimitiveClassLiteral (primitiveType: JPrimitiveType, dim: Int) extends IRClassLiteral {
-    def staticType: Option[JObjectType] = boxedPrimitiveTypes(primitiveType).map(_.array(dim)).flatMap(classTypeOf)
+    def staticType: JObjectType = classTypeOf(primitiveType.array(dim))
   }
 
   case class IRCharLiteral (value: Char) extends IRJavaLiteral {
-    def staticType = Some(charType)
+    def staticType: JPrimitiveType = charType
   }
 
   case class IRIntLiteral(value: Int) extends IRJavaLiteral {
-    def staticType = Some(intType)
+    def staticType: JPrimitiveType = intType
   }
 
   case class IRLongLiteral(value: Long) extends IRJavaLiteral {
-    def staticType = Some(longType)
+    def staticType: JPrimitiveType = longType
   }
 
   case class IRBooleanLiteral(value: Boolean) extends IRJavaLiteral {
-    def staticType = Some(booleanType)
+    def staticType: JPrimitiveType = booleanType
   }
 
   case class IRStringLiteral(value: String) extends IRJavaLiteral {
-    def staticType: Option[JObjectType] = stringType
+    def staticType: JObjectType = stringType
   }
 
   case class IRNullLiteral(expected: JType) extends IRJavaLiteral {
-    def staticType = Some(expected)
+    def staticType: JType = expected
   }
 
   case class IRThisRef(thisType: JObjectType) extends IRExpression {
-    def staticType = Some(thisType)
+    def staticType: JObjectType = thisType
 
     def modifyEnv (env: Environment): Environment = env
 
@@ -213,12 +220,12 @@ trait IRExpressions {
   }
 
   case class IRLocalVariableRef(localType: JType, name: String) extends IRLeftHandSide {
-    def staticType = Some(localType)
+    def staticType: JType = localType
     def modifyEnv (env: Environment): Environment = env
   }
 
   case class IRContextRef(contextType: JObjectType) extends IRExpression {
-    def staticType = Some(contextType)
+    def staticType: JObjectType = contextType
     def modifyEnv (env: Environment): Environment = env
   }
 
@@ -231,7 +238,7 @@ trait IRExpressions {
   case class IREnumConstantRef(field: JFieldDef) extends IRAnnotationElement
 
   case class IRStatementExpression(stmt: IRStatement) extends IRExpression {
-    def staticType: Option[JType] = boxedVoidType
+    def staticType: JType = boxedVoidType
     def modifyEnv (env: Environment): Environment = stmt.modifyEnv(env)
   }
 }

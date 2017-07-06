@@ -34,12 +34,16 @@ trait LiteralOperatorParsersModule {
             case (bind, arg) => constructParser(rest, bind, arg :: operands)
           }
         case JRepetition0(param, p) :: rest =>
-          rep0(param, p, binding, Nil) >> {
-            case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
+          rep0(param, p, binding, Nil).mapOption {
+            case (bind, args) => param.genericType.bind(bind).map(bind -> IRVariableArguments(args, _))
+          } >> {
+            case (bind, vargs) => constructParser(rest, bind, vargs :: operands)
           }
         case JRepetition1(param, p) :: rest =>
-          rep1(param, p, binding, Nil) >> {
-            case (bnd, args) => constructParser(rest, bnd, IRVariableArguments(args, param.genericType.bind(bnd)) :: operands)
+          rep1(param, p, binding, Nil).mapOption {
+            case (bind, args) => param.genericType.bind(bind).map(bind -> IRVariableArguments(args, _))
+          } >> {
+            case (bind, vargs) => constructParser(rest, bind, vargs :: operands)
           }
         case JMetaOperand(name, param, p) :: rest =>
           if (binding.contains(name)) getMetaValueLiteralParser(name, binding(name), p, binding, lop) >> { bind => constructParser(rest, bind, operands) }

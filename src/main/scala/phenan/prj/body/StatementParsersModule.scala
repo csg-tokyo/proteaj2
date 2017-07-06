@@ -126,11 +126,7 @@ trait StatementParsersModule {
       lazy val statementExpression: ContextSensitiveParser[IRExpression] = expression(voidType)
 
 
-      def collection(elemType: JType): ContextSensitiveParser[IRExpression] = {
-        someOrError(iterableOf(elemType).map(expression).map(_ | expression(elemType.array)),
-          "cannot get type object Iterable<" + elemType.name + ">", expression(elemType.array))
-      }
-
+      def collection(elemType: JType): ContextSensitiveParser[IRExpression] = expression(iterableOf(elemType)) | expression(elemType.array)
 
       def expression(expected: JType): ContextSensitiveParser[IRExpression] = getExpressionParser(expected)
 

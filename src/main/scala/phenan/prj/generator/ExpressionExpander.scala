@@ -127,14 +127,13 @@ trait ExpressionExpander {
       val (body, e, _) = expression(arg).run(r, s2)
       val csExpr = SIRContextSensitiveExpression(cs, body :+ SIRReturnStatement(e))
       val generatedName = generateLocalName
-      val localDecl = SIRLocalDeclaration(csArg.staticType.get, generatedName, Some(csExpr))
+      val localDecl = SIRLocalDeclaration(csArg.staticType, generatedName, Some(csExpr))
       (List(localDecl), SIRLocalRef(generatedName), s)
     }
 
     def variableArgument (vArgs: IRVariableArguments): Gen[SIRExpression] = vArgs.componentType match {
-      case Some(p: JPrimitiveType) => vArgs.args.traverse(expression).map(???)
-      case Some(r: JRefType)       => ???
-      case None                    => ???
+      case p: JPrimitiveType => vArgs.args.traverse(expression).map(???)
+      case r: JRefType       => ???
     }
 
     def javaLiteral (literal: IRJavaLiteral): SIRJavaLiteral = literal match {

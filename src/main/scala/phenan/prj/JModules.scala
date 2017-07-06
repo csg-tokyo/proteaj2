@@ -235,7 +235,7 @@ trait JModules {
       case that: JObjectType => isSubtypeOf(that)
       case that: JCapturedWildcardType => that.lowerBound.exists(lb => isSubtypeOf(lb))
       case that: JUnboundTypeVariable =>
-        if (that.bounds.isEmpty) objectType.exists(b => isSubtypeOf(b))
+        if (that.bounds.isEmpty) isSubtypeOf(objectType)
         else that.bounds.exists(b => isSubtypeOf(b))
       case _: JPrimitiveType | _: JArrayType | _: JTypeVariable => false
     }
@@ -321,7 +321,7 @@ trait JModules {
   }
 
   case class JTypeVariable(name: String, bounds: List[JRefType]) extends JRefType {
-    def isSubtypeOf(that: JType): Boolean = this == that || bounds.exists(_.isSubtypeOf(that)) || objectType.contains(that)
+    def isSubtypeOf(that: JType): Boolean = this == that || bounds.exists(_.isSubtypeOf(that)) || objectType == that
 
     override def matches(v: MetaArgument): Boolean = this == v
 
@@ -369,7 +369,7 @@ trait JModules {
       case _: MetaValue => false
     }
 
-    def isSubtypeOf(that: JType): Boolean = bounds.exists(_.isSubtypeOf(that)) | objectType.contains(that)
+    def isSubtypeOf(that: JType): Boolean = bounds.exists(_.isSubtypeOf(that)) || objectType == that
 
     def findField(name: String, from: JClass, receiverIsThis: Boolean): Option[JField] = findField_helper(bounds, name, from, receiverIsThis)
 
@@ -385,7 +385,7 @@ trait JModules {
       case Nil => None
     }
 
-    lazy val boundHead: Option[JRefType] = bounds.headOption.orElse(objectType)
+    lazy val boundHead: JRefType = bounds.headOption.getOrElse(objectType)
   }
 
 }

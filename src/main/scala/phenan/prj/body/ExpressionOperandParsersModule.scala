@@ -18,7 +18,7 @@ trait ExpressionOperandParsersModule {
         contexts <- inferContexts(param.contexts, binding, eop.method)
       } yield {
         val parser =
-          if (boxedVoidType.contains(expectedType) && contexts.nonEmpty) getStatementExpressionParser(pri, eop.syntax.priority)
+          if (boxedVoidType == expectedType && contexts.nonEmpty) getStatementExpressionParser(pri, eop.syntax.priority)
           else getExpressionParser(expectedType, pri, eop.syntax.priority)
 
         parser.withLocalContexts(contexts).argumentFor(param, binding)
@@ -41,12 +41,12 @@ trait ExpressionOperandParsersModule {
     }
 
     private def getMetaArgumentParser(metaType: JType, pri: Option[JPriority], eop: ExpressionOperator): ContextSensitiveParser[MetaArgument] = {
-      if (typeType.contains(metaType)) typeParsers.metaValue.^#
+      if (typeType == metaType) typeParsers.metaValue.^#
       else getExpressionParser(metaType, pri, eop.syntax.priority) ^^ { arg => ConcreteMetaValue(arg, metaType) }
     }
 
     private def getStatementExpressionParser (pri: Option[JPriority], enclosingPriority: JPriority): ContextSensitiveParser[IRExpression] = {
-      val boxed = getExpressionParser(boxedVoidType.get, pri, enclosingPriority)
+      val boxed = getExpressionParser(boxedVoidType, pri, enclosingPriority)
       val unboxed = getExpressionParser(voidType, pri, enclosingPriority) ^^ { e => IRStatementExpression(IRExpressionStatement(e)) }
       val block = getStatementParsers(voidType).block ^^ IRStatementExpression
       boxed | unboxed | block

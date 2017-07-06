@@ -59,6 +59,8 @@ trait JErasedTypes {
     def isEnum: Boolean = mod.check(JModifier.accEnum)
 
     def isAnnotation: Boolean = mod.check(JModifier.accAnnotation)
+
+    override def toString: String = s"JClass($name)"
   }
 
   case class JPrimitiveClass (name: String) extends JErasedType {
@@ -113,6 +115,8 @@ trait JErasedTypes {
     def signature: JTypeSignature
 
     def isStatic: Boolean = mod.check(JModifier.accStatic)
+
+    override def toString: String = s"JFieldDef($declaringClass#$name:$signature)"
   }
 
   trait JMethodDef {

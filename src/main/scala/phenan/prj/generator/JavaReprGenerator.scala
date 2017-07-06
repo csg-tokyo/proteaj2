@@ -251,8 +251,7 @@ trait JavaReprGenerator {
   private def expressionStatement (stmt: IRExpressionStatement, contexts: List[IRContextRef]): ExpressionStatement = ExpressionStatement(expression(stmt.expression, contexts))
 
   private def activateStatement (stmt: IRActivateStatement, contexts: List[IRContextRef], activates: List[JRefType]): ExpressionStatement = {
-    val activateType = stmt.expression.staticType.getOrElse(throw InvalidASTException("invalid activate statement"))
-    val index = activates.indexOf(activateType)
+    val index = activates.indexOf(stmt.expression.staticType)
     if (index >= 0) activateContext(expression(stmt.expression, contexts), index)
     else throw InvalidASTException("activated context is not declared in the activates clause")
   }
@@ -326,7 +325,7 @@ trait JavaReprGenerator {
 
   private def instanceMethodCall (instance: IRExpression, e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = {
     if (e.requiredContexts.nonEmpty) {
-      val lam = instanceMethodWrapper(getStaticType(e), getStaticType(instance), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
+      val lam = instanceMethodWrapper(e.staticType, instance.staticType, typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(_.staticType), e.throws, e.requiredContexts, contexts)
       MethodCall(Union[Receiver](lam), Nil, "apply", expression(instance, contexts) :: e.args.map(expression(_, contexts)))
     }
     else MethodCall(Union[Receiver](expression(instance, contexts)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
@@ -334,7 +333,7 @@ trait JavaReprGenerator {
 
   private def staticMethodCall (e: IRMethodCall, contexts: List[IRContextRef]): MethodCall = {
     if (e.requiredContexts.nonEmpty) {
-      val lam = staticMethodWrapper(getStaticType(e), ClassRef(e.method.declaringClass.name), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
+      val lam = staticMethodWrapper(e.staticType, ClassRef(e.method.declaringClass.name), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(_.staticType), e.throws, e.requiredContexts, contexts)
       MethodCall(Union[Receiver](lam), Nil, "apply", e.args.map(expression(_, contexts)))
     }
     else MethodCall(Union[Receiver](ClassRef(e.method.declaringClass.name)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
@@ -342,7 +341,7 @@ trait JavaReprGenerator {
 
   private def superMethodCall (e: IRSuperMethodCall, contexts: List[IRContextRef]): MethodCall = {
     if (e.requiredContexts.nonEmpty) {
-      val lam = superMethodWrapper(getStaticType(e), SuperRef(ClassRef(e.thisType.erase.name)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
+      val lam = superMethodWrapper(e.staticType, SuperRef(ClassRef(e.thisType.erase.name)), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(_.staticType), e.throws, e.requiredContexts, contexts)
       MethodCall(Union[Receiver](lam), Nil, "apply", e.args.map(expression(_, contexts)))
     }
     else MethodCall(Union[Receiver](SuperRef(ClassRef(e.thisType.erase.name))), typeArgs(e.method, e.metaArgs), e.method.name, e.args.map(expression(_, contexts)))
@@ -350,7 +349,7 @@ trait JavaReprGenerator {
 
   private def newExpression (e: IRNewExpression, contexts: List[IRContextRef]): Expression = {
     if (e.requiredContexts.nonEmpty) {
-      val lam = newExpressionWrapper(e.constructor.declaring, typeArgs(e.constructor, e.metaArgs), e.args.map(getStaticType), e.throws, e.requiredContexts, contexts)
+      val lam = newExpressionWrapper(e.constructor.declaring, typeArgs(e.constructor, e.metaArgs), e.args.map(_.staticType), e.throws, e.requiredContexts, contexts)
       Union[Expression](MethodCall(Union[Receiver](lam), Nil, "apply", e.args.map(expression(_, contexts))))
     }
     else Union[Expression](NewExpression(typeArgs(e.constructor, e.metaArgs), objectType(e.constructor.declaring), e.args.map(expression(_, contexts))))
@@ -365,9 +364,8 @@ trait JavaReprGenerator {
   private def castExpression (e: IRCastExpression, contexts: List[IRContextRef]): CastExpression = CastExpression(typeToSig(e.destType), expression(e.expression, contexts))
 
   private def variableArguments (e: IRVariableArguments, contexts: List[IRContextRef]): Expression = e.componentType match {
-    case Some(p: JPrimitiveType) => Union[Expression](ArrayInit(typeToSig(p), 1, e.args.map(expression(_, contexts))))
-    case Some(r: JRefType)       => Union[Expression](MethodCall(arraysRef, List(Union[TypeArg](typeToSig(r))), "mkArray", e.args.map(expression(_, contexts))))
-    case None                    => throw InvalidASTException("invalid component type of variable arguments")
+    case p: JPrimitiveType => Union[Expression](ArrayInit(typeToSig(p), 1, e.args.map(expression(_, contexts))))
+    case r: JRefType       => Union[Expression](MethodCall(arraysRef, List(Union[TypeArg](typeToSig(r))), "mkArray", e.args.map(expression(_, contexts))))
   }
 
   private def defaultArgument (e: IRDefaultArgument): MethodCall = {
@@ -375,15 +373,15 @@ trait JavaReprGenerator {
   }
 
   private def contextualArgument (e: IRContextualArgument, contexts: List[IRContextRef]): Expression = {
-    contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), getStaticType(e.argument), Nil, contexts.size)
+    contextualArgument(e.contexts, expression(e.argument, contexts ++ e.contexts), e.argument.staticType, Nil, contexts.size)
   }
 
   private def contextualArgument (cs: List[IRContextRef], e: Expression, t: JType, throws: List[TypeSig], offset: Int): Expression = cs match {
     case c :: rest =>
-      val functionType = functionTypeOf(c.contextType, t).getOrElse(throw InvalidASTException("invalid context type"))
+      val functionType = functionTypeOf(c.contextType, t)
       contextualArgument(
         rest,
-        Union[Expression](lambda(objectType(functionType), typeToSig(boxing(t).get), "apply",
+        Union[Expression](lambda(objectType(functionType), typeToSig(boxing(t)), "apply",
           List(parameter(c.contextType, contextName(rest.length + offset))), throws, Block(List(returnStatement(e))))),
         functionType,
         throws,
@@ -401,10 +399,6 @@ trait JavaReprGenerator {
     val index = contexts.indexOf(e)
     if (index >= 0) LocalRef(contextName(index))
     else throw InvalidASTException("context not found")
-  }
-
-  private def getStaticType (e: IRExpression): JType = e.staticType.getOrElse {
-    throw InvalidASTException("invalid expression : compiler cannot determine the static type of " + e)
   }
 
   private def typeArgs (procedure: JProcedure, metaArgs: Map[String, MetaArgument]): List[TypeArg] = {

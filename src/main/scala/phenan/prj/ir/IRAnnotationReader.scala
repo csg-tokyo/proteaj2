@@ -170,7 +170,7 @@ trait IRAnnotationReader {
       case enm: JClass if enm.isEnum         => annotationElement_EnumConstant(arg, enm)
       case ann: JClass if ann.isAnnotation   => annotationElement_Annotation(arg, ann)
       case prm: JPrimitiveClass              => evaluate(arg, prm.primitiveType)
-      case str: JClass if stringClass == str => stringType.flatMap(evaluate(arg, _))
+      case str: JClass if stringClass == str => evaluate(arg, stringType)
     }
 
     private def annotationElement_Array (arg: AnnotationElement, component: JErasedType): Option[IRAnnotationElementArray] = arg match {
@@ -191,7 +191,7 @@ trait IRAnnotationReader {
     }
 
     private def evaluate (arg: AnnotationElement, expected: JType): Option[IRAnnotationElement] = arg match {
-      case e: AnnotationExpression => evaluate(e).filter(_.staticType.exists(_ <:< expected))
+      case e: AnnotationExpression => evaluate(e).filter(_.staticType <:< expected)
       case _ => None
     }
 
