@@ -13,8 +13,8 @@ object JClassSignature {
 }
 
 case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: List[JParameterSignature], returnType: JTypeSignature,
-                             returnBounds: List[JTypeSignature], throwTypes: List[JTypeSignature],
-                             activates: List[JTypeSignature], deactivates: List[JTypeSignature], requires: List[JTypeSignature]) {
+                             returnBounds: List[JTypeSignature], throwTypes: List[JClassTypeSignature],
+                             activates: List[JClassTypeSignature], deactivates: List[JClassTypeSignature], requires: List[JClassTypeSignature]) {
   def throws (es: List[String]): JMethodSignature = {
     if (es.nonEmpty) JMethodSignature(metaParams, parameters, returnType, returnBounds, throwTypes ++ es.map(name => SimpleClassTypeSignature(name, Nil)), activates, deactivates, requires)
     else this
@@ -47,6 +47,7 @@ object JTypeSignature {
   def functionTypeSig (from: JTypeArgument, to: JTypeArgument): JTypeSignature = SimpleClassTypeSignature(CommonNames.functionClassName, List(from, to))
   def consumerTypeSig (arg: JTypeArgument): JTypeSignature = SimpleClassTypeSignature(CommonNames.consumerClassName, List(arg))
   def enumTypeSig (e: JTypeArgument): JClassTypeSignature = SimpleClassTypeSignature(CommonNames.enumClassName, List(e))
+  def pairTypeSig (car: JTypeArgument, cdr: JTypeArgument): JTypeSignature = SimpleClassTypeSignature(CommonNames.pairClassName, List(car, cdr))
 
   def arraySig (typeSig: JTypeSignature, dim: Int): JTypeSignature = {
     if (dim > 0) arraySig(JArrayTypeSignature(typeSig), dim - 1)

@@ -11,21 +11,21 @@ trait LiteralOperandParsersModule {
   trait LiteralOperandParsers {
     this: LiteralParsers with CommonParsers with ContextSensitiveParsers =>
 
-    def getLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], lop: LiteralOperator): ContextSensitiveScanner[ParsedArgument] = {
+    def getLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: MetaArgs, lop: LiteralOperator): ContextSensitiveScanner[ParsedArgument] = {
       for {
         expectedType <- inferExpectedType(param, binding, lop.method)
         contexts     <- inferContexts(param.contexts, binding, lop.method)
       } yield getLiteralParser(expectedType, pri, lop.syntax.priority).withLocalContexts(contexts).argumentFor(param, binding)
     }.getOrElse(ContextSensitiveScanner.failure[ParsedArgument]("fail to parse argument expression"))
 
-    def getMetaLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], lop: LiteralOperator): ContextSensitiveScanner[MetaArgument] = {
+    def getMetaLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: MetaArgs, lop: LiteralOperator): ContextSensitiveScanner[MetaArgument] = {
       inferExpectedType(param, binding, lop.method) match {
         case Some(e) => getMetaArgumentParser(e, pri, lop)
         case None => ContextSensitiveScanner.failure[MetaArgument]("fail to parse meta expression")
       }
     }
 
-    def getMetaValueLiteralParser(name: String, mv: MetaArgument, pri: Option[JPriority], binding: Map[String, MetaArgument], lop: LiteralOperator): ContextSensitiveScanner[MetaArgs] = mv match {
+    def getMetaValueLiteralParser(name: String, mv: MetaArgument, pri: Option[JPriority], binding: MetaArgs, lop: LiteralOperator): ContextSensitiveScanner[MetaArgs] = mv match {
       case c: ConcreteMetaValue => getMetaArgumentParser(c.valueType, pri, lop) ^? { case v if c.ast == v => c } ^^^ binding
       case u: JUnboundMetaVariable => getMetaArgumentParser(u.valueType, pri, lop) ^^ { arg => binding + (name -> arg) }
       case _: JRefType | _: JWildcard | _: MetaVariableRef => ContextSensitiveScanner.failure[MetaArgs]("type name cannot be used in a literal")

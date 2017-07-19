@@ -77,7 +77,7 @@ trait SignatureParser {
 
     lazy val pureVariable: Parser[MetaVariableSignature] = 'P' ~> identifier <~ ';' ^^ MetaVariableSignature
 
-    lazy val throwsType: PackratParser[JTypeSignature] = '^' ~> (classType | typeVariable)
+    lazy val throwsType: PackratParser[JClassTypeSignature] = '^' ~> classType     // or typeVariable
 
     lazy val identifier: PackratParser[String] =
       elem("id start", Character.isJavaIdentifierStart) ~ elem("id part", Character.isJavaIdentifierPart).* ^^ {

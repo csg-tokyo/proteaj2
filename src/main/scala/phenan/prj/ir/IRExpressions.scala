@@ -23,8 +23,8 @@ trait IRExpressions {
     }
   }
 
-  type ParsedArgument     = (Map[String, MetaArgument], IRExpression)
-  type ParsedArgumentList = (Map[String, MetaArgument], List[IRExpression])
+  type ParsedArgument     = (MetaArgs, IRExpression)
+  type ParsedArgumentList = (MetaArgs, List[IRExpression])
 
   case class IRContextualArgument(argument: IRExpression, contexts: List[IRContextRef]) extends IRExpression {
     def staticType: JType = argument.staticType
@@ -50,18 +50,22 @@ trait IRExpressions {
 
   case class IRSimpleAssignmentExpression(left: IRLeftHandSide, right: IRExpression) extends IRAssignmentExpression
 
-  case class IRAnonymousClass(metaArgs: Map[String, MetaArgument], baseType: JObjectType, args: List[IRExpression], requiredContexts: List[IRContextRef], members: List[IRClassMember]) extends IRExpression {
+  case class IRAnonymousClass(metaArgs: MetaArgs, baseType: JObjectType, args: List[IRExpression], requiredContexts: List[IRContextRef], members: List[IRClassMember]) extends IRExpression {
     // TODO: staticType should be a sub-type of baseType
     def staticType: JType = baseType
 
     def modifyEnv(env: Environment): Environment = env.modify(args)
   }
 
-  sealed trait IRExplicitConstructorCall
+  sealed trait IRExplicitConstructorCall {
+    def metaArgs: MetaArgs
+    def constructor: JConstructor
+    def requiredContexts: List[IRContextRef]
+  }
 
-  case class IRThisConstructorCall(metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExplicitConstructorCall
+  case class IRThisConstructorCall(metaArgs: MetaArgs, constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExplicitConstructorCall
 
-  case class IRSuperConstructorCall(metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExplicitConstructorCall
+  case class IRSuperConstructorCall(metaArgs: MetaArgs, constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRExplicitConstructorCall
 
   sealed trait IRArrayCreation extends IRExpression
 
@@ -111,7 +115,7 @@ trait IRExpressions {
   }
 
   sealed trait IRProcedureCall extends IRExpression {
-    def metaArgs: Map[String, MetaArgument]
+    def metaArgs: MetaArgs
     def procedure: JProcedure
     def args: List[IRExpression]
     def requiredContexts: List[IRContextRef]
@@ -131,7 +135,7 @@ trait IRExpressions {
     lazy val throws: List[JType] = procedure.exceptionTypes.flatMap(_.bind(metaArgs))
   }
 
-  case class IRNewExpression(metaArgs: Map[String, MetaArgument], constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRProcedureCall {
+  case class IRNewExpression(metaArgs: MetaArgs, constructor: JConstructor, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRProcedureCall {
     def procedure: JProcedure = constructor
     def staticType: JObjectType = constructor.declaring
   }
@@ -141,25 +145,25 @@ trait IRExpressions {
     def procedure: JProcedure = method
 
     lazy val staticType: JType = method.returnType.bind(metaArgs).getOrElse {
-      throw InvalidASTException("return type is invalid type")
+      throw InvalidASTException(s"return type is invalid type\n  method: ${method.declaringClass.name}.${method.name}\n  returnType: ${method.returnType}\n  metaArgs: $metaArgs")
     }
   }
 
-  case class IRInstanceMethodCall(instance: IRExpression, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
+  case class IRInstanceMethodCall(instance: IRExpression, metaArgs: MetaArgs, method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 
-  case class IRSuperMethodCall(thisType: JObjectType, metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
+  case class IRSuperMethodCall(thisType: JObjectType, metaArgs: MetaArgs, method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 
-  case class IRStaticMethodCall(metaArgs: Map[String, MetaArgument], method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
+  case class IRStaticMethodCall(metaArgs: MetaArgs, method: JMethod, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall
 
-  case class IRDSLOperation(method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall {
+  case class IRDSLOperation(method: JMethod, metaArgs: MetaArgs, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall {
     override def toString: String = "#DSLOperation#" + method.name + args.mkString("(", ",", ")")
   }
 
-  case class IRContextOperation(context: IRContextRef, method: JMethod, metaArgs: Map[String, MetaArgument], args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall {
+  case class IRContextOperation(context: IRContextRef, method: JMethod, metaArgs: MetaArgs, args: List[IRExpression], requiredContexts: List[IRContextRef]) extends IRMethodCall {
     override def toString: String = "#ContextOperation#" + context.contextType.name + '.' + method.name + args.mkString("(", ",", ")")
   }
 
-  case class IRDefaultArgument(defaultMethod: JMethod) extends IRExpression {
+  case class IRDefaultArgument(defaultMethod: JMethod, metaArgs: MetaArgs) extends IRExpression {
     def staticType: JType = defaultMethod.returnType.bind(Map.empty).getOrElse {
       throw InvalidASTException("default argument type is invalid type")
     }

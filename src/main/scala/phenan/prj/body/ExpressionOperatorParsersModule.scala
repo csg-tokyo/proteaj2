@@ -72,14 +72,15 @@ trait ExpressionOperatorParsersModule {
         }
       }
 
-      private def defaultArgumentParser (param: JParameter, binding: Map[String, MetaArgument]): ContextFreeParser[ParsedArgument] = defaultArgument(param) match {
+      private def defaultArgumentParser (param: JParameter, binding: Map[String, MetaArgument]): ContextFreeParser[ParsedArgument] = defaultArgument(param, binding) match {
         case Some(value) => ContextFreeParser.success((binding, value))
         case None        => ContextFreeParser.failure("default argument is not found")
       }
 
-      private def defaultArgument (param: JParameter): Option[IRDefaultArgument] = {
-        param.defaultArg.flatMap(name => eop.declaringClassModule.findMethod(name, declaringModule).find(_.erasedParameterTypes == Nil)).map(IRDefaultArgument)
-      }
+      private def defaultArgument (param: JParameter, binding: Map[String, MetaArgument]): Option[IRDefaultArgument] = for {
+        name   <- param.defaultArg
+        method <- eop.declaringClassModule.findMethod(name, declaringModule).find(_.erasedParameterTypes == Nil)
+      } yield IRDefaultArgument(method, binding)
     }
   }
 }

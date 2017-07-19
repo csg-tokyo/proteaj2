@@ -37,10 +37,11 @@ trait OperatorPool {
   }
 
   private def checkBounds (expected: JType, metaArgs: Map[String, MetaArgument], bounds: List[JGenericType]): Boolean = bounds match {
-    case bound :: rest => bound.bind(metaArgs) match {
-      case Some(b) if expected <:< b => checkBounds(expected, metaArgs, rest)
-      case _ => false
-    }
-    case Nil => true
+    case bound :: rest =>
+      val x = inferType(expected, bound).nonEmpty
+      val y = checkBounds(expected, metaArgs, rest)
+      x && y
+    case Nil =>
+      true
   }
 }

@@ -36,7 +36,7 @@ class BodyParsersTest extends FunSuite with Matchers {
 
     val body = method.asInstanceOf[IRMethod].methodBody
 
-    val expected = IRMethodBody(IRBlock(List(IRReturnStatement(IRThisRef(test0.thisType.get)))))
+    val expected = IRMethodBody(IRBlock(List(IRReturnStatement(IRThisRef(test0.thisType)))))
 
     body shouldBe Some(expected)
   }
@@ -58,7 +58,7 @@ class BodyParsersTest extends FunSuite with Matchers {
 
     val body = method.asInstanceOf[IRMethod].methodBody
 
-    val thisType = test0.thisType.get
+    val thisType = test0.thisType
     val expected = IRMethodBody(IRBlock(List(IRReturnStatement(IRInstanceFieldAccess(IRThisRef(thisType), thisType.findField("n", test0, true).get)))))
 
     body shouldBe Some(expected)
@@ -103,7 +103,7 @@ class BodyParsersTest extends FunSuite with Matchers {
 
     val body = method.asInstanceOf[IRMethod].methodBody
 
-    val thisType = test0.thisType.get
+    val thisType = test0.thisType
     val expected = IRMethodBody(IRBlock(List(IRExpressionStatement(
       IRSimpleAssignmentExpression(IRInstanceFieldAccess(IRThisRef(thisType), thisType.findField("n", test0, true).get),
         IRLocalVariableRef(intType, "n"))))))
@@ -215,7 +215,7 @@ class BodyParsersTest extends FunSuite with Matchers {
 
     val body = method.asInstanceOf[IRMethod].methodBody
 
-    val thisType = test0.thisType.get
+    val thisType = test0.thisType
     val expected = IRMethodBody(IRBlock(List(IRExpressionStatement(
       IRSimpleAssignmentExpression(IRInstanceFieldAccess(IRThisRef(thisType), thisType.findField("n", test0, true).get),
         IRLocalVariableRef(JTypeVariable("T", Nil), "n"))))))

@@ -98,6 +98,10 @@ trait JModules {
       else methods.getOrElse(name, Nil).filter(_.isPublic)
     }
 
+    def findPublicMethod (name: String): List[JMethod] = sortMethods {
+      methods.getOrElse(name, Nil).filter(_.isPublic)
+    }
+
     lazy val declaredFields: List[JField] = clazz.fields.filter(_.isStatic).flatMap { fieldDef =>
       fromTypeSignature(fieldDef.signature, Map.empty).map(fieldType => JField(fieldDef, fieldType, this))
     }

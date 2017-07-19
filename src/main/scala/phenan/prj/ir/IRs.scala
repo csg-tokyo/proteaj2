@@ -6,6 +6,7 @@ import phenan.prj.body.BodyCompiler
 
 import scala.util._
 import JModifier._
+import phenan.prj.exception._
 
 import scalaz.syntax.traverse._
 import scalaz.std.list._
@@ -119,12 +120,14 @@ trait IRs {
 
     lazy val inners: List[IRModule] = declaredMembers.collect { case m: IRModule => m }
 
-    lazy val fields: List[IRField] = declaredMembers.collect { case f: IRField => f }
+    lazy val fields: List[JFieldDef] = declaredMembers.collect { case f: JFieldDef => f }
 
     lazy val methods: List[JMethodDef] = procedures ++ syntheticMethods
 
     lazy val procedures: List[IRProcedure] = declaredMembers.collect { case m: IRProcedure => m }
-    lazy val syntheticMethods: List[IRSyntheticMethod] = procedures.flatMap(_.paramInitializers)
+    lazy val syntheticMethods: List[IRSyntheticMethod] = {
+      fields.collect { case f: IRField => f }.flatMap(_.initializer) ++ procedures.flatMap(_.paramInitializers)
+    }
 
     lazy val annotations: List[IRAnnotation] = readAnnotations(modifiersAST.collect { case ann: Annotation => ann })
 
@@ -144,11 +147,12 @@ trait IRs {
       case None => constructResolver(metaParametersAST, Nil, staticResolver)
     }
 
-    lazy val thisType: Option[JObjectType] = metaParametersRef.flatMap(getObjectType(this, _))
+    lazy val thisType: JObjectType = metaParametersRef.flatMap(getObjectType(this, _)).getOrElse {
+      throw InvalidTypeException(s"this object of class $name has invalid type")
+    }
 
-    lazy val metaParameters: Map[String, MetaArgument] = metaParametersRef.map(args => signature.metaParams.map(_.name).zip(args).toMap).getOrElse {
-      error("invalid meta parameters")
-      Map.empty
+    lazy val metaParameters: MetaArgs = metaParametersRef.map(args => signature.metaParams.map(_.name).zip(args).toMap).getOrElse {
+      throw InvalidTypeException(s"invalid meta parameters for class $name : $metaParametersRef")
     }
 
     lazy val staticEnvironment: ModuleEnvironment = file.environment.staticEnvironment(this)
@@ -242,7 +246,7 @@ trait IRs {
 
     def simpleName: String = enumAST.name
 
-    def declaredMembers: List[IREnumMember] = enumConstants ++ enumMembers
+    def declaredMembers: List[IRMember] = enumConstants ++ enumMembers
 
     lazy val enumConstants: List[IREnumConstant] = enumAST.enumConstants.map(IREnumConstant(_, this))
     lazy val enumMembers: List[IREnumMember] = declaredMembers(enumAST.members, Nil)
@@ -304,7 +308,7 @@ trait IRs {
 
     def simpleName: String = dslAST.name
 
-    lazy val declaredMembers: List[IRDSLMember] = declaredMembers(dslAST.members, Nil)
+    lazy val (declaredMembers: List[IRDSLMember], priorityDeclarations: List[IRPriorities]) = declaredMembers(dslAST.members, Nil, Nil)
 
     protected def modifiersAST: List[Modifier] = dslAST.modifiers
 
@@ -322,15 +326,13 @@ trait IRs {
 
     override def isDSL: Boolean = true
 
-    private def declaredMembers(membersAST: List[DSLMember], ms: List[IRDSLMember]): List[IRDSLMember] = membersAST match {
-      case (p: PrioritiesDeclaration) :: rest => declaredMembers(rest, IRPriorities(p, this) :: ms)
-      case (o: OperatorDeclaration) :: rest => declaredMembers(rest, IROperator(o, this) :: ms)
-      case (c: ConstructorDeclaration) :: rest => declaredMembers(rest, IRDSLConstructor(c, this) :: ms)
-      case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRDSLField(mods, ft, _, this)) ++ ms)
-      case Nil => ms.reverse
+    private def declaredMembers(membersAST: List[DSLMember], ms: List[IRDSLMember], ps: List[IRPriorities]): (List[IRDSLMember], List[IRPriorities]) = membersAST match {
+      case (p: PrioritiesDeclaration) :: rest => declaredMembers(rest, ms, IRPriorities(p, this) :: ps)
+      case (o: OperatorDeclaration) :: rest => declaredMembers(rest, IROperator(o, this) :: ms, ps)
+      case (c: ConstructorDeclaration) :: rest => declaredMembers(rest, IRDSLConstructor(c, this) :: ms, ps)
+      case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRDSLField(mods, ft, _, this)) ++ ms, ps)
+      case Nil => (ms.reverse, ps.reverse)
     }
-
-    private lazy val priorityDeclarations = declaredMembers.collect { case p: IRPriorities => p }
 
     private def withDSLs(ast: List[QualifiedName], result: List[JClass]): List[JClass] = ast match {
       case qualifiedName :: rest => staticResolver.resolve(qualifiedName.names) match {
@@ -342,30 +344,6 @@ trait IRs {
       case Nil => result.reverse
     }
   }
-
-  /*
-  case class IRContext (contextAST: ContextDeclaration, dsl: IRDSL) extends IRModule with IRDSLMember {
-    def file: IRFile = dsl.file
-    def outer: Option[IRModule] = Some(dsl)
-
-    def simpleName: String = contextAST.name
-    lazy val declaredMembers: List[IRContextMember] = declaredMembers(contextAST.members, Nil)
-
-    protected def modifiersAST: List[Modifier] = contextAST.modifiers
-    protected def metaParametersAST: List[MetaParameter] = contextAST.metaParameters
-    protected def superTypeAST: Option[TypeName] = None
-    protected def interfacesAST: List[TypeName] = Nil
-
-    protected def implicitModifier = accSuper | accStatic
-
-    private def declaredMembers (membersAST: List[ContextMember], ms: List[IRContextMember]): List[IRContextMember] = membersAST match {
-      case (c: ConstructorDeclaration) :: rest    => declaredMembers(rest, IRContextConstructor(c, this) :: ms)
-      case FieldDeclaration(mods, ft, ds) :: rest => declaredMembers(rest, ds.map(IRContextField(mods, ft, _, this)) ++ ms)
-      case (o: OperatorDeclaration) :: rest       => declaredMembers(rest, IRContextOperator(o, this) :: ms)
-      case Nil => ms.reverse
-    }
-  }
-  */
 
   case class IRTopLevelClass(classAST: ClassDeclaration, file: IRFile) extends IRClass with IRTopLevelModule {
     protected def implicitModifier: Int = accSuper
@@ -438,21 +416,15 @@ trait IRs {
 
     protected def implicitModifiers: Int
 
-    override def file: IRFile = declaringClass.file
-
-    lazy val annotations: List[IRAnnotation] = readAnnotations(modifiersAST.collect { case ann: Annotation => ann })
-
-    lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifiers
-
-    def initializer: Option[IRExpression]
-  }
-
-  trait IRMemberVariable extends IRField with IRAnnotationReaders {
     protected def fieldTypeAST: TypeName
 
     protected def declaratorAST: VariableDeclarator
 
-    override def file: IRFile = declaringClass.file
+    def file: IRFile = declaringClass.file
+
+    lazy val annotations: List[IRAnnotation] = readAnnotations(modifiersAST.collect { case ann: Annotation => ann })
+
+    lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifiers
 
     def name: String = declaratorAST.name
 
@@ -468,48 +440,39 @@ trait IRs {
       else declaringClass.resolver
     }
 
-    lazy val initializer: Option[IRExpression] = declaratorAST.initializer.flatMap { src =>
-      if (isStatic) fromTypeSignature(signature, Map.empty).flatMap { expected =>
-        parseExpression(src.snippet, expected, declaringClass.staticEnvironment) match {
-          case Success(e) => Some(e)
-          case Failure(e) => errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
-        }
-      }
-      else fromTypeSignature(signature, declaringClass.metaParameters).flatMap { expected =>
-        parseExpression(src.snippet, expected, declaringClass.instanceEnvironment) match {
-          case Success(e) => Some(e)
-          case Failure(e) => errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
-        }
-      }
-    }
+    lazy val initializer: Option[IRFieldInitializer] = declaratorAST.initializer.map(IRFieldInitializer(this, _))
   }
 
-  case class IRClassField(modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRClass) extends IRMemberVariable with IRClassMember {
+  case class IRClassField(modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRClass) extends IRField with IRClassMember {
     protected def implicitModifiers = 0
   }
 
-  case class IREnumField(modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IREnum) extends IRMemberVariable with IREnumMember {
+  case class IREnumField(modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IREnum) extends IRField with IREnumMember {
     protected def implicitModifiers = 0
   }
 
-  case class IRInterfaceField(modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRInterface) extends IRMemberVariable with IRInterfaceMember {
+  case class IRInterfaceField(modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRInterface) extends IRField with IRInterfaceMember {
     protected def implicitModifiers: Int = accPublic | accStatic | accFinal
   }
 
-  case class IRDSLField(modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRDSL) extends IRMemberVariable with IRDSLMember {
+  case class IRDSLField(modifiersAST: List[Modifier], fieldTypeAST: TypeName, declaratorAST: VariableDeclarator, declaringClass: IRDSL) extends IRField with IRDSLMember {
     protected def implicitModifiers = 0
   }
 
-  case class IREnumConstant(constantAST: EnumConstant, declaringClass: IREnum) extends IRField with IREnumMember {
+  case class IREnumConstant(constantAST: EnumConstant, declaringClass: IREnum) extends JFieldDef with IRMember with IRAnnotationReaders {
     protected def modifiersAST: List[Modifier] = constantAST.annotations
 
     protected def implicitModifiers: Int = accPublic | accStatic | accFinal
+
+    lazy val annotations: List[IRAnnotation] = readAnnotations(modifiersAST.collect { case ann: Annotation => ann })
+
+    lazy val mod: JModifier = IRModifiers.mod(modifiersAST) | implicitModifiers
 
     def name: String = constantAST.name
 
     def signature: JTypeSignature = SimpleClassTypeSignature(declaringClass.internalName, Nil)
 
-    def initializer: Option[IRExpression] = None
+    def file: IRFile = declaringClass.file
   }
 
   trait IRProcedure extends JMethodDef with IRMember with IRAnnotationReaders {
@@ -550,7 +513,7 @@ trait IRs {
       Nil
     }
 
-    lazy val activateTypes: List[JRefType] = signature.activates.flatMap(fromTypeSignature_RefType(_, metaParameters))
+    lazy val activateTypes: List[JObjectType] = signature.activates.flatMap(fromClassTypeSignature(_, metaParameters))
 
     lazy val requiresContexts: List[IRContextRef] = {
       someOrError(signature.requires.traverse(fromTypeSignature(_, metaParameters).collect { case obj: JObjectType => IRContextRef(obj) }), "invalid required context type", Nil)
@@ -650,10 +613,10 @@ trait IRs {
       case Nil => result.reverse
     }
 
-    private def readClause(name: String, reader: PartialFunction[MethodClause, List[TypeName]], resolver: NameResolver): List[JTypeSignature] = clausesAST.collectFirst(reader).map(readClause(name, _, Nil, resolver)).getOrElse(Nil)
+    private def readClause(name: String, reader: PartialFunction[MethodClause, List[TypeName]], resolver: NameResolver): List[JClassTypeSignature] = clausesAST.collectFirst(reader).map(readClause(name, _, Nil, resolver)).getOrElse(Nil)
 
-    private def readClause(name: String, types: List[TypeName], signatures: List[JTypeSignature], resolver: NameResolver): List[JTypeSignature] = types match {
-      case t :: rest => resolver.typeSignature(t) match {
+    private def readClause(name: String, types: List[TypeName], signatures: List[JClassTypeSignature], resolver: NameResolver): List[JClassTypeSignature] = types match {
+      case t :: rest => resolver.classTypeSignature(t) match {
         case Success(sig) => readClause(name, rest, sig :: signatures, resolver)
         case Failure(e) =>
           error("invalid " + name + " clause of method " + this.name, e)
@@ -664,18 +627,15 @@ trait IRs {
   }
 
   class IRFormalParameter(ast: FormalParameter, resolver: NameResolver, method: IRProcedure) {
-    private lazy val initializer = ast.initializer.map(snippet => (method.name + "$init$" + generateUniqueId, snippet))
-
     def name: String = ast.name
 
-    lazy val signature: Try[JParameterSignature] = resolver.parameterSignature(ast, initializer.map(_._1))
+    lazy val signature: Try[JParameterSignature] = resolver.parameterSignature(ast, initializerMethod)
 
     def actualTypeSignature: Option[JTypeSignature] = signature.map(_.actualTypeSignature).toOption
 
-    lazy val initializerMethod: Option[IRParameterInitializer] = for {
-      returnType <- signature.map(_.actualTypeSignature).toOption
-      (name, snippet) <- initializer
-    } yield IRParameterInitializer(method, returnType, name, snippet)
+    lazy val initializerMethod: Option[IRParameterInitializer] = for ( snippet <- ast.initializer ) yield {
+      IRParameterInitializer(method, this, snippet)
+    }
   }
 
   trait IRMethod extends IRProcedure {
@@ -695,12 +655,13 @@ trait IRs {
 
     protected def clausesAST: List[MethodClause] = methodAST.clauses
 
-    lazy val methodBody: Option[IRMethodBody] = methodAST.body.flatMap { src =>
-      fromTypeSignature(signature.returnType, metaParameters).flatMap { expected =>
-        parseMethodBody(src.snippet, expected, environment) match {
-          case Success(e) => Some(e)
-          case Failure(e) => errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
+    lazy val methodBody: Option[IRMethodBody] = methodAST.body.map { src =>
+      fromTypeSignature(signature.returnType, metaParameters) match {
+        case Some(expected) => parseMethodBody(src.snippet, expected, environment) match {
+          case Success(v) => v
+          case Failure(e) => throw InvalidASTException(s"parse error at the body of method ${declaringClass.name}.$name\n  cause: $e")
         }
+        case None => throw InvalidTypeException(s"invalid expected return type for method ${declaringClass.name}.$name")
       }
     }
   }
@@ -734,11 +695,9 @@ trait IRs {
 
     protected def clausesAST: List[MethodClause] = constructorAST.clauses
 
-    lazy val constructorBody: Option[IRConstructorBody] = {
-      parseConstructorBody(constructorAST.body.snippet, environment) match {
-        case Success(e) => Some(e)
-        case Failure(e) => errorAndReturn("parse error at constructor of " + declaringClass.name, e, None)
-      }
+    lazy val constructorBody: IRConstructorBody = parseConstructorBody(constructorAST.body.snippet, environment) match {
+      case Success(v) => v
+      case Failure(e) => throw InvalidASTException(s"parse error at the body of constructor ${declaringClass.name}\n  cause: $e")
     }
   }
 
@@ -773,10 +732,10 @@ trait IRs {
 
     protected def implicitModifiers: Int = 0
 
-    lazy val initializerBody: Option[IRInitializerBody] = {
+    lazy val initializerBody: IRInitializerBody = {
       parseInitializerBody(instanceInitializerAST.block.snippet, environment) match {
-        case Success(e) => Some(e)
-        case Failure(e) => errorAndReturn("parse error at instance initializer of " + declaringClass.name, e, None)
+        case Success(e) => e
+        case Failure(e) => throw InvalidASTException(s"parse error at instance initializer of ${declaringClass.name}\n  cause: $e")
       }
     }
   }
@@ -804,10 +763,10 @@ trait IRs {
 
     protected def implicitModifiers: Int = accStatic
 
-    lazy val initializerBody: Option[IRInitializerBody] = {
+    lazy val initializerBody: IRInitializerBody = {
       parseInitializerBody(staticInitializerAST.block.snippet, environment) match {
-        case Success(e) => Some(e)
-        case Failure(e) => errorAndReturn("parse error at static initializer of " + declaringClass.name, e, None)
+        case Success(e) => e
+        case Failure(e) => throw InvalidASTException(s"parse error at static initializer of ${declaringClass.name}\n  cause: $e")
       }
     }
   }
@@ -858,12 +817,13 @@ trait IRs {
       case NotPredicate(t, p) => JNotPredicateDef(predicateSignature(t), p.flatMap(resolver.priority))
     }
 
-    lazy val operatorBody: Option[IRMethodBody] = operatorAST.body.flatMap { src =>
-      fromTypeSignature(signature.returnType, metaParameters).flatMap { expected =>
-        parseMethodBody(src.snippet, expected, environment) match {
-          case Success(e) => Some(e)
-          case Failure(e) => errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
+    lazy val operatorBody: Option[IRMethodBody] = operatorAST.body.map { src =>
+      fromTypeSignature(signature.returnType, metaParameters) match {
+        case Some(expected) => parseMethodBody(src.snippet, expected, environment) match {
+          case Success(v) => v
+          case Failure(e) => throw InvalidASTException(s"parse error at the body of operator ${declaringClass.name}.$name\n  cause: $e")
         }
+        case None => throw InvalidTypeException(s"invalid expected return type for operator ${declaringClass.name}.$name")
       }
     }
 
@@ -872,7 +832,7 @@ trait IRs {
     }
   }
 
-  case class IRPriorities(prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) extends IRDSLMember {
+  case class IRPriorities(prioritiesAST: PrioritiesDeclaration, declaringDSL: IRDSL) {
     def priorityNames: List[String] = prioritiesAST.names
 
     lazy val constraints: List[List[JPriority]] = prioritiesAST.constraints.map(declaringDSL.staticResolver.constraint)
@@ -895,7 +855,41 @@ trait IRs {
     protected def returnTypeSignature: JTypeSignature
   }
 
-  case class IRParameterInitializer(method: IRProcedure, returnTypeSignature: JTypeSignature, name: String, snippet: ExpressionSnippet) extends IRSyntheticMethod {
+  case class IRFieldInitializer (field: IRField, snippet: ExpressionSnippet) extends IRSyntheticMethod {
+    protected def modifiers: Int = {
+      if (field.isStatic) accPublic | accStatic | accFinal
+      else accPublic | accFinal
+    }
+
+    protected def metaParameters: List[FormalMetaParameter] = Nil
+
+    protected def returnTypeSignature: JTypeSignature = field.signature
+
+    protected def parameterSignatures: List[JParameterSignature] = Nil
+
+    def name: String = field.name + "$init$" + generateUniqueId
+
+    def declaringClass: IRModule = field.declaringClass
+
+    lazy val expression: IRExpression = {
+      if (field.isStatic) fromTypeSignature(field.signature, Map.empty) match {
+        case Some(expected) => parseExpression(snippet.snippet, expected, declaringClass.staticEnvironment) match {
+          case Success(v) => v
+          case Failure(e) => throw InvalidASTException(s"parse error at the initializer of field ${declaringClass.name}.$name\n  cause: $e")
+        }
+        case None           => throw InvalidTypeException(s"invalid expected type for the initializer of field ${field.declaringClass.name}.$name")
+      }
+      else fromTypeSignature(field.signature, declaringClass.metaParameters) match {
+        case Some(expected) => parseExpression(snippet.snippet, expected, declaringClass.instanceEnvironment) match {
+          case Success(v) => v
+          case Failure(e) => throw InvalidASTException(s"parse error at the initializer of field ${declaringClass.name}.$name\n  cause: $e")
+        }
+        case None           => throw InvalidTypeException(s"invalid expected type for the initializer of field ${field.declaringClass.name}.$name")
+      }
+    }
+  }
+
+  case class IRParameterInitializer (method: IRProcedure, param: IRFormalParameter, snippet: ExpressionSnippet) extends IRSyntheticMethod {
     protected def modifiers: Int = {
       if (method.isStatic) accPublic | accStatic | accFinal
       else accPublic | accFinal
@@ -905,20 +899,27 @@ trait IRs {
 
     protected def parameterSignatures: List[JParameterSignature] = Nil
 
-    def declaringClass: IRModule = method.declaringClass
-
-    def environment: ModuleEnvironment = {
-      if (isStatic) declaringClass.staticEnvironment
-      else declaringClass.instanceEnvironment
+    protected def returnTypeSignature: JTypeSignature = param.actualTypeSignature.getOrElse {
+      throw InvalidTypeException(s"invalid type signature for the parameter initializer of method ${declaringClass.name}.${method.name}")
     }
 
-    lazy val expression: Option[IRExpression] = {
-      fromTypeSignature(returnTypeSignature, method.metaParameters).flatMap { expected =>
-        parseExpression(snippet.snippet, expected, environment) match {
-          case Success(e) => Some(e)
-          case Failure(e) => errorAndReturn("parse error at " + declaringClass.name + '.' + name, e, None)
+    def name: String = method.name + "$init$" + generateUniqueId
+
+    def declaringClass: IRModule = method.declaringClass
+
+    lazy val expression: IRExpression = {
+      fromTypeSignature(returnTypeSignature, method.metaParameters) match {
+        case Some(expected) => parseExpression(snippet.snippet, expected, environment) match {
+          case Success(v) => v
+          case Failure(e) => throw InvalidASTException(s"parse error at the parameter initializer of method ${declaringClass.name}.$name\n  cause: $e")
         }
+        case None           => throw InvalidTypeException(s"invalid expected type for the parameter initializer of method ${declaringClass.name}.${method.name}")
       }
+    }
+
+    private def environment: ModuleEnvironment = {
+      if (isStatic) declaringClass.staticEnvironment
+      else declaringClass.instanceEnvironment
     }
   }
 

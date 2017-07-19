@@ -66,10 +66,15 @@ trait JClassLoader {
   lazy val errorClass: JClass    = loadClass_Unsafe(errorClassName)
   lazy val functionClass: JClass = loadClass_Unsafe(functionClassName)
   lazy val consumerClass: JClass = loadClass_Unsafe(consumerClassName)
+  lazy val supplierClass: JClass = loadClass_Unsafe(supplierClassName)
 
   lazy val runtimeExceptionClass: JClass = loadClass_Unsafe(runtimeExceptionName)
   lazy val predefOperatorsClass: JClass  = loadClass_Unsafe(predefOperatorsName)
 
+  lazy val pairClass: JClass              = loadClass_Unsafe(pairClassName)
+  lazy val arraysUtilClass: JClass        = loadClass_Unsafe(arraysUtilClassName)
+  lazy val activatedContextsClass: JClass = loadClass_Unsafe(activatedCtxClassName)
+  lazy val supplierRunnerClass: JClass    = loadClass_Unsafe(supplierRunnerClassName)
 
   def erase (signature: JTypeSignature, metaParams: List[FormalMetaParameter]): Try[JErasedType] = signature match {
     case prm: JPrimitiveTypeSignature    => Success(erase(prm))

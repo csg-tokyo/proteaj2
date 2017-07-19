@@ -77,25 +77,15 @@ object JavaRepr {
 
   case class Param (parameterType: TypeSig, name: String)
 
-  type Statement = Block :|: LocalDeclarationStatement :|: IfStatement :|: WhileStatement :|: ForStatement :|: TryStatement :|: ThrowStatement :|: ReturnStatement :|: ExpressionStatement :|: ExplicitConstructorCall :|: UNil
-
-  case class LocalDeclarationStatement (declaration: LocalDeclaration)
+  type Statement = Block :|: LocalDeclaration :|: IfStatement :|: WhileStatement :|: EnhancedForStatement :|: TryStatement :|: ThrowStatement :|: ReturnStatement :|: ExpressionStatement :|: BreakStatement.type :|: ThisConstructorCall :|: SuperConstructorCall :|: UNil
   
-  case class LocalDeclaration (localType: TypeSig, declarators: List[LocalDeclarator])
-
-  case class LocalDeclarator (name: String, dim: Int, initializer: Option[Expression])
+  case class LocalDeclaration (localType: TypeSig, name: String, initializer: Option[Expression])
 
   case class IfStatement (condition: Expression, thenStatement: Statement, elseStatement: Option[Statement])
 
   case class WhileStatement (condition: Expression, loopBody: Statement)
 
-  type ForStatement = NormalForStatement :|: EnhancedForStatement :|: UNil
-
-  type ForInit = LocalDeclaration :|: List[Expression] :|: UNil
-
-  case class NormalForStatement (forInit: ForInit, condition: Option[Expression], update: List[Expression], loopBody: Statement)
-
-  case class EnhancedForStatement (elementType: TypeSig, name: String, dim: Int, iterable: Expression, loopBody: Statement)
+  case class EnhancedForStatement (elementType: TypeSig, name: String, iterable: Expression, loopBody: Statement)
 
   case class TryStatement (tryBlock: Block, catchBlocks: List[ExceptionHandler], finallyBlock: Option[Block])
 
@@ -103,25 +93,23 @@ object JavaRepr {
 
   case class ThrowStatement (exception: Expression)
 
-  case class ReturnStatement (returnValue: Expression)
+  case class ReturnStatement (returnValue: Option[Expression])
 
   case class Block (statements: List[Statement])
 
   case class ExpressionStatement (statementExpression: Expression)
 
-  type ExplicitConstructorCall = ThisConstructorCall :|: SuperConstructorCall :|: UNil
+  case object BreakStatement
 
   case class ThisConstructorCall (typeArguments: List[TypeArg], arguments: List[Expression])
 
   case class SuperConstructorCall (typeArguments: List[TypeArg], arguments: List[Expression])
 
-  type Expression = Assignment :|: MethodCall :|: FieldAccess :|: CastExpression :|: ArrayAccess :|: NewExpression :|: AnonymousClass :|: NewArray :|: ArrayInit :|: LocalRef :|: ThisRef :|: JavaLiteral :|: UNil
+  type Expression = Assignment :|: MethodCall :|: FieldAccess :|: CastExpression :|: ArrayAccess :|: NewExpression :|: AnonymousClass :|: Lambda :|: NewArray :|: ArrayInit :|: LocalRef :|: ThisRef :|: JavaLiteral :|: UNil
 
   type Receiver = Expression :|: ClassRef :|: SuperRef :|: UNil
 
-  type Assignment = SimpleAssignment
-
-  case class SimpleAssignment (left: Expression, right: Expression)
+  case class Assignment (left: Expression, right: Expression)
 
   case class MethodCall (receiver: Receiver, typeArguments: List[TypeArg], methodName: String, arguments: List[Expression])
 
@@ -134,6 +122,8 @@ object JavaRepr {
   case class NewExpression (typeArguments: List[TypeArg], constructType: ClassSig, arguments: List[Expression])
 
   case class AnonymousClass (baseType: ClassSig, arguments: List[Expression], members: List[ClassMember])
+
+  case class Lambda (parameters: List[Param], body: Block)
 
   case class NewArray (componentType: TypeSig, arraySize: List[Expression], dim: Int)
 

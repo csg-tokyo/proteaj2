@@ -6,6 +6,8 @@ import phenan.prj.body._
 import phenan.prj.declaration.DeclarationCompiler
 import phenan.prj.exception.InitializationFailedException
 import phenan.prj.generator._
+import phenan.prj.generator.ir2sir.SimplifiedIRGeneratorsModule
+import phenan.prj.generator.sir2javarepr._
 import phenan.prj.internal._
 import phenan.prj.ir._
 import phenan.prj.signature._
@@ -40,7 +42,9 @@ trait JCompiler {
 
 object JCompiler {
   case class JCompilerImpl (config: Config) extends JCompiler
-    with BodyCompiler with BodyParser with DeclarationCompiler with JavaClassFileGenerator with JavaReprGenerator
+    with BodyCompiler with BodyParser with DeclarationCompiler with JavaClassFileGenerator with JavaReprGeneratorsModule
+    with JavaStatementGeneratorsModule with JavaExpressionGeneratorsModule with JavaLiteralsGeneratorsModule with JavaAnnotationsGeneratorsModule
+    with JavaSignatureGeneratorsModule with SimplifiedIRGeneratorsModule with SimplifiedIRs
     with StatementParsersModule with ExpressionParsersModule with ExpressionOperatorParsersModule with ExpressionOperandParsersModule
     with JavaExpressionParsersModule with ArgumentParsersModule with LiteralParsersModule with LiteralOperatorParsersModule
     with LiteralOperandParsersModule with JavaLiteralParsersModule with TypeParsersModule with CommonParsersModule with ContextSensitiveParsersModule

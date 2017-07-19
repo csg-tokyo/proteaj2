@@ -5,12 +5,14 @@ import java.net.URI
 import javax.tools._
 
 import phenan.prj.Application
+import phenan.prj.generator.ir2sir.SimplifiedIRGeneratorsModule
+import phenan.prj.generator.sir2javarepr.JavaReprGeneratorsModule
 import phenan.prj.ir._
 
 import scala.collection.JavaConverters._
 
 trait JavaClassFileGenerator {
-  this: JavaReprGenerator with IRs with Application =>
+  this: JavaReprGeneratorsModule with SimplifiedIRGeneratorsModule with IRs with Application =>
 
   def generateClassFile (files: List[IRFile]): Unit = {
     val compiler = ToolProvider.getSystemJavaCompiler
@@ -26,7 +28,8 @@ trait JavaClassFileGenerator {
 
   private def createJavaSourceObject (file: IRFile): Option[JavaSourceObject] = try {
     val uri = getURI(file.filePath)
-    val src = generateJavaFile(file)
+    val sir = SimplifiedIRGenerators.compilationUnit(file)
+    val src = JavaReprGenerators.javaFile(sir)
     Some(new JavaSourceObject(uri, JavaCodeGenerators.javaFile(src)))
   } catch { case e: Exception  =>
     error("compile failed : " + file.filePath, e)

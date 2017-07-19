@@ -1,11 +1,10 @@
-package phenan.prj.body
+package phenan.prj
 
-import phenan.prj._
 import phenan.prj.ir._
 
-import scalaz.syntax.traverse._
 import scalaz.std.list._
 import scalaz.std.option._
+import scalaz.syntax.traverse._
 
 trait ExpectedTypeInferencer {
   this: JTypeLoader with IRExpressions with JModules with JMembers =>

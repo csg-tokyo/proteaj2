@@ -608,10 +608,12 @@ trait Unifier {
     }
 
     private def checkArgs (args: List[(MetaArgument, JTypeArgument)], env: MetaArgs): Option[MetaArgs] = args match {
-      case (mv, arg) :: rest => MetaArgumentInferencer.check(mv, arg, env) match {
-        case Some(e) => checkArgs(rest, e)
-        case None    => None
-      }
+      case (mv, arg) :: rest =>
+        val x = MetaArgumentInferencer.check(mv, arg, env)
+        x match {
+          case Some(e) => checkArgs(rest, e)
+          case None    => None
+        }
       case Nil => Some(env)
     }
   }
@@ -669,14 +671,16 @@ trait Unifier {
     def check (cap: JCapturedWildcardType, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = None
     def check (cap: JCapturedWildcardType, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = None
 
-    // never called (maybe)
-    def check (unb: JUnboundTypeVariable, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = None
-    def check (unb: JUnboundTypeVariable, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = None
-    def check (unb: JUnboundTypeVariable, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = None
-    def check (unb: JUnboundTypeVariable, pts: JPrimitiveTypeSignature, args: MetaArgs): Option[MetaArgs] = None
-    def check (unb: JUnboundTypeVariable, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = None
-    def check (unb: JUnboundTypeVariable, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = None
-    def check (unb: JUnboundTypeVariable, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = None
+    def check (unb: JUnboundTypeVariable, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = Some(args)
+    def check (unb: JUnboundTypeVariable, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = Some(args)
+    def check (unb: JUnboundTypeVariable, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = Some(args)
+    def check (unb: JUnboundTypeVariable, pts: JPrimitiveTypeSignature, args: MetaArgs): Option[MetaArgs] = Some(args)
+    def check (unb: JUnboundTypeVariable, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = Some(args)
+    def check (unb: JUnboundTypeVariable, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = {
+      if (args.contains(tvs.name)) Some(args)
+      else Some(args + (tvs.name -> unb))
+    }
+    def check (unb: JUnboundTypeVariable, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = Some(args)
 
     def check (pv: MetaValue, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = {
       if (args.contains(pvs.name)) {

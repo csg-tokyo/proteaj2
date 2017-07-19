@@ -64,7 +64,7 @@ trait Environments {
   }
 
   class Environment_Instance(val declaringModule: IRModule, val fileEnvironment: FileEnvironment) extends ModuleEnvironment {
-    def thisType: Option[JObjectType] = declaringModule.thisType
+    def thisType: Option[JObjectType] = Some(declaringModule.thisType)
 
     def resolver: NameResolver = declaringModule.resolver
   }

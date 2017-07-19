@@ -7,7 +7,6 @@ dsl MatchDSL {
   priority match, case, matcher, var, id {
     match < case < matcher < var < id
   }
-
   static <T, R> R [match] _ "match" "{" _+ "}" ( T t, Case<T, R>... cases ) {
     for (Case<T, R> c : cases) {
       Optional<R> result = c.apply(t);
@@ -18,18 +17,18 @@ dsl MatchDSL {
   static <T, R> Case0<T, R> [case] "|" _ "=>" _ ( Matcher0<T> m, Lazy |- R f ) {
     return new Case0<T, R> (m, new DelayedApplication<Lazy, R>(f, new Lazy()));
   }
-  static <T, A, name: Identifier, R> Case1<T, A, name, R> [case] "|" _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> |- R f ) {
+case1operator:
+  static <T, A, name: Identifier, R> Case<T, R> [case] "|" _ "=>" _ ( Matcher1<T, A, name> m, Var<A, name> |- R f ) {
     return new Case1<T, A, name, R> (m, f);
   }
   static <T, R> DefaultCase<T, R> [case] "|" "_" "=>" _ ( Lazy |- R f ) {
     return new DefaultCase<T, R> (new DelayedApplication<Lazy, R>(f, new Lazy()));
   }
-
-  static <T, name: Identifier> Matcher1<T, T, name> [var] name () {
+buildIdentifier:
+  static exact <T, name: Identifier> Matcher1<T, T, name> [var] name () {
     return new VariablePattern<T, name> ();
   }
-
-  static Identifier[id] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+  static exact Identifier[id] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
     return new Identifier(name);
   }
 }

@@ -13,8 +13,9 @@ trait JavaReprGenerator {
 
   /* AST transformation : ProteaJ IR ==> Java AST */
 
-  def generateJavaFile (file: IRFile): JavaFile = JavaFile (file.packageName.map(_.names.mkString(".")), file.topLevelModules.map(moduleDef))
+  def generateJavaFile (file: IRFile): JavaFile = ??? //JavaFile (file.packageName.map(_.names.mkString(".")), file.topLevelModules.map(moduleDef))
 
+  /*
   private def moduleDef (clazz: IRModule): ModuleDef = clazz match {
     case cls: IRTopLevelClass     => Union[ModuleDef](classDef(cls))
     case enm: IRTopLevelEnum      => Union[ModuleDef](enumDef(enm))
@@ -57,7 +58,7 @@ trait JavaReprGenerator {
     def typeParameters: List[TypeParam] = typeParams(dsl.signature.metaParams)
     def superType: ClassSig = objectClassSig
     def interfaces = Nil
-    def members: List[ClassMember] = dsl.declaredMembers.flatMap(dslMember) ++ dsl.syntheticMethods.map(syntheticMember)
+    def members: List[ClassMember] = dsl.declaredMembers.map(dslMember) ++ dsl.syntheticMethods.map(syntheticMember)
   }
 
   private def classMember (member: IRClassMember): ClassMember = member match {
@@ -85,11 +86,10 @@ trait JavaReprGenerator {
     case module: IRModule          => Union[ClassMember](moduleDef(module))
   }
 
-  private def dslMember (member: IRDSLMember): Option[ClassMember] = member match {
-    case field: IRDSLField             => Some(Union[ClassMember](fieldDef(field)))
-    case operator: IROperator          => Some(Union[ClassMember](operatorDef(operator)))
-    case constructor: IRDSLConstructor => Some(Union[ClassMember](constructorDef(constructor)))
-    case _: IRPriorities               => None
+  private def dslMember (member: IRDSLMember): ClassMember = member match {
+    case field: IRDSLField             => Union[ClassMember](fieldDef(field))
+    case operator: IROperator          => Union[ClassMember](operatorDef(operator))
+    case constructor: IRDSLConstructor => Union[ClassMember](constructorDef(constructor))
   }
 
   private def syntheticMember (synthetic: IRSyntheticMethod): ClassMember = synthetic match {
@@ -101,7 +101,7 @@ trait JavaReprGenerator {
     def modifiers: JModifier = field.mod
     def fieldType: TypeSig = typeSig(field.signature)
     def name: String = field.name
-    def initializer: Option[Expression] = field.initializer.map(expression(_, Nil))
+    def initializer: Option[Expression] = ??? //field.initializer.map(expression(_, Nil))
   }
 
   private def methodDef (method: IRMethod): MethodDef = new MethodDef {
@@ -112,7 +112,7 @@ trait JavaReprGenerator {
     def name: String = method.name
     def parameters: List[Param] = method.parameters.map(parameter)
     def throws: List[TypeSig] = method.signature.throwTypes.map(typeSig)
-    def body: Option[Block] = method.methodBody.map(methodBody(_, method.requiresContexts, method.activateTypes))
+    def body: Option[Block] = method.methodBody.map(body => methodBody(body, method.requiresContexts, method.activateTypes))
   }
 
   private def operatorDef (operator: IROperator): MethodDef = new MethodDef {
@@ -134,7 +134,7 @@ trait JavaReprGenerator {
     def name: String = initializer.name
     def parameters = Nil
     def throws = Nil
-    def body: Option[Block] = initializer.expression.map(parameterInitializer)
+    def body: Option[Block] = Some(parameterInitializer(initializer.expression))
   }
 
   private def constructorDef (constructor: IRConstructor): ConstructorDef = new ConstructorDef {
@@ -144,21 +144,15 @@ trait JavaReprGenerator {
     def className: String = constructor.declaringClass.simpleName
     def parameters: List[Param] = constructor.parameters.map(parameter)
     def throws: List[TypeSig] = constructor.signature.throwTypes.map(typeSig)
-    def body: Block = constructor.constructorBody.map(constructorBody(_, constructor.requiresContexts, constructor.activateTypes)).getOrElse {
-      throw InvalidASTException("constructor must have its body")
-    }
+    def body: Block = constructorBody(constructor.constructorBody, constructor.requiresContexts, constructor.activateTypes)
   }
 
-  private def instanceInitializerDef (iin: IRInstanceInitializer): InstanceInitializerDef = InstanceInitializerDef {
-    iin.initializerBody.map(initializerBody).getOrElse {
-      throw InvalidASTException("invalid instance initializer")
-    }
+  private def instanceInitializerDef (iin: IRInstanceInitializer): InstanceInitializerDef = {
+    InstanceInitializerDef(initializerBody(iin.initializerBody))
   }
 
-  private def staticInitializerDef (sin: IRStaticInitializer): StaticInitializerDef = StaticInitializerDef {
-    sin.initializerBody.map(initializerBody).getOrElse {
-      throw InvalidASTException("invalid static initializer")
-    }
+  private def staticInitializerDef (sin: IRStaticInitializer): StaticInitializerDef = {
+    StaticInitializerDef(initializerBody(sin.initializerBody))
   }
 
   private def enumConstantDef (constant: IREnumConstant): EnumConstantDef = EnumConstantDef(constant.name)
@@ -738,5 +732,5 @@ trait JavaReprGenerator {
     private def strLit (str: String) = Union[AnnotationElement](Union[JavaLiteral](Literal(str)))
 
     private def classLit (clazz: JClass) = Union[AnnotationElement](Union[JavaLiteral](classLiteral(clazz)))
-  }
+  }*/
 }

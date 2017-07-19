@@ -48,18 +48,14 @@ object JavaCodeGenerators extends Generators {
     param.parameterType -> param.name
   }
 
-  lazy val statement: Generator[Statement] = block :|: localDeclarationStatement :|: ifStatement :|: whileStatement :|: forStatement :|: tryStatement :|: throwStatement :|: returnStatement :|: expressionStatement :|: explicitConstructorCall :|: nil
+  lazy val statement: Generator[Statement] = block :|: localDeclarationStatement :|: ifStatement :|: whileStatement :|: enhancedForStatement :|: tryStatement :|: throwStatement :|: returnStatement :|: expressionStatement :|: breakStatement :|: thisConstructorCall :|: superConstructorCall :|: nil
 
   lazy val block: Generator[Block] = '{' ~> indent(statement.*(newLine)) <~ '}' ^^ { _.statements }
 
-  lazy val localDeclarationStatement: Generator[LocalDeclarationStatement] = localDeclaration <~ ';' ^^ { _.declaration }
+  lazy val localDeclarationStatement: Generator[LocalDeclaration] = localDeclaration <~ ';'
 
-  lazy val localDeclaration: Generator[LocalDeclaration] = typeSig ~ localDeclarator.*(',') ^^ { local =>
-    local.localType -> local.declarators
-  }
-
-  lazy val localDeclarator: Generator[LocalDeclarator] = string ~ dimension ~ ( '=' ~> expression ).? ^^ { local =>
-    local.name -> local.dim -> local.initializer
+  lazy val localDeclaration: Generator[LocalDeclaration] = typeSig ~ string ~ ( '=' ~> expression ).? ^^ { local =>
+    local.localType -> local.name -> local.initializer
   }
 
   lazy val ifStatement: Generator[IfStatement] = "if" ~> ( '(' ~> expression <~ ')' ) ~ statement ~ ( "else" ~> statement ).? ^^ { stmt =>
@@ -70,17 +66,9 @@ object JavaCodeGenerators extends Generators {
     stmt.condition -> stmt.loopBody
   }
 
-  lazy val forStatement: Generator[ForStatement] = normalForStatement :|: enhancedForStatement :|: nil
-
-  lazy val normalForStatement: Generator[NormalForStatement] = "for" ~> ( '(' ~> forInit ~ ( ';' ~> expression.? <~ ';' ) ~ expression.*(',') <~ ')' ) ~ statement ^^ { stmt =>
-    stmt.forInit -> stmt.condition -> stmt.update -> stmt.loopBody
+  lazy val enhancedForStatement: Generator[EnhancedForStatement] = "for" ~> ( '(' ~> typeSig ~ string ~ ( ':' ~> expression ) <~ ')' ) ~ statement ^^ { stmt =>
+    stmt.elementType -> stmt.name -> stmt.iterable -> stmt.loopBody
   }
-
-  lazy val enhancedForStatement: Generator[EnhancedForStatement] = "for" ~> ( '(' ~> typeSig ~ string ~ dimension ~ ( ':' ~> expression ) <~ ')' ) ~ statement ^^ { stmt =>
-    stmt.elementType -> stmt.name -> stmt.dim -> stmt.iterable -> stmt.loopBody
-  }
-
-  lazy val forInit: Generator[ForInit] = localDeclaration :|: expression.*(',') :|: nil
 
   lazy val tryStatement: Generator[TryStatement] = ( "try" ~> block ) ~ catchClause.* ~ ( "finally" ~> block ).? ^^ { stmt =>
     stmt.tryBlock -> stmt.catchBlocks -> stmt.finallyBlock
@@ -92,11 +80,11 @@ object JavaCodeGenerators extends Generators {
 
   lazy val throwStatement: Generator[ThrowStatement] = "throw" ~> expression <~ ';' ^^ { _.exception }
 
-  lazy val returnStatement: Generator[ReturnStatement] = "return" ~> expression <~ ';' ^^ { _.returnValue }
+  lazy val returnStatement: Generator[ReturnStatement] = "return" ~> expression.? <~ ';' ^^ { _.returnValue }
 
   lazy val expressionStatement: Generator[ExpressionStatement] = expression <~ ';' ^^ { _.statementExpression }
 
-  lazy val explicitConstructorCall: Generator[ExplicitConstructorCall] = thisConstructorCall :|: superConstructorCall :|: nil
+  lazy val breakStatement: Generator[BreakStatement.type] = "break" <~ ';'  ^^ { _ => () }
 
   lazy val thisConstructorCall: Generator[ThisConstructorCall] = typeArg.*?('<', ',', '>') ~ ( "this" ~> '(' ~> expression.*(',') <~ ')' ) ^^ { cc =>
     cc.typeArguments -> cc.arguments
@@ -106,13 +94,11 @@ object JavaCodeGenerators extends Generators {
     cc.typeArguments -> cc.arguments
   }
 
-  lazy val expression: Generator[Expression] = assignment :|: methodCall :|: fieldAccess :|: castExpression :|: arrayAccess :|: newExpression :|: anonymousClass :|: newArray :|: arrayInit :|: localRef :|: thisRef :|: javaLiteral :|: nil
+  lazy val expression: Generator[Expression] = assignment :|: methodCall :|: fieldAccess :|: castExpression :|: arrayAccess :|: newExpression :|: anonymousClass :|: lambda :|: newArray :|: arrayInit :|: localRef :|: thisRef :|: javaLiteral :|: nil
 
   lazy val receiver: Generator[Receiver] = expression :|: classRef :|: superRef :|: nil
 
-  lazy val assignment: Generator[Assignment] = simpleAssignment
-
-  lazy val simpleAssignment: Generator[SimpleAssignment] = expression ~ ( '=' ~> expression ) ^^ { assign =>
+  lazy val assignment: Generator[Assignment] = expression ~ ( '=' ~> expression ) ^^ { assign =>
     assign.left -> assign.right
   }
 
@@ -138,6 +124,10 @@ object JavaCodeGenerators extends Generators {
 
   lazy val anonymousClass: Generator[AnonymousClass] = "new" ~> classSig ~ ( '(' ~> expression.*(',') <~ ')' ) ~ ( '{' ~> indent(classMember.*(newLine)) <~ '}' ) ^^ { expr =>
     expr.baseType -> expr.arguments -> expr.members
+  }
+
+  lazy val lambda: Generator[Lambda] = ( '(' ~> parameter.*(',') <~ ')' ) ~ ( "->" ~> block ) ^^ { lambda =>
+    lambda.parameters -> lambda.body
   }
 
   lazy val newArray: Generator[NewArray] = "new" ~> typeSig ~ ( '[' ~> expression <~ ']' ).* ~ dimension ^^ { expr =>

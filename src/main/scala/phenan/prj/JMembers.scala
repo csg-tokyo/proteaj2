@@ -102,6 +102,7 @@ trait JMembers {
   case class JParameter(signature: JParameterSignature, env: MetaArgs) {
     lazy val contexts: List[JGenericType] = signature.contexts.map(sig => JGenericType(sig, env))
     lazy val genericType: JGenericType = JGenericType(signature.typeSig, env)
+    lazy val actualGenericType: JGenericType = JGenericType(signature.actualTypeSignature, env)
     lazy val scopes: List[JGenericType] = signature.scopes.map(sig => JGenericType(sig, env))
 
     def varArgs: Boolean = signature.varArgs
