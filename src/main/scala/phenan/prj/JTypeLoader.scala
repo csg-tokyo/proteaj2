@@ -2,6 +2,7 @@ package phenan.prj
 
 import phenan.prj.exception._
 
+import scala.util._
 import scalaz.Memo._
 import scalaz.syntax.traverse._
 import scalaz.std.list._
@@ -12,19 +13,23 @@ trait JTypeLoader {
 
   val arrayTypeOf: JType => JArrayType = mutableHashMapMemo(getArrayType)
 
-  def getObjectType (clazz: JClass, args: List[MetaArgument]): Option[JObjectType] = {
+  def getObjectType (clazz: JClass, args: List[MetaArgument]): Try[JObjectType] = {
     val result = getLoadedObjectType(clazz, args)
-    if (validTypeArgs(clazz.signature.metaParams, args, result.env)) Some(result)
-    else {
-      error("invalid type arguments of class " + clazz.name + " : " + args.mkString("<", ",", ">"))
-      None
+    if (validTypeArgs(clazz.signature.metaParams, args, result.env)) Success(result)
+    else Failure(InvalidTypeException(s"invalid type arguments of class ${clazz.name} : ${args.mkString("<", ",", ">")}"))
+  }
+
+  def getObjectType_NoFail(clazz: JClass, args: List[MetaArgument]): Option[JObjectType] = {
+    getObjectType(clazz, args) match {
+      case Success(t) => Some(t)
+      case Failure(e) =>
+        error("fail to load type", e)
+        None
     }
   }
 
-  def getObjectType_Unsafe (clazz: JClass, args: List[MetaArgument]): JObjectType = {
-    val result = getLoadedObjectType(clazz, args)
-    if (validTypeArgs(clazz.signature.metaParams, args, result.env)) result
-    else throw InvalidTypeException(s"type ${clazz.name}${args.map(_.name).mkString("<", ",", ">")} is not found")
+  private def getObjectType_Unsafe (clazz: JClass, args: List[MetaArgument]): JObjectType = {
+    getObjectType(clazz, args).fold(e => throw InitializationFailedException(e), identity)
   }
 
   lazy val typeType: JObjectType     = getObjectType_Unsafe(typeClass, Nil)
@@ -59,7 +64,7 @@ trait JTypeLoader {
   )
 
   lazy val superTypesOfArray: List[JObjectType] = CommonNames.superClassesOfArray.flatMap { name =>
-    loadClass_NoFail(name).flatMap(getObjectType(_, Nil))
+    loadClass_NoFail(name).flatMap(getObjectType_NoFail(_, Nil))
   }
 
   lazy val runtimeExceptionType: JObjectType = getObjectType_Unsafe(runtimeExceptionClass, Nil)

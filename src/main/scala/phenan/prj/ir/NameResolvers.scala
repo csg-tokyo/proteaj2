@@ -21,10 +21,15 @@ trait NameResolvers {
 
   trait NameResolver {
 
-    def environment: Map[String, MetaArgument]
+    def environment: MetaArgs
 
     def resolve (name: String): Try[JClass]
     def priority (name: String): Option[JPriority]
+
+    def metaArgumentFor (name: String): Try[MetaArgument] = environment.get(name) match {
+      case Some(arg) => Success(arg)
+      case None      => Failure(InvalidTypeException(s"missing meta argument for $name"))
+    }
 
     def isTypeVariable (name: String): Boolean
     def isMetaVariable (name: String): Boolean

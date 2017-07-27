@@ -8,7 +8,7 @@ import phenan.prj._
 trait SimplifiedIRs {
   this: JModules with JMembers with JErasedTypes with Application =>
 
-  case class SIRFile (packageName: Option[String], modules: List[SIRModule])
+  case class SIRFile (packageName: Option[String], modules: List[SIRModule], filePath: String)
 
   sealed trait SIRModule extends SIRMember {
     def annotations: List[SIRAnnotation]

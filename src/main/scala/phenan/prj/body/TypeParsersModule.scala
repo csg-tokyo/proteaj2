@@ -41,7 +41,7 @@ trait TypeParsersModule {
       lazy val componentType: ContextFreeParser[JType] = primitiveTypeName | objectType
       lazy val refType: ContextFreeParser[JRefType] = arrayType | typeVariable | objectType
       lazy val objectType: ContextFreeParser[JObjectType] = className ~ metaArguments ^^? {
-        case clazz ~ args => getObjectType(clazz, args)
+        case clazz ~ args => getObjectType(clazz, args).toOption
       }
       lazy val packageName: ContextFreeParser[List[String]] = (identifier <~ '.').repFor[List[String]](Nil, isNotClassName, _ :+ _)
 

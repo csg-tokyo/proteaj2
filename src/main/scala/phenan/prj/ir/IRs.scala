@@ -147,12 +147,14 @@ trait IRs {
       case None => constructResolver(metaParametersAST, Nil, staticResolver)
     }
 
-    lazy val thisType: JObjectType = metaParametersRef.flatMap(getObjectType(this, _)).getOrElse {
-      throw InvalidTypeException(s"this object of class $name has invalid type")
+    lazy val thisType: JObjectType = metaParametersRef.flatMap(getObjectType(this, _)) match {
+      case Success(t) => t
+      case Failure(e) => throw InvalidTypeException(s"this object of class $name has invalid type", e)
     }
 
-    lazy val metaParameters: MetaArgs = metaParametersRef.map(args => signature.metaParams.map(_.name).zip(args).toMap).getOrElse {
-      throw InvalidTypeException(s"invalid meta parameters for class $name : $metaParametersRef")
+    lazy val metaParameters: MetaArgs = metaParametersRef.map(args => signature.metaParams.map(_.name).zip(args).toMap) match {
+      case Success(args) => args
+      case Failure(e) => throw InvalidTypeException(s"invalid meta parameters for class $name : $metaParametersRef", e)
     }
 
     lazy val staticEnvironment: ModuleEnvironment = file.environment.staticEnvironment(this)
@@ -164,14 +166,14 @@ trait IRs {
 
     private lazy val dslInfo = readDsl(annotations)
 
-    private lazy val metaParametersRef: Option[List[MetaArgument]] = metaParametersRef(signature.metaParams, Nil)
+    private lazy val metaParametersRef: Try[List[MetaArgument]] = metaParametersRef(signature.metaParams, Nil)
 
-    private def metaParametersRef(mps: List[FormalMetaParameter], ref: List[MetaArgument]): Option[List[MetaArgument]] = mps match {
-      case mp :: rest => resolver.environment.get(mp.name) match {
-        case Some(arg) => metaParametersRef(rest, arg :: ref)
-        case None => None
+    private def metaParametersRef(mps: List[FormalMetaParameter], ref: List[MetaArgument]): Try[List[MetaArgument]] = mps match {
+      case mp :: rest => resolver.metaArgumentFor(mp.name) match {
+        case Success(arg) => metaParametersRef(rest, arg :: ref)
+        case Failure(e)   => Failure(e)
       }
-      case Nil => Some(ref.reverse)
+      case Nil => Success(ref.reverse)
     }
 
     private def constructResolver(metaParametersAST: List[MetaParameter], metaParams: List[FormalMetaParameter], resolver: NameResolver): (JClassSignature, NameResolver) = metaParametersAST match {
@@ -508,27 +510,27 @@ trait IRs {
 
     def paramInitializers: List[IRParameterInitializer] = parameters.flatMap(_.initializerMethod)
 
-    def parameterVariables: List[(JType, String)] = parametersRef(parameters, Nil, metaParameters).getOrElse {
+    def parameterVariables: List[(JType, String)] = parametersRef(parameters, Nil, metaArguments).getOrElse {
       error("invalid parameter type")
       Nil
     }
 
-    lazy val activateTypes: List[JObjectType] = signature.activates.flatMap(fromClassTypeSignature(_, metaParameters))
+    lazy val activateTypes: List[JObjectType] = signature.activates.flatMap(fromClassTypeSignature(_, metaArguments))
 
     lazy val requiresContexts: List[IRContextRef] = {
-      someOrError(signature.requires.traverse(fromTypeSignature(_, metaParameters).collect { case obj: JObjectType => IRContextRef(obj) }), "invalid required context type", Nil)
+      someOrError(signature.requires.traverse(fromTypeSignature(_, metaArguments).collect { case obj: JObjectType => IRContextRef(obj) }), "invalid required context type", Nil)
     }
 
-    lazy val exceptions: List[JRefType] = signature.throwTypes.flatMap(fromTypeSignature_RefType(_, metaParameters))
+    lazy val exceptions: List[JRefType] = signature.throwTypes.flatMap(fromTypeSignature_RefType(_, metaArguments))
 
     def environment: ProcedureEnvironment = {
       if (isStatic) declaringClass.staticEnvironment.procedureEnvironment(this)
       else declaringClass.instanceEnvironment.procedureEnvironment(this)
     }
 
-    lazy val metaParameters: Map[String, MetaArgument] = {
-      if (isStatic) metaParameters(signature.metaParams, Map.empty)
-      else metaParameters(signature.metaParams, declaringClass.metaParameters)
+    lazy val metaArguments: MetaArgs = {
+      if (isStatic) metaArguments(signature.metaParams, Map.empty)
+      else metaArguments(signature.metaParams, declaringClass.metaParameters)
     }
 
     private lazy val methodSyntax = readOperator(annotations)
@@ -546,12 +548,12 @@ trait IRs {
       case Nil => Some(ref.reverse)
     }
 
-    private def metaParameters(mps: List[FormalMetaParameter], bind: Map[String, MetaArgument]): Map[String, MetaArgument] = mps match {
-      case mp :: rest => resolver.environment.get(mp.name) match {
-        case Some(arg) => metaParameters(rest, bind + (mp.name -> arg))
-        case None =>
-          error("invalid meta parameters : " + mp.name)
-          metaParameters(rest, bind)
+    private def metaArguments(mps: List[FormalMetaParameter], bind: Map[String, MetaArgument]): Map[String, MetaArgument] = mps match {
+      case mp :: rest => resolver.metaArgumentFor(mp.name) match {
+        case Success(arg) => metaArguments(rest, bind + (mp.name -> arg))
+        case Failure(e) =>
+          error("invalid meta parameters : " + mp.name, e)
+          metaArguments(rest, bind)
       }
       case Nil => bind
     }
@@ -656,10 +658,10 @@ trait IRs {
     protected def clausesAST: List[MethodClause] = methodAST.clauses
 
     lazy val methodBody: Option[IRMethodBody] = methodAST.body.map { src =>
-      fromTypeSignature(signature.returnType, metaParameters) match {
+      fromTypeSignature(signature.returnType, metaArguments) match {
         case Some(expected) => parseMethodBody(src.snippet, expected, environment) match {
           case Success(v) => v
-          case Failure(e) => throw InvalidASTException(s"parse error at the body of method ${declaringClass.name}.$name\n  cause: $e")
+          case Failure(e) => throw InvalidASTException(s"parse error at the body of method ${declaringClass.name}.$name", e)
         }
         case None => throw InvalidTypeException(s"invalid expected return type for method ${declaringClass.name}.$name")
       }
@@ -697,7 +699,7 @@ trait IRs {
 
     lazy val constructorBody: IRConstructorBody = parseConstructorBody(constructorAST.body.snippet, environment) match {
       case Success(v) => v
-      case Failure(e) => throw InvalidASTException(s"parse error at the body of constructor ${declaringClass.name}\n  cause: $e")
+      case Failure(e) => throw InvalidASTException(s"parse error at the body of constructor ${declaringClass.name}", e)
     }
   }
 
@@ -735,7 +737,7 @@ trait IRs {
     lazy val initializerBody: IRInitializerBody = {
       parseInitializerBody(instanceInitializerAST.block.snippet, environment) match {
         case Success(e) => e
-        case Failure(e) => throw InvalidASTException(s"parse error at instance initializer of ${declaringClass.name}\n  cause: $e")
+        case Failure(e) => throw InvalidASTException(s"parse error at instance initializer of ${declaringClass.name}", e)
       }
     }
   }
@@ -766,7 +768,7 @@ trait IRs {
     lazy val initializerBody: IRInitializerBody = {
       parseInitializerBody(staticInitializerAST.block.snippet, environment) match {
         case Success(e) => e
-        case Failure(e) => throw InvalidASTException(s"parse error at static initializer of ${declaringClass.name}\n  cause: $e")
+        case Failure(e) => throw InvalidASTException(s"parse error at static initializer of ${declaringClass.name}", e)
       }
     }
   }
@@ -818,10 +820,10 @@ trait IRs {
     }
 
     lazy val operatorBody: Option[IRMethodBody] = operatorAST.body.map { src =>
-      fromTypeSignature(signature.returnType, metaParameters) match {
+      fromTypeSignature(signature.returnType, metaArguments) match {
         case Some(expected) => parseMethodBody(src.snippet, expected, environment) match {
           case Success(v) => v
-          case Failure(e) => throw InvalidASTException(s"parse error at the body of operator ${declaringClass.name}.$name\n  cause: $e")
+          case Failure(e) => throw InvalidASTException(s"parse error at the body of operator ${declaringClass.name}.$name", e)
         }
         case None => throw InvalidTypeException(s"invalid expected return type for operator ${declaringClass.name}.$name")
       }
@@ -875,14 +877,14 @@ trait IRs {
       if (field.isStatic) fromTypeSignature(field.signature, Map.empty) match {
         case Some(expected) => parseExpression(snippet.snippet, expected, declaringClass.staticEnvironment) match {
           case Success(v) => v
-          case Failure(e) => throw InvalidASTException(s"parse error at the initializer of field ${declaringClass.name}.$name\n  cause: $e")
+          case Failure(e) => throw InvalidASTException(s"parse error at the initializer of field ${declaringClass.name}.$name", e)
         }
         case None           => throw InvalidTypeException(s"invalid expected type for the initializer of field ${field.declaringClass.name}.$name")
       }
       else fromTypeSignature(field.signature, declaringClass.metaParameters) match {
         case Some(expected) => parseExpression(snippet.snippet, expected, declaringClass.instanceEnvironment) match {
           case Success(v) => v
-          case Failure(e) => throw InvalidASTException(s"parse error at the initializer of field ${declaringClass.name}.$name\n  cause: $e")
+          case Failure(e) => throw InvalidASTException(s"parse error at the initializer of field ${declaringClass.name}.$name", e)
         }
         case None           => throw InvalidTypeException(s"invalid expected type for the initializer of field ${field.declaringClass.name}.$name")
       }
@@ -908,10 +910,10 @@ trait IRs {
     def declaringClass: IRModule = method.declaringClass
 
     lazy val expression: IRExpression = {
-      fromTypeSignature(returnTypeSignature, method.metaParameters) match {
+      fromTypeSignature(returnTypeSignature, method.metaArguments) match {
         case Some(expected) => parseExpression(snippet.snippet, expected, environment) match {
           case Success(v) => v
-          case Failure(e) => throw InvalidASTException(s"parse error at the parameter initializer of method ${declaringClass.name}.$name\n  cause: $e")
+          case Failure(e) => throw InvalidASTException(s"parse error at the parameter initializer of method ${declaringClass.name}.$name", e)
         }
         case None           => throw InvalidTypeException(s"invalid expected type for the parameter initializer of method ${declaringClass.name}.${method.name}")
       }

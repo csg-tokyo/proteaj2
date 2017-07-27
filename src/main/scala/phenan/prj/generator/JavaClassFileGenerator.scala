@@ -12,27 +12,26 @@ import phenan.prj.ir._
 import scala.collection.JavaConverters._
 
 trait JavaClassFileGenerator {
-  this: JavaReprGeneratorsModule with SimplifiedIRGeneratorsModule with IRs with Application =>
+  this: JavaReprGeneratorsModule with SimplifiedIRGeneratorsModule with SimplifiedIRs with IRs with Application =>
 
   def generateClassFile (files: List[IRFile]): Unit = {
     val compiler = ToolProvider.getSystemJavaCompiler
     if (compiler == null) error("Java Compiler cannot be found")
     else {
       val compileOptions = List("-d", config.destination.getAbsolutePath, "-cp", config.getClassPathString)
-      val compilationUnits = files.flatMap(createJavaSourceObject)
+      val compilationUnits = files.map(SimplifiedIRGenerators.compilationUnit).flatMap(createJavaSourceObject)
       if (config.displayJavaSources) compilationUnits.foreach(source => println(source.getSource))
       val res = compiler.getTask(null, null, null, compileOptions.asJava, null, compilationUnits.asJava).call()
       info("compile status : " + res)
     }
   }
 
-  private def createJavaSourceObject (file: IRFile): Option[JavaSourceObject] = try {
-    val uri = getURI(file.filePath)
-    val sir = SimplifiedIRGenerators.compilationUnit(file)
+  private def createJavaSourceObject (sir: SIRFile): Option[JavaSourceObject] = try {
+    val uri = getURI(sir.filePath)
     val src = JavaReprGenerators.javaFile(sir)
     Some(new JavaSourceObject(uri, JavaCodeGenerators.javaFile(src)))
   } catch { case e: Exception  =>
-    error("compile failed : " + file.filePath, e)
+    error("compile failed : " + sir.filePath, e)
     None
   }
 

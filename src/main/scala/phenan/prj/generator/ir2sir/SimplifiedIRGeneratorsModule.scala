@@ -19,7 +19,9 @@ trait SimplifiedIRGeneratorsModule {
 
   object SimplifiedIRGenerators {
 
-    def compilationUnit (file: IRFile): SIRFile = SIRFile(file.packageName.map(_.names.mkString(".")), file.topLevelModules.map(moduleDef))
+    def compilationUnit (file: IRFile): SIRFile = {
+      SIRFile(file.packageName.map(_.names.mkString(".")), file.topLevelModules.map(moduleDef), file.filePath)
+    }
 
     def moduleDef (module: IRModule): SIRModule = module match {
       case clazz: IRClass         => classDef(clazz)

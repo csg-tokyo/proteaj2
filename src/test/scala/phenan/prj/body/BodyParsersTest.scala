@@ -136,7 +136,7 @@ class BodyParsersTest extends FunSuite with Matchers {
 
     val outField = loadClass("java/lang/System").toOption.flatMap(_.classModule.findField("out", test0))
 
-    val printMethods = loadClass("java/io/PrintStream").toOption.flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
+    val printMethods = loadClass("java/io/PrintStream").flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
     val printMethod = printMethods.find { m =>
       m.erasedParameterTypes.headOption.contains(stringClass)
     }
@@ -162,7 +162,7 @@ class BodyParsersTest extends FunSuite with Matchers {
 
     val outField = loadClass("java/lang/System").toOption.flatMap(_.classModule.findField("out", test0))
 
-    val printMethods = loadClass("java/io/PrintStream").toOption.flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
+    val printMethods = loadClass("java/io/PrintStream").flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
     val printMethod = printMethods.find { m =>
       m.erasedParameterTypes.headOption.contains(stringClass)
     }
@@ -241,7 +241,7 @@ class BodyParsersTest extends FunSuite with Matchers {
     val body = method.asInstanceOf[IRMethod].methodBody
 
     val outField = loadClass("java/lang/System").toOption.flatMap(_.classModule.findField("out", test0))
-    val printMethods = loadClass("java/io/PrintStream").toOption.flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
+    val printMethods = loadClass("java/io/PrintStream").flatMap(getObjectType(_, Nil)).map(_.findMethod("println", test0, false)).getOrElse(Nil)
     val printMethod = printMethods.find { m =>
       m.erasedParameterTypes.headOption.contains(stringClass)
     }

@@ -4,6 +4,7 @@ import phenan.prj._
 import phenan.prj.body.EnvModifyStrategy
 import phenan.prj.exception.InvalidASTException
 
+import scala.util._
 import scalaz.syntax.traverse._
 import scalaz.std.list._
 import scalaz.std.option._
@@ -182,8 +183,9 @@ trait IRExpressions {
   sealed trait IRClassLiteral extends IRJavaLiteral
 
   case class IRObjectClassLiteral (clazz: JClass, dim: Int) extends IRClassLiteral {
-    def staticType: JObjectType = getObjectType(clazz, Nil).map(_.array(dim)).map(classTypeOf).getOrElse {
-      throw InvalidASTException("invalid object class literal type")
+    def staticType: JObjectType = getObjectType(clazz, Nil).map(_.array(dim)).map(classTypeOf) match {
+      case Success(t) => t
+      case Failure(e) => throw InvalidASTException("invalid object class literal type", e)
     }
   }
 
