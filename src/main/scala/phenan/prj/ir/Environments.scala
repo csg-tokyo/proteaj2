@@ -35,7 +35,13 @@ trait Environments {
       else this
     }
 
-    def defineLocals(locals: IRLocalDeclaration): Environment = Environment_LocalVariables(locals.declarators.map(local => (locals.localType.array(local.dim), local.name)), this)
+    def defineLocals (locals: IRLocalDeclaration): Environment = Environment_LocalVariables(locals.declarators.map(local => (locals.localType.array(local.dim), local.name)), this)
+
+    def inheritActiveContexts (from: Environment): Environment = {
+      val diff = from.dslEnvironment.contexts.diff(this.dslEnvironment.contexts)
+      if (diff.nonEmpty) Environment_LocalContexts(diff, Nil, this)
+      else this
+    }
   }
 
   trait BaseEnvironment {

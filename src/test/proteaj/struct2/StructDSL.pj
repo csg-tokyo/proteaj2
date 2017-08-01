@@ -1,0 +1,46 @@
+package struct2;
+
+dsl StructDSL {
+  priority p0, p1, p2 { p0 > p1 > p2 }
+
+  static <R> R[p2] "do" _ (Ans<R> |- Void body scope for Variable) {
+    Ans<R> ans = new Ans<R>();
+    body.apply(ans);
+    return ans.returnValue;
+  }
+}
+
+dsl Ans <R> {
+  void[StructDSL.p1] "ret" _ (R r) { returnValue = r; }
+
+  <T, name: Identifier> void[StructDSL.p1] "let" name ":" T "=" _ (T t) activates Variable<T, name> {
+    activate new Variable<T, name>(t);
+  }
+
+  Identifier[StructDSL.p0] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+    return new Identifier(name);
+  }
+
+  void[StructDSL.p1] "block" _[StructDSL.p1] (Lazy |- Void body) { body.apply(new Lazy()); }
+
+  R returnValue;
+}
+
+dsl Lazy {}
+
+dsl Variable <T, name: Identifier> {
+  Variable (T t) {
+    this.t = t;
+  }
+
+  T[StructDSL.p0] name[StructDSL.p0] () { return t; }
+
+  private T t;
+}
+
+class Identifier {
+  public Identifier (String name) { this.name = name; }
+  public String getName() { return name; }
+  private String name;
+}
+

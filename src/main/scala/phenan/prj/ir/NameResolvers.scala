@@ -86,7 +86,7 @@ trait NameResolvers {
       case tn: TypeName => for {
         cs  <- contexts.traverse(typeSignature)
         sig <- typeSignature(tn).map(JTypeSignature.arraySig(_, dim))
-        sc  <- scope.traverse(typeSignature)
+        sc  <- scope.traverse(classTypeSignature)
       } yield JParameterSignature(cs, sig, varArgs, initializer, sc)
     }
 

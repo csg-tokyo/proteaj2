@@ -137,16 +137,11 @@ trait ContextSensitiveParsersModule {
       def argumentFor (param: JParameter, binding: MetaArgs): ContextSensitiveParser[ParsedArgument] = {
         new ContextSensitiveParser ( env => parser.parser(env) >> { argument =>
           val newBinding = bindTypeArgs(param, argument.staticType, binding)
-          param.scopes.traverse(_.bind(newBinding).collect { case obj: JObjectType => IRContextRef(obj) }) match {
-            case Some(Nil) =>
-              ContextFreeParser.success((newBinding, argument))
-            case Some(scopes) =>
-              val newEnv = argument.modifyEnv(env)
-              val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts)
-              ContextFreeParser.success((newBinding, IRScopeArgument(argument, diff.filter(scopes.contains(_)))))
-            case None =>
-              ContextFreeParser.failure("")
-          }
+          val newEnv = argument.modifyEnv(env)
+          val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts).filter(c => param.scopes.contains(c.contextType.erase))
+
+          if (diff.isEmpty) ContextFreeParser.success((newBinding, argument))
+          else ContextFreeParser.success((newBinding, IRScopeArgument(argument, diff)))
         })
       }
     }
@@ -275,16 +270,11 @@ trait ContextSensitiveParsersModule {
       def argumentFor (param: JParameter, binding: MetaArgs): ContextSensitiveScanner[ParsedArgument] = {
         new ContextSensitiveScanner ( env => scanner.parser(env) >> { argument =>
           val newBinding = bindTypeArgs(param, argument.staticType, binding)
-          param.scopes.traverse(_.bind(newBinding).collect { case obj: JObjectType => IRContextRef(obj) }) match {
-            case Some(Nil) =>
-              ContextFreeScanner.success((newBinding, argument))
-            case Some(scopes) =>
-              val newEnv = argument.modifyEnv(env)
-              val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts)
-              ContextFreeScanner.success((newBinding, IRScopeArgument(argument, diff.filter(scopes.contains(_)))))
-            case None =>
-              ContextFreeScanner.failure("")
-          }
+          val newEnv = argument.modifyEnv(env)
+          val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts).filter(c => param.scopes.contains(c.contextType.erase))
+
+          if (diff.isEmpty) ContextFreeScanner.success((newBinding, argument))
+          else ContextFreeScanner.success((newBinding, IRScopeArgument(argument, diff)))
         })
       }
     }

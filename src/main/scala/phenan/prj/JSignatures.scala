@@ -21,7 +21,7 @@ case class JMethodSignature (metaParams: List[FormalMetaParameter], parameters: 
   }
 }
 
-case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, varArgs: Boolean, defaultArg: Option[String], scopes: List[JTypeSignature]) {
+case class JParameterSignature (contexts: List[JTypeSignature], typeSig: JTypeSignature, varArgs: Boolean, defaultArg: Option[String], scopes: List[JClassTypeSignature]) {
   def actualTypeSignature: JTypeSignature = {
     val target = if (varArgs) JArrayTypeSignature(typeSig) else typeSig
     contexts.foldRight(target)(JTypeSignature.functionTypeSig)

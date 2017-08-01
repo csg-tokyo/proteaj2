@@ -16,7 +16,7 @@ trait IRStatements {
   }
 
   case class IRBlock(statements: List[IRStatement]) extends IRStatement {
-    override def modifyEnv(env: Environment): Environment = env
+    override def modifyEnv(env: Environment): Environment = env.inheritActiveContexts(statements.foldLeft(env)((e, s) => s.modifyEnv(e)))
   }
 
   case class IRLocalDeclarationStatement(declaration: IRLocalDeclaration) extends IRStatement {

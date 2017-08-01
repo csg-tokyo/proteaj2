@@ -23,7 +23,7 @@ trait SignatureParser {
 
     lazy val parameterSignature: PackratParser[JParameterSignature] = ('@' ~> typeSignature).* ~ typeSignature ~ ('*'.? ^^ {
       _.nonEmpty
-    }) ~ ('?' ~> identifier).? ~ ('#' ~> typeSignature).* ^^ {
+    }) ~ ('?' ~> identifier).? ~ ('#' ~> classType).* ^^ {
       case contexts ~ sig ~ va ~ df ~ scope => JParameterSignature(contexts, sig, va, df, scope)
     }
 
@@ -38,11 +38,11 @@ trait SignatureParser {
 
     lazy val classType: PackratParser[JClassTypeSignature] = 'L' ~> classTypeSigRef <~ ';'
 
-    def classTypeSigRef: PackratParser[JClassTypeSignature] = new PackratParser[JClassTypeSignature] {
+    private def classTypeSigRef: PackratParser[JClassTypeSignature] = new PackratParser[JClassTypeSignature] {
       override def apply(in: Input): ParseResult[JClassTypeSignature] = classTypeSig(in)
     }
 
-    lazy val classTypeSig: PackratParser[JClassTypeSignature] = nestedClassType | topLevelClassType
+    private lazy val classTypeSig: PackratParser[JClassTypeSignature] = nestedClassType | topLevelClassType
 
     lazy val topLevelClassType: PackratParser[SimpleClassTypeSignature] = topLevelClass ~ typeArgList ^^ {
       case clazz ~ args => SimpleClassTypeSignature(clazz, args)

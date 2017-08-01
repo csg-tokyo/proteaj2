@@ -1,0 +1,18 @@
+package struct2;
+
+import dsl StructDSL;
+
+public class Main {
+  public static void main (String[] args) {
+    String str = do {
+      block {
+        let s : String = "hello";
+        let t : String = "world";
+      };
+      //ret "hello";
+      ret s;
+    };
+
+    System.out.println(str);
+  }
+}

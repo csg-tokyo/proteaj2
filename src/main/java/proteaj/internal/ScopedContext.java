@@ -2,7 +2,7 @@ package proteaj.internal;
 
 import java.util.Arrays;
 
-public class ActivatedContexts {
+public class ScopedContext {
   @SuppressWarnings("unchecked")
   public static <C> C get (int index) { return (C)(contexts.get()[index]); }
 

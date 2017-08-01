@@ -18,7 +18,7 @@ object CommonNames {
   val pairClassName           = "proteaj/lang/Pair"
   val predefOperatorsName     = "proteaj/lang/PredefOperators"
   val arraysUtilClassName     = "proteaj/internal/Arrays"
-  val activatedCtxClassName   = "proteaj/internal/ActivatedContexts"
+  val scopedContextClassName  = "proteaj/internal/ScopedContext"
   val supplierRunnerClassName = "proteaj/internal/SupplierRunner"
   val boxedBooleanClassName   = "java/lang/Boolean"
   val boxedByteClassName      = "java/lang/Byte"
