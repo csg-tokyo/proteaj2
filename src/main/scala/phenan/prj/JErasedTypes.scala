@@ -115,6 +115,7 @@ trait JErasedTypes {
     def signature: JTypeSignature
 
     def isStatic: Boolean = mod.check(JModifier.accStatic)
+    def isSynthetic: Boolean = mod.check(JModifier.accSynthetic)
 
     override def toString: String = s"JFieldDef($declaringClass#$name:$signature)"
   }
@@ -144,5 +145,7 @@ trait JErasedTypes {
     def isInstanceMethod: Boolean = !(isStatic || isConstructor || isClassInitializer || isInstanceInitializer)
 
     def isStaticMethod: Boolean = isStatic && !(isConstructor || isClassInitializer || isInstanceInitializer)
+
+    def isSynthetic: Boolean = mod.check(JModifier.accSynthetic)
   }
 }

@@ -54,6 +54,11 @@ class JCompilerTest extends FunSuite with Matchers with BeforeAndAfterAll {
     result shouldBe "b\n"
   }
 
+  test ("ScopedDSL") {
+    val result = compileAndRun("scoped.Main", List("src/test/proteaj/scoped/ScopedDSL.pj", "src/test/proteaj/scoped/Main.pj"))
+    result shouldBe "hello, world\n"
+  }
+
   override protected def beforeAll(): Unit = {
     if (new java.io.File("bin").isDirectory) "rm -r bin" ! ProcessLogger(_ => ())
     "mkdir bin" ! ProcessLogger(_ => ())

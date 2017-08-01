@@ -10,9 +10,6 @@ import scala.util.matching.Regex
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
 
-import scalaz.syntax.traverse._
-import scalaz.std.list._
-import scalaz.std.option._
 import scalaz.Memo._
 
 /**
@@ -75,7 +72,7 @@ trait ContextSensitiveParsersModule {
 
       def apply (src: String, env: Environment): Try[T] = parser(env)(new CharSequenceReader(src)) match {
         case Impl.Success(result, _) => Success(result)
-        case Impl.Failure(msg, _)    => Failure(ParseException(msg))
+        case Impl.NoSuccess(msg, _)  => Failure(ParseException(msg))
       }
 
       def ~ [U : HasEnvModify] (that: => ContextSensitiveParser[U]): ContextSensitiveParser[T ~ U] = new ContextSensitiveParser(env => for {

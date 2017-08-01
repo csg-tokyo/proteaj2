@@ -1,6 +1,6 @@
-package struct2;
+package scoped;
 
-import dsl StructDSL;
+import dsl ScopedDSL;
 
 public class Main {
   public static void main (String[] args) {
@@ -9,8 +9,7 @@ public class Main {
         let s : String = "hello";
         let t : String = "world";
       };
-      //ret "hello";
-      ret s;
+      ret s + ", " + t;
     };
 
     System.out.println(str);

@@ -78,6 +78,8 @@ trait JTypeLoader {
   def functionTypeOf (from: JType, to: JType): JObjectType = getObjectType_Unsafe(functionClass, List(boxing(from), boxing(to)))
   def consumerTypeOf (arg: JType): JObjectType = getObjectType_Unsafe(consumerClass, List(boxing(arg)))
 
+  def scopedContextTypeOf (arg: JType): JObjectType = getObjectType_Unsafe(scopedContextClass, List(boxing(arg)))
+
   def pairTypeOf (arg1: JType, arg2: JType): JObjectType = getObjectType_Unsafe(pairClass, List(boxing(arg1), boxing(arg2)))
 
   def boxing (t: JType): JRefType = t match {

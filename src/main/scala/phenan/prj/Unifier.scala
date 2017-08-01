@@ -1,5 +1,7 @@
 package phenan.prj
 
+import phenan.prj.exception.InvalidTypeException
+
 trait Unifier {
   this: JTypeLoader with JClassLoader with JModules with JMembers with Application =>
 
@@ -473,6 +475,8 @@ trait Unifier {
         case _ => None
       }
       case JWildcard(None, None) => Some(args)
+      case JWildcard(Some(_), Some(_)) =>
+        throw InvalidTypeException("wildcard type can only have either of lower bound or upper bound")
     }
 
     def check (wc: JWildcard, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = checkWildcard(wc, cts, args)
@@ -485,6 +489,8 @@ trait Unifier {
       case JWildcard(Some(ub), None) => TypeUnifier.check(ub, sig, args)
       case JWildcard(None, Some(lb)) => TypeInferencer.check(lb, sig, args)
       case JWildcard(None, None) => Some(args)
+      case JWildcard(Some(_), Some(_)) =>
+        throw InvalidTypeException("wildcard type can only have either of lower bound or upper bound")
     }
   }
 
@@ -513,6 +519,8 @@ trait Unifier {
         case WildcardArgument(Some(obj), None) if JTypeSignature.objectTypeSig == obj => Some(args)
         case _ => None
       }
+      case JWildcard(Some(_), Some(_)) =>
+        throw InvalidTypeException("wildcard type can only have either of lower bound or upper bound")
     }
 
     def check (wc: JWildcard, cts: JClassTypeSignature, args: MetaArgs): Option[MetaArgs] = None
@@ -653,6 +661,8 @@ trait Unifier {
         case _ => None
       }
       case WildcardArgument(None, None) => Some(args)
+      case WildcardArgument(Some(_), Some(_)) =>
+        throw InvalidTypeException("wildcard argument can only have either of lower bound or upper bound")
     }
 
     def check (ary: JArrayType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(ary, tvs, args)
@@ -725,6 +735,8 @@ trait Unifier {
       case WildcardArgument(Some(ub), None) => TypeInferencer.check(ref, ub, args)
       case WildcardArgument(None, Some(lb)) => TypeUnifier.check(ref, lb, args)
       case WildcardArgument(None, None) => Some(args)
+      case WildcardArgument(Some(_), Some(_)) =>
+        throw InvalidTypeException("wildcard argument can only have either of lower bound or upper bound")
     }
   }
 }

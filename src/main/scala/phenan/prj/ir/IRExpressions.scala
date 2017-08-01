@@ -43,7 +43,7 @@ trait IRExpressions {
     def left: IRLeftHandSide
     def right: IRExpression
 
-    def staticType: JType = right.staticType
+    def staticType: JType = left.staticType
 
     // correct ?
     def modifyEnv (env: Environment): Environment = right.modifyEnv(left.modifyEnv(env))

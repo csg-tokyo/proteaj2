@@ -44,11 +44,11 @@ trait ClassFileLoader {
     lazy val name: String = internalName.replace('/', '.').replace('$', '.')
 
     lazy val fields: List[JFieldDef] = classFile.fields.flatMap { field =>
-      parseFieldDescriptor(readUTF(field.desc)).map(new JLoadedFieldDef(field, this, _))
+      parseFieldDescriptor(readUTF(field.desc)).map(new JLoadedFieldDef(field, this, _)).filterNot(_.isSynthetic)
     }
 
     lazy val methods: List[JMethodDef] = classFile.methods.flatMap { method =>
-      parseMethodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _))
+      parseMethodDescriptor(readUTF(method.desc)).map(new JLoadedMethodDef(method, this, _)).filterNot(_.isSynthetic)
     }
 
     lazy val signature: JClassSignature = annotations.signature.orElse {

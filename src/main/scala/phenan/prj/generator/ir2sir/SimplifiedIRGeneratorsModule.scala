@@ -207,7 +207,7 @@ trait SimplifiedIRGeneratorsModule {
       } yield ()
     }
 
-    def explicitConstructorCallArgs (call: IRExplicitConstructorCall, args: List[(SIRSimpleExpression, List[SIRStatement])], contexts: List[SIRLocalRef]): List[SIRExpression] = {
+    def explicitConstructorCallArgs (call: IRExplicitConstructorCall, args: List[(SIRSimpleExpression, List[SIRStatement])], contexts: List[SIRSimpleExpression]): List[SIRExpression] = {
       inferArgTypes(call).zip(args).map { case (t, (expr, stmts)) =>
         SIRStaticMethodCall(supplierRunnerClass.classModule, List(t), "run", List(SIRLambda(Nil, SIRBlock(stmts :+ SIRReturnStatement(Some(expr))))))
       } ++ contexts
@@ -399,8 +399,8 @@ trait SimplifiedIRGeneratorsModule {
       val cs = scopes.map(c => c.contextType -> generateLocalName)
 
       for {
-        _ <- tell(cs.map { case (typ, name) => SIRLocalDeclaration(typ, name, None) })
-        _ <- addContexts(cs)
+        _ <- tell(cs.map { case (typ, name) => SIRLocalDeclaration(scopedContextTypeOf(typ), name, Some(SIRConstructorCall(List(typ), scopedContextTypeOf(typ), Nil))) })
+        _ <- modify(_ ++ cs.map { case (typ, name) => typ -> SIRInstanceFieldAccess(SIRLocalRef(name), "context") })
         e <- expression(arg)
       } yield e
     }
@@ -594,7 +594,7 @@ trait SimplifiedIRGeneratorsModule {
       }
     }
 
-    private type Gen[T] = RWS[List[(JObjectType, String)], List[SIRStatement], Map[JObjectType, SIRLocalRef], T]
+    private type Gen[T] = RWS[List[(JObjectType, String)], List[SIRStatement], Map[JObjectType, SIRSimpleExpression], T]
 
     private def ret [T] (t: T): Gen[T] = RWS((_, s) => (Nil, t, s))
 
@@ -682,9 +682,9 @@ trait SimplifiedIRGeneratorsModule {
     }
 
     // for state
-    private def lookup (t: JObjectType): Gen[SIRLocalRef] = State.gets[Map[JObjectType, SIRLocalRef], SIRLocalRef](_(t)).rwst
+    private def lookup (t: JObjectType): Gen[SIRSimpleExpression] = State.gets[Map[JObjectType, SIRSimpleExpression], SIRSimpleExpression](_(t)).rwst
 
-    private def modify (f: Map[JObjectType, SIRLocalRef] => Map[JObjectType, SIRLocalRef]): Gen[Unit] = State.modify(f).rwst
+    private def modify (f: Map[JObjectType, SIRSimpleExpression] => Map[JObjectType, SIRSimpleExpression]): Gen[Unit] = State.modify(f).rwst
 
     private def addContexts (contexts: List[(JObjectType, String)]): Gen[Unit] = {
       modify(_ ++ contexts.map { case (typ, str) => (typ, SIRLocalRef(str)) })
