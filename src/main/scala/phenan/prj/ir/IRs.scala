@@ -869,7 +869,7 @@ trait IRs {
 
     protected def parameterSignatures: List[JParameterSignature] = Nil
 
-    def name: String = field.name + "$init$" + generateUniqueId
+    lazy val name: String = field.name + "$init$" + generateUniqueId
 
     def declaringClass: IRModule = field.declaringClass
 
@@ -905,7 +905,7 @@ trait IRs {
       throw InvalidTypeException(s"invalid type signature for the parameter initializer of method ${declaringClass.name}.${method.name}")
     }
 
-    def name: String = method.name + "$init$" + generateUniqueId
+    lazy val name: String = method.name + "$init$" + generateUniqueId
 
     def declaringClass: IRModule = method.declaringClass
 
