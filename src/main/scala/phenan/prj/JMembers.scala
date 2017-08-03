@@ -1,5 +1,7 @@
 package phenan.prj
 
+import phenan.prj.exception.InvalidTypeException
+
 trait JMembers {
   this: JClassLoader with Syntax with JModules with JErasedTypes with Application =>
   trait JMember {
@@ -103,7 +105,7 @@ trait JMembers {
     lazy val contexts: List[JGenericType] = signature.contexts.map(sig => JGenericType(sig, env))
     lazy val genericType: JGenericType = JGenericType(signature.typeSig, env)
     lazy val actualGenericType: JGenericType = JGenericType(signature.actualTypeSignature, env)
-    lazy val scopes: List[JClass] = signature.scopes.map(sig => erase(sig).get)
+    lazy val scopes: List[JClass] = signature.scopes.map(sig => erase(sig).getOrElse(throw InvalidTypeException("invalid type for scope declaration")))
 
     def varArgs: Boolean = signature.varArgs
 

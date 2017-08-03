@@ -33,7 +33,7 @@ trait StatementParsersModule {
     private class StatementParsersImpl(returnType: JType) extends StatementParsersInterface {
       lazy val methodBody: ContextSensitiveParser[IRMethodBody] = block ^^ IRMethodBody
 
-      lazy val constructorBody: ContextSensitiveParser[IRConstructorBody] = '{' ~> (explicitConstructorCallParser.? ~ blockStatement.*) <~ '}' ^^ {
+      lazy val constructorBody: ContextSensitiveParser[IRConstructorBody] = '{' ~> ((explicitConstructorCallParser <~ ';').? ~ blockStatement.*) <~ '}' ^^ {
         case ecc ~ statements => IRConstructorBody(ecc, statements)
       }
 

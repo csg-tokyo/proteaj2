@@ -86,11 +86,11 @@ object JavaCodeGenerators extends Generators {
 
   lazy val breakStatement: Generator[BreakStatement.type] = "break" <~ ';'  ^^ { _ => () }
 
-  lazy val thisConstructorCall: Generator[ThisConstructorCall] = typeArg.*?('<', ',', '>') ~ ( "this" ~> '(' ~> expression.*(',') <~ ')' ) ^^ { cc =>
+  lazy val thisConstructorCall: Generator[ThisConstructorCall] = typeArg.*?('<', ',', '>') ~ ( "this" ~> '(' ~> expression.*(',') <~ ')' <~ ';' ) ^^ { cc =>
     cc.typeArguments -> cc.arguments
   }
 
-  lazy val superConstructorCall: Generator[SuperConstructorCall] = typeArg.*?('<', ',', '>') ~ ( "super" ~> '(' ~> expression.*(',') <~ ')' ) ^^ { cc =>
+  lazy val superConstructorCall: Generator[SuperConstructorCall] = typeArg.*?('<', ',', '>') ~ ( "super" ~> '(' ~> expression.*(',') <~ ')' <~ ';' ) ^^ { cc =>
     cc.typeArguments -> cc.arguments
   }
 

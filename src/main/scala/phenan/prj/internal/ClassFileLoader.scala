@@ -20,7 +20,7 @@ trait ClassFileLoader {
     findIR(name).map(Success(_)) orElse
       findAndLoadClassFile(name) orElse
       findAndCompileSourceFile(name) getOrElse
-      Failure(ClassFileNotFoundException("not found : " + name))
+      Failure(ClassFileNotFoundException("class not found : " + name))
   }
 
   private def findAndLoadClassFile (name: String): Option[Try[JClass]] = {
