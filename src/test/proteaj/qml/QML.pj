@@ -1,0 +1,194 @@
+package qml;
+
+import java.util.*;
+import java.awt.Color;
+
+dsl QML {
+  priority p0, p1, p2, p3, p4 {
+    p0 < p1 < p2 < PredefOperators.add < p3 < p4
+  }
+
+  static void[p0] "QML" _ (QML |- Void fs scope for { QMLAttr, QMLAttr2, QMLRectangleProperties }) {
+    QML qml = new QML();
+    fs.apply(qml);
+    System.out.println(qml.root.toString());
+  }
+
+  Integer[p3] _[p3] (int n) { return new Integer(n); }
+
+  <name: Identifier> void[p1] "Rectangle" name _[p1] ({ QMLObjectDecl<name>, QMLRectangleDecl, QMLRectangleProperties<name> } |- Void f scope for QMLAttr) activates QMLAttr<name, QMLRectangle>, QMLRectangleProperties<name> {
+    QMLRectangle rect = new QMLRectangle();
+    QMLRectangleProperties<name> props = new QMLRectangleProperties<name>(rect);
+    f.apply(new QMLObjectDecl<name>(rect)).apply(new QMLRectangleDecl(rect)).apply(props);
+    root.setAttribute(rect.getName(), rect);
+    activate new QMLAttr<name, QMLRectangle>(root, rect.getName());
+    activate props;
+  }
+
+  exact Color[p4] "red" () { return Color.red; }
+  exact Color[p4] "blue" () { return Color.blue; }
+  exact Color[p4] "green" () { return Color.green; }
+  exact Color[p4] "cyan" () { return Color.cyan; }
+  exact Color[p4] "magenta" () { return Color.magenta; }
+  exact Color[p4] "yellow" () { return Color.yellow; }
+  exact Color[p4] "white" () { return Color.white; }
+  exact Color[p4] "black" () { return Color.black; }
+
+  exact Identifier[p4] _%"\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" (String name) {
+    return new Identifier(name);
+  }
+
+  private QMLObject root = new QMLObject("Root");
+}
+
+dsl QMLAttr <name: Identifier, T> {
+  QMLAttr (QMLObject object, String attribute) {
+    this.object = object;
+    this.attribute = attribute;
+  }
+
+  T[QML.p3] name () { return (T)object.getAttribute(attribute); }
+  void[QML.p2] name ":" _ (T t) { object.setAttribute(attribute, t); }
+
+  private QMLObject object;
+  private String attribute;
+}
+
+dsl QMLAttr2 <name1: Identifier, name2: Identifier, T> {
+  QMLAttr2 (QMLObject object, String attribute) {
+    this.object = object;
+    this.attribute = attribute;
+  }
+
+  T[QML.p3] name1 "." name2 () { return (T)object.getAttribute(attribute); }
+  void[QML.p2] name1 "." name2 ":" _ (T t) { object.setAttribute(attribute, t); }
+
+  private QMLObject object;
+  private String attribute;
+}
+
+dsl QMLObjectDecl <name: Identifier> {
+  QMLObjectDecl (QMLObject object) {
+    this.object = object;
+  }
+
+  <T, id: Identifier> void[QML.p1] "property" T id ":" _ (T value) activates QMLAttr<id, T>, QMLAttr2<name, id, T> {
+    String attribute = object.addProperty(value);
+    activate new QMLAttr<id, T>(object, attribute);
+    activate new QMLAttr2<name, id, T>(object, attribute);
+  }
+
+  private QMLObject object;
+}
+
+dsl QMLRectangleDecl {
+  QMLRectangleDecl (QMLRectangle object) {
+    this.object = object;
+  }
+
+  int[QML.p3] "width" () {
+    return ((Integer)object.getAttribute("width")).intValue();
+  }
+
+  void[QML.p2] "width" ":" _ (int n) {
+    object.setAttribute("width", new Integer(n));
+  }
+
+  int[QML.p3] "height" () {
+    return ((Integer)object.getAttribute("height")).intValue();
+  }
+
+  void[QML.p2] "height" ":" _ (int n) {
+    object.setAttribute("height", new Integer(n));
+  }
+
+  Color[QML.p3] "color" () {
+    return (Color)object.getAttribute("color");
+  }
+
+  void[QML.p2] "color" ":" _ (Color color) {
+    object.setAttribute("color", color);
+  }
+
+  private QMLRectangle object;
+}
+
+dsl QMLRectangleProperties <name: Identifier> {
+  QMLRectangleProperties (QMLRectangle object) {
+    this.object = object;
+  }
+  int[QML.p3] name "." "width" () {
+    return ((Integer)object.getAttribute("width")).intValue();
+  }
+  int[QML.p3] name "." "height" () {
+    return ((Integer)object.getAttribute("height")).intValue();
+  }
+  Color[QML.p3] name "." "color" () {
+    return (Color)object.getAttribute("color");
+  }
+  private QMLRectangle object;
+}
+
+class QMLRectangle extends QMLObject {
+  QMLRectangle () {
+    super("Rectangle");
+    setAttribute("width", new Integer(0));
+    setAttribute("height", new Integer(0));
+    setAttribute("color", Color.white);
+  }
+}
+
+class QMLObject {
+  QMLObject (String kind) {
+    this.kind = kind;
+    this.attributes = new HashMap<String, Object>();
+    int i = uniqueId;
+    uniqueId = uniqueId + 1;
+    this.attributes.put("id", new Identifier("id" + Integer.toString(i)));
+  }
+
+  public String getName() {
+    return ((Identifier)attributes.get("id")).toString();
+  }
+
+  public String toString() {
+    StringBuilder buf = new StringBuilder();
+    buf.append(kind);
+    buf.append('{');
+    for (String key : attributes.keySet()) {
+      buf.append('\n');
+      buf.append(key);
+      buf.append(':');
+      buf.append(attributes.get(key));
+    }
+    buf.append('\n');
+    buf.append('}');
+    return buf.toString();
+  }
+
+  void setAttribute (String attribute, Object value) {
+    attributes.put(attribute, value);
+  }
+
+  Object getAttribute (String attribute) {
+    return attributes.get(attribute);
+  }
+
+  String addProperty (Object value) {
+    int i = uniqueId;
+    uniqueId = uniqueId + 1;
+    String attribute = "UserDefinedProp" + Integer.toString(i);
+    attributes.put(attribute, value);
+    return attribute;
+  }
+
+  private String kind;
+  private Map<String, Object> attributes;
+  private static int uniqueId = 0;
+}
+
+class Identifier {
+  public Identifier (String name) { this.name = name; }
+  public String toString() { return name; }
+  private String name;
+}

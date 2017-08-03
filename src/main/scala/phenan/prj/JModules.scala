@@ -273,11 +273,11 @@ trait JModules {
     /* helper methods for collecting non-private inherited members */
 
     private def nonPrivateFieldList: List[JField] = {
-      superTypes.map(_.nonPrivateFieldList).reduceLeftOption(_ ++ _).getOrElse(Nil) ++ declaredFields.filterNot(_.isPrivate)
+      superTypes.map(_.nonPrivateFieldList).fold[List[JField]](Nil)(_ ++ _) ++ declaredFields.filterNot(_.isPrivate)
     }
 
     private def nonPrivateMethodList: List[JMethod] = {
-      superTypes.map(_.nonPrivateMethodList).reduceLeftOption(_ ++ _).getOrElse(Nil) ++ declaredMethods.filterNot(_.isPrivate)
+      superTypes.map(_.nonPrivateMethodList).fold[List[JMethod]](Nil)(_ ++ _) ++ declaredMethods.filterNot(_.isPrivate)
     }
 
     private def filterOutOverriddenMethod(list: List[JMethod]): List[JMethod] = {

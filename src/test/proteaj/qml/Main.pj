@@ -1,0 +1,26 @@
+package qml;
+
+import dsl QML;
+
+public class Main {
+  public static void main (String[] args) {
+    QML {
+      Rectangle rect1 {
+        width : 100;
+        height: rect1.width;
+        property String msg : "hello";
+        property String foo : msg + ", world!";
+      };
+      Rectangle rect2 {
+        color : red;
+        width : rect1.width;
+        property String msg : rect1.foo;
+        property Integer bar : rect1.height;
+        System.out.println(rect2.msg);
+      };
+      Rectangle rect3 {
+        color : rect1.color;
+      };
+    };
+  }
+}

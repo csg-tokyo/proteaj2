@@ -430,7 +430,7 @@ trait SimplifiedIRGeneratorsModule {
 
       for {
         body <- bodyGen.written
-        ref  <- write(argType, SIRLambda(cs, SIRBlock(body)))
+        ref  <- write(argType, cs.init.foldRight(SIRLambda(List(cs.last), SIRBlock(body)))((c, b) => SIRLambda(List(c), SIRBlock(List(SIRReturnStatement(Some(b)))))))
       } yield ref
     }
 
@@ -676,8 +676,8 @@ trait SimplifiedIRGeneratorsModule {
 
     private implicit class GenUnit (gen: Gen[Unit]) {
       def written: Gen[List[SIRStatement]] = RWS { (r, s) =>
-        val (w, _, s2) = gen.run(r, s)
-        (Nil, w, s2)
+        val (w, _, _) = gen.run(r, s)
+        (Nil, w, s)
       }
     }
 
