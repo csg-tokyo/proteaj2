@@ -8,7 +8,7 @@ dsl QML {
     p0 < p1 < p2 < PredefOperators.add < p3 < p4
   }
 
-  static void[p0] "QML" _ (QML |- Void fs scope for { QMLAttr, QMLAttr2, QMLRectangleProperties }) {
+  static void[p0] "QML" _ (QML |- Void fs scope for { QMLAttr<?, ?>, QMLAttr2<?, ?, ?>, QMLRectangleProperties<?> }) {
     QML qml = new QML();
     fs.apply(qml);
     System.out.println(qml.root.toString());
@@ -16,7 +16,7 @@ dsl QML {
 
   Integer[p3] _[p3] (int n) { return new Integer(n); }
 
-  <name: Identifier> void[p1] "Rectangle" name _[p1] ({ QMLObjectDecl<name>, QMLRectangleDecl, QMLRectangleProperties<name> } |- Void f scope for QMLAttr) activates QMLAttr<name, QMLRectangle>, QMLRectangleProperties<name> {
+  <name: Identifier> void[p1] "Rectangle" name _[p1] ({ QMLObjectDecl<name>, QMLRectangleDecl, QMLRectangleProperties<name> } |- Void f scope for QMLAttr<?, ?>) activates QMLAttr<name, QMLRectangle>, QMLRectangleProperties<name> {
     QMLRectangle rect = new QMLRectangle();
     QMLRectangleProperties<name> props = new QMLRectangleProperties<name>(rect);
     f.apply(new QMLObjectDecl<name>(rect)).apply(new QMLRectangleDecl(rect)).apply(props);
@@ -25,7 +25,7 @@ dsl QML {
     activate props;
   }
 
-  void[p1] "Text" _[p1] (Lazy \ {/*QMLObjectDecl<?>, */QMLRectangleDecl} |- Void f) {
+  void[p1] "Text" _[p1] (Lazy \ {QMLObjectDecl<?>, QMLRectangleDecl} |- Void f) {
     f.apply(new Lazy());
   }
 

@@ -106,7 +106,7 @@ trait JMembers {
     lazy val withoutCts: List[JGenericType] = signature.without.map(sig => JGenericType(sig, env))
     lazy val genericType: JGenericType = JGenericType(signature.typeSig, env)
     lazy val actualGenericType: JGenericType = JGenericType(signature.actualTypeSignature, env)
-    lazy val scopes: List[JClass] = signature.scopes.map(sig => erase(sig).getOrElse(throw InvalidTypeException("invalid type for scope declaration")))
+    lazy val scopes: List[JGenericType] = signature.scopes.map(sig => JGenericType(sig, env))
 
     def varArgs: Boolean = signature.varArgs
 

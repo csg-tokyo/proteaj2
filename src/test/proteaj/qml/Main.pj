@@ -21,7 +21,7 @@ public class Main {
       Rectangle rect3 {
         color : rect1.color;
         Text {
-          property String baz : "hoge";
+          //property String baz : "hoge";
         };
       };
     };

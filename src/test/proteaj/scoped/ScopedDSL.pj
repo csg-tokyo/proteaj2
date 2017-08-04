@@ -3,7 +3,7 @@ package scoped;
 dsl ScopedDSL {
   priority p0, p1, p2 { p0 > PredefOperators.add > p1 > p2 }
 
-  static <R> R[p2] "do" _ (Ans<R> |- Void body scope for Variable) {
+  static <R> R[p2] "do" _ (Ans<R> |- Void body scope for Variable<?, ?>) {
     Ans<R> ans = new Ans<R>();
     body.apply(ans);
     return ans.returnValue;

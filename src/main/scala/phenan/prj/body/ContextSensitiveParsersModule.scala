@@ -11,6 +11,9 @@ import scala.util.parsing.combinator._
 import scala.util.parsing.input._
 
 import scalaz.Memo._
+import scalaz.syntax.traverse._
+import scalaz.std.option._
+import scalaz.std.list._
 
 /**
   * Created by ichikawa on 2017/06/20.
@@ -139,7 +142,9 @@ trait ContextSensitiveParsersModule {
         new ContextSensitiveParser ( env => parser.parser(env) >> { argument =>
           val newBinding = bindTypeArgs(param, argument.staticType, binding)
           val newEnv = argument.modifyEnv(env)
-          val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts).filter(c => param.scopes.contains(c.contextType.erase))
+
+          val activatedContexts = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts)
+          val diff = activatedContexts.filter(c => param.scopes.traverse(_.bind(binding)).exists(_.exists(c.contextType <:< _)))
 
           if (diff.isEmpty) ContextFreeParser.success((newBinding, argument))
           else ContextFreeParser.success((newBinding, IRScopeArgument(argument, diff)))
@@ -276,7 +281,9 @@ trait ContextSensitiveParsersModule {
         new ContextSensitiveScanner ( env => scanner.parser(env) >> { argument =>
           val newBinding = bindTypeArgs(param, argument.staticType, binding)
           val newEnv = argument.modifyEnv(env)
-          val diff = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts).filter(c => param.scopes.contains(c.contextType.erase))
+
+          val activatedContexts = newEnv.dslEnvironment.contexts.diff(env.dslEnvironment.contexts)
+          val diff = activatedContexts.filter(c => param.scopes.traverse(_.bind(binding)).exists(_.exists(c.contextType <:< _)))
 
           if (diff.isEmpty) ContextFreeScanner.success((newBinding, argument))
           else ContextFreeScanner.success((newBinding, IRScopeArgument(argument, diff)))
