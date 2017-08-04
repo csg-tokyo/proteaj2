@@ -34,7 +34,7 @@ trait IRExpressions {
 
   case class IRScopeArgument (argument: IRExpression, scopes: List[IRContextRef]) extends IRExpression {
     def staticType: JType = argument.staticType
-    def modifyEnv (env: Environment): Environment = argument.modifyEnv(env).deactivates(scopes)
+    def modifyEnv (env: Environment): Environment = env.inheritActiveContexts(argument.modifyEnv(env).deactivates(scopes))
   }
 
   sealed trait IRLeftHandSide extends IRExpression

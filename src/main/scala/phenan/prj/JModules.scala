@@ -42,7 +42,7 @@ trait JModules {
     def matches(that: MetaArgument): Boolean = that match {
       case that: JRefType => upperBound.forall(that <:< _) && lowerBound.forall(_ <:< that)
       case that: JWildcard => upperBound.forall(ub => that.upperBound.exists(_ <:< ub)) && lowerBound.forall(lb => that.lowerBound.exists(lb <:< _))
-      case _: MetaValue => false
+      case _: MetaValue => true
     }
   }
 

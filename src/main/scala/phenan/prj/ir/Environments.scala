@@ -30,7 +30,7 @@ trait Environments {
     }
 
     def deactivates (contexts: List[IRContextRef]): Environment = {
-      val cs = dslEnvironment.contexts.intersect(contexts)
+      val cs = dslEnvironment.contexts.filter(c => contexts.exists(_.contextType >:> c.contextType))
       if (cs.nonEmpty) Environment_LocalContexts(Nil, cs, this)
       else this
     }

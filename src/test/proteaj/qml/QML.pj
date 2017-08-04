@@ -25,7 +25,7 @@ dsl QML {
     activate props;
   }
 
-  void[p1] "Text" _[p1] (Lazy \ QMLRectangleDecl |- Void f) {
+  void[p1] "Text" _[p1] (Lazy \ {/*QMLObjectDecl<?>, */QMLRectangleDecl} |- Void f) {
     f.apply(new Lazy());
   }
 

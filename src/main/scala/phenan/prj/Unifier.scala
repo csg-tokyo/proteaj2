@@ -393,7 +393,7 @@ trait Unifier {
 
     def check (wc: JWildcard, pts: JPrimitiveTypeSignature, args: MetaArgs): Option[MetaArgs] = None
     def check (wc: JWildcard, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(wc, tvs, args)
-    def check (wc: JWildcard, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = None
+    def check (wc: JWildcard, pvs: MetaVariableSignature, args: MetaArgs): Option[MetaArgs] = Some(args)
 
     def check (ary: JArrayType, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(ary, tvs, args)
     def check (ary: JArrayType, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = ExactTypeUnifier.check(ary.componentType, ats.component, args)
@@ -704,7 +704,7 @@ trait Unifier {
     def check (pv: MetaValue, pts: JPrimitiveTypeSignature, args: MetaArgs): Option[MetaArgs] = None
     def check (pv: MetaValue, ats: JArrayTypeSignature, args: MetaArgs): Option[MetaArgs] = None
     def check (pv: MetaValue, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = None
-    def check (pv: MetaValue, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = None
+    def check (pv: MetaValue, wld: WildcardArgument, args: MetaArgs): Option[MetaArgs] = Some(args)
     def check (pv: MetaValue, cws: JCapturedWildcardSignature, args: MetaArgs): Option[MetaArgs] = None
 
     def check (tvr: JTypeVariable, tvs: JTypeVariableSignature, args: MetaArgs): Option[MetaArgs] = typeVariableSignature(tvr, tvs, args)
