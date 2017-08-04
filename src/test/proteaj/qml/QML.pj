@@ -51,6 +51,7 @@ dsl QMLAttr <name: Identifier, T> {
     this.attribute = attribute;
   }
 
+  @SuppressWarnings("unchecked")
   T[QML.p3] name () { return (T)object.getAttribute(attribute); }
   void[QML.p2] name ":" _ (T t) { object.setAttribute(attribute, t); }
 
@@ -64,6 +65,7 @@ dsl QMLAttr2 <name1: Identifier, name2: Identifier, T> {
     this.attribute = attribute;
   }
 
+  @SuppressWarnings("unchecked")
   T[QML.p3] name1 "." name2 () { return (T)object.getAttribute(attribute); }
   void[QML.p2] name1 "." name2 ":" _ (T t) { object.setAttribute(attribute, t); }
 
@@ -90,6 +92,7 @@ dsl QMLRectangleDecl {
     this.object = object;
   }
 
+  @SuppressWarnings("unchecked")
   int[QML.p3] "width" () {
     return ((Integer)object.getAttribute("width")).intValue();
   }
@@ -98,6 +101,7 @@ dsl QMLRectangleDecl {
     object.setAttribute("width", new Integer(n));
   }
 
+  @SuppressWarnings("unchecked")
   int[QML.p3] "height" () {
     return ((Integer)object.getAttribute("height")).intValue();
   }
@@ -106,6 +110,7 @@ dsl QMLRectangleDecl {
     object.setAttribute("height", new Integer(n));
   }
 
+  @SuppressWarnings("unchecked")
   Color[QML.p3] "color" () {
     return (Color)object.getAttribute("color");
   }
@@ -121,12 +126,15 @@ dsl QMLRectangleProperties <name: Identifier> {
   QMLRectangleProperties (QMLRectangle object) {
     this.object = object;
   }
+  @SuppressWarnings("unchecked")
   int[QML.p3] name "." "width" () {
     return ((Integer)object.getAttribute("width")).intValue();
   }
+  @SuppressWarnings("unchecked")
   int[QML.p3] name "." "height" () {
     return ((Integer)object.getAttribute("height")).intValue();
   }
+  @SuppressWarnings("unchecked")
   Color[QML.p3] name "." "color" () {
     return (Color)object.getAttribute("color");
   }
@@ -153,6 +161,7 @@ class QMLObject {
     this.attributes.put("id", new Identifier("id" + Integer.toString(i)));
   }
 
+  @SuppressWarnings("unchecked")
   public String getName() {
     return ((Identifier)attributes.get("id")).toString();
   }

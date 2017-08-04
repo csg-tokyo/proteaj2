@@ -18,7 +18,7 @@ trait JavaClassFileGenerator {
     val compiler = ToolProvider.getSystemJavaCompiler
     if (compiler == null) error("Java Compiler cannot be found")
     else {
-      val compileOptions = List("-d", config.destination.getAbsolutePath, "-cp", config.getClassPathString)
+      val compileOptions = List("-d", config.destination.getAbsolutePath, "-cp", config.getClassPathString, "-Xlint:unchecked")
       val compilationUnits = files.map(SimplifiedIRGenerators.compilationUnit).flatMap(createJavaSourceObject)
       if (config.displayJavaSources) compilationUnits.foreach(source => println(source.getSource))
       val res = compiler.getTask(null, null, null, compileOptions.asJava, null, compilationUnits.asJava).call()

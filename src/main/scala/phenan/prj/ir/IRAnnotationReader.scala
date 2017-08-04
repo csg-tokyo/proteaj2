@@ -162,7 +162,7 @@ trait IRAnnotationReader {
     }
 
     private def annotationElement (name: String, arg: AnnotationElement, clazz: JClass): Option[(String, IRAnnotationElement)] = {
-      clazz.methods.find(_.name == name).flatMap(method => annotationElement(arg, method.erasedReturnType).map(name -> _))
+      clazz.methods.find(_.name == name).map(_.erasedReturnType).flatMap(t => annotationElement(arg, t).map(name -> _))
     }
 
     private def annotationElement (arg: AnnotationElement, annType: JErasedType): Option[IRAnnotationElement] = annType match {
@@ -175,7 +175,7 @@ trait IRAnnotationReader {
 
     private def annotationElement_Array (arg: AnnotationElement, component: JErasedType): Option[IRAnnotationElementArray] = arg match {
       case ArrayOfAnnotationElement(array) => array.traverse(annotationElement(_, component)).map(IRAnnotationElementArray)
-      case _ => None
+      case _ => annotationElement(arg, component).map(e => IRAnnotationElementArray(List(e)))
     }
 
     private def annotationElement_EnumConstant (arg: AnnotationElement, enum: JClass): Option[IREnumConstantRef] = arg match {
