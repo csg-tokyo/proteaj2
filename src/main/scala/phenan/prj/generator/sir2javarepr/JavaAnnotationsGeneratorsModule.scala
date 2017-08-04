@@ -149,10 +149,11 @@ trait JavaAnnotationsGeneratorsModule {
 
     private def parameterSigString (sig: JParameterSignature): String = {
       val cs = sig.contexts.map('@' + typeSigString(_)).mkString
+      val ws = sig.without.map('!' + typeSigString(_)).mkString
       val da = sig.defaultArg.map('?' + _).mkString
       val sc = sig.scopes.map('#' + typeSigString(_)).mkString
-      if(sig.varArgs) cs + typeSigString(sig.typeSig) + '*' + da + sc
-      else cs + typeSigString(sig.typeSig) + da + sc
+      if(sig.varArgs) cs + ws + typeSigString(sig.typeSig) + '*' + da + sc
+      else cs + ws + typeSigString(sig.typeSig) + da + sc
     }
 
     private def typeArgString (sig: JTypeArgument): String = sig match {

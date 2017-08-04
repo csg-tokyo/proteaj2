@@ -15,7 +15,8 @@ trait LiteralOperandParsersModule {
       for {
         expectedType <- inferExpectedType(param, binding, lop.method)
         contexts     <- inferContexts(param.contexts, binding, lop.method)
-      } yield getLiteralParser(expectedType, pri, lop.syntax.priority).withLocalContexts(contexts).argumentFor(param, binding)
+        withoutCts   <- inferContexts(param.withoutCts, binding, lop.method)
+      } yield getLiteralParser(expectedType, pri, lop.syntax.priority).withLocalContexts(contexts).withoutLocalContexts(withoutCts).argumentFor(param, binding)
     }.getOrElse(ContextSensitiveScanner.failure[ParsedArgument]("fail to parse argument expression"))
 
     def getMetaLiteralOperandParser(param: JParameter, pri: Option[JPriority], binding: MetaArgs, lop: LiteralOperator): ContextSensitiveScanner[MetaArgument] = {

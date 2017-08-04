@@ -180,11 +180,7 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val requiresClause: HParser[RequiresClause] = "requires" ~> typeName.+(',') ^^ RequiresClause
 
-  lazy val requires_Turnstile: HParser[RequiresClause] = contextTypeNames ^^ RequiresClause
-
-  lazy val contextTypeNames: HParser[List[TypeName]] = ( multipleTypeNames | typeName ^^ { List(_) } ) <~ turnstileSymbol.^
-
-  lazy val multipleTypeNames: HParser[List[TypeName]] = '{' ~> typeName.+(',') <~ '}'
+  lazy val requires_Turnstile: HParser[RequiresClause] = ( '{' ~> typeName.+(',') <~ '}' | typeName ^^ { List(_) } ) <~ turnstileSymbol.^ ^^ RequiresClause
 
   lazy val turnstileSymbol: LParser[_] = elem('|') ~> elem('-')
 
@@ -219,9 +215,11 @@ object DeclarationParsers extends TwoLevelParsers {
 
   lazy val parameterType: HParser[ParameterType] = contextualType | typeName
 
-  lazy val contextualType: HParser[ContextualType] = contextTypeNames ~ parameterType ^^ {
-    case ct ~ pt => ContextualType(ct, pt)
+  lazy val contextualType: HParser[ContextualType] = contextTypeNames ~ ('\\' ~> contextTypeNames).? ~ ( turnstileSymbol.^ ~> parameterType ) ^^ {
+    case ct1 ~ ct2 ~ pt => ContextualType(ct1, ct2.getOrElse(Nil), pt)
   }
+
+  lazy val contextTypeNames: HParser[List[TypeName]] = '{' ~> typeName.+(',') <~ '}' | typeName ^^ { List(_) }
 
   lazy val returnBound: HParser[TypeName] = '^' ~> typeName
 

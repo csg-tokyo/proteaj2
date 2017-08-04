@@ -131,6 +131,10 @@ trait ContextSensitiveParsersModule {
         parser.parser(env.activates(contexts)) ^^ { _.withContexts(contexts) }
       )
 
+      def withoutLocalContexts (contexts: List[IRContextRef]): ContextSensitiveParser[IRExpression] = new ContextSensitiveParser ( env =>
+        parser.parser(env.deactivates(contexts))
+      )
+
       def argumentFor (param: JParameter, binding: MetaArgs): ContextSensitiveParser[ParsedArgument] = {
         new ContextSensitiveParser ( env => parser.parser(env) >> { argument =>
           val newBinding = bindTypeArgs(param, argument.staticType, binding)
@@ -262,6 +266,10 @@ trait ContextSensitiveParsersModule {
     implicit class ContextSensitiveScanner_IRExpression (scanner: ContextSensitiveScanner[IRExpression]) {
       def withLocalContexts(contexts: List[IRContextRef]): ContextSensitiveScanner[IRExpression] = new ContextSensitiveScanner (env =>
         scanner.parser(env.activates(contexts)) ^^ { _.withContexts(contexts) }
+      )
+
+      def withoutLocalContexts(contexts: List[IRContextRef]): ContextSensitiveScanner[IRExpression] = new ContextSensitiveScanner (env =>
+        scanner.parser(env.deactivates(contexts))
       )
 
       def argumentFor (param: JParameter, binding: MetaArgs): ContextSensitiveScanner[ParsedArgument] = {

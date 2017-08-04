@@ -156,7 +156,7 @@ case class TypeParameter (name: String, bounds: List[TypeName]) extends MetaPara
 case class MetaValueParameter (name: String, metaType: TypeName) extends MetaParameter
 
 sealed trait ParameterType
-case class ContextualType (contexts: List[TypeName], paramType: ParameterType) extends ParameterType
+case class ContextualType (contexts: List[TypeName], without: List[TypeName], paramType: ParameterType) extends ParameterType
 
 sealed trait TypeArgument
 case class TypeName (name: QualifiedName, args: List[TypeArgument], dim: Int) extends TypeArgument with ParameterType

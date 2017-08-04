@@ -15,13 +15,14 @@ trait ExpressionOperandParsersModule {
     def getExpressionOperandParser(param: JParameter, pri: Option[JPriority], binding: Map[String, MetaArgument], eop: ExpressionOperator): ContextSensitiveParser[ParsedArgument] = {
       for {
         expectedType <- inferExpectedType(param, binding, eop.method)
-        contexts <- inferContexts(param.contexts, binding, eop.method)
+        contexts     <- inferContexts(param.contexts, binding, eop.method)
+        withoutCts   <- inferContexts(param.withoutCts, binding, eop.method)
       } yield {
         val parser =
           if (boxedVoidType == expectedType && contexts.nonEmpty) getStatementExpressionParser(pri, eop.syntax.priority)
           else getExpressionParser(expectedType, pri, eop.syntax.priority)
 
-        parser.withLocalContexts(contexts).argumentFor(param, binding)
+        parser.withLocalContexts(contexts).withoutLocalContexts(withoutCts).argumentFor(param, binding)
       }
     }.getOrElse(ContextSensitiveParser.failure[ParsedArgument]("fail to parse operand expression"))
 

@@ -25,6 +25,10 @@ dsl QML {
     activate props;
   }
 
+  void[p1] "Text" _[p1] (Lazy \ QMLRectangleDecl |- Void f) {
+    f.apply(new Lazy());
+  }
+
   exact Color[p4] "red" () { return Color.red; }
   exact Color[p4] "blue" () { return Color.blue; }
   exact Color[p4] "green" () { return Color.green; }
@@ -128,6 +132,8 @@ dsl QMLRectangleProperties <name: Identifier> {
   }
   private QMLRectangle object;
 }
+
+dsl Lazy {}
 
 class QMLRectangle extends QMLObject {
   QMLRectangle () {

@@ -45,7 +45,8 @@ trait ArgumentParsersModule {
       val parser = for {
         expectedType <- inferExpectedType(param, binding, procedure)
         contexts     <- inferContexts(param.contexts, binding, procedure)
-      } yield getExpressionParser(expectedType).withLocalContexts(contexts).argumentFor(param, binding)
+        withoutCts   <- inferContexts(param.withoutCts, binding, procedure)
+      } yield getExpressionParser(expectedType).withLocalContexts(contexts).withoutLocalContexts(withoutCts).argumentFor(param, binding)
 
       parser.getOrElse(ContextSensitiveParser.failure[ParsedArgument]("fail to parse argument expression"))
     }
@@ -54,7 +55,8 @@ trait ArgumentParsersModule {
       val parser = for {
         expectedType <- param.genericType.bind(binding)
         contexts     <- param.contexts.traverse(_.bind(binding).collect { case obj: JObjectType => IRContextRef(obj) })
-      } yield getExpressionParser(expectedType).withLocalContexts(contexts).argumentFor(param, binding)
+        withoutCts   <- param.withoutCts.traverse(_.bind(binding).collect { case obj: JObjectType => IRContextRef(obj) })
+      } yield getExpressionParser(expectedType).withLocalContexts(contexts).withoutLocalContexts(withoutCts).argumentFor(param, binding)
 
       parser.getOrElse(ContextSensitiveParser.failure[ParsedArgument]("fail to parse argument expression"))
     }

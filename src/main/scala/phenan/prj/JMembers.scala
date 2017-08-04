@@ -103,6 +103,7 @@ trait JMembers {
 
   case class JParameter(signature: JParameterSignature, env: MetaArgs) {
     lazy val contexts: List[JGenericType] = signature.contexts.map(sig => JGenericType(sig, env))
+    lazy val withoutCts: List[JGenericType] = signature.without.map(sig => JGenericType(sig, env))
     lazy val genericType: JGenericType = JGenericType(signature.typeSig, env)
     lazy val actualGenericType: JGenericType = JGenericType(signature.actualTypeSignature, env)
     lazy val scopes: List[JClass] = signature.scopes.map(sig => erase(sig).getOrElse(throw InvalidTypeException("invalid type for scope declaration")))
@@ -114,7 +115,7 @@ trait JMembers {
 
   object JParameter {
     def apply(sig: JTypeSignature, env: MetaArgs): JParameter = {
-      JParameter(JParameterSignature(Nil, sig, false, None, Nil), env)
+      JParameter(JParameterSignature(Nil, Nil, sig, false, None, Nil), env)
     }
   }
 }

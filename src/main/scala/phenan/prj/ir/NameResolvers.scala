@@ -78,16 +78,17 @@ trait NameResolvers {
     } yield SimpleClassTypeSignature(clazz.internalName, as)
 
     def parameterSignature (param: FormalParameter, initializer: Option[IRParameterInitializer]): Try[JParameterSignature] = {
-      parameterSignature(Nil, param.parameterType, param.varArgs, param.dim, initializer.map(_.name), param.scopeFor)
+      parameterSignature(Nil, Nil, param.parameterType, param.varArgs, param.dim, initializer.map(_.name), param.scopeFor)
     }
 
-    private def parameterSignature (contexts: List[TypeName], parameterType: ParameterType, varArgs: Boolean, dim: Int, initializer: Option[String], scope: List[TypeName]): Try[JParameterSignature] = parameterType match {
-      case ContextualType(cs, p) => parameterSignature(contexts ++ cs, p, varArgs, dim, initializer, scope)
+    private def parameterSignature (contexts: List[TypeName], without: List[TypeName], parameterType: ParameterType, varArgs: Boolean, dim: Int, initializer: Option[String], scope: List[TypeName]): Try[JParameterSignature] = parameterType match {
+      case ContextualType(cs, ws, p) => parameterSignature(contexts ++ cs, without ++ ws, p, varArgs, dim, initializer, scope)
       case tn: TypeName => for {
         cs  <- contexts.traverse(typeSignature)
+        ws  <- without.traverse(typeSignature)
         sig <- typeSignature(tn).map(JTypeSignature.arraySig(_, dim))
         sc  <- scope.traverse(classTypeSignature)
-      } yield JParameterSignature(cs, sig, varArgs, initializer, sc)
+      } yield JParameterSignature(cs, ws, sig, varArgs, initializer, sc)
     }
 
     private def nonArrayTypeSignature (name: QualifiedName, args: List[TypeArgument]): Try[JTypeSignature] = {

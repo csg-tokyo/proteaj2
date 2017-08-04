@@ -21,11 +21,11 @@ trait SignatureParser {
       case typeParams ~ parameters ~ retType ~ throwsTypes => JMethodSignature(typeParams, parameters, retType, Nil, throwsTypes, Nil, Nil, Nil)
     }
 
-    lazy val parameterSignature: PackratParser[JParameterSignature] = ('@' ~> typeSignature).* ~ typeSignature ~ ('*'.? ^^ {
-      _.nonEmpty
-    }) ~ ('?' ~> identifier).? ~ ('#' ~> classType).* ^^ {
-      case contexts ~ sig ~ va ~ df ~ scope => JParameterSignature(contexts, sig, va, df, scope)
-    }
+    lazy val parameterSignature: PackratParser[JParameterSignature] =
+      ('@' ~> typeSignature).* ~ ('!' ~> typeSignature).* ~ typeSignature ~ '*'.? ~ ('?' ~> identifier).? ~ ('#' ~> classType).* ^^
+        {
+          case contexts ~ without ~ sig ~ va ~ df ~ scope => JParameterSignature(contexts, without, sig, va.nonEmpty, df, scope)
+        }
 
     lazy val typeSignature: PackratParser[JTypeSignature] = fieldType | baseType
 
