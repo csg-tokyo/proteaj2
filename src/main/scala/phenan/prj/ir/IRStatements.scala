@@ -1,6 +1,7 @@
 package phenan.prj.ir
 
 import phenan.prj._
+import phenan.prj.exception._
 
 trait IRStatements {
   this: Environments with IRExpressions with JModules =>
@@ -62,8 +63,11 @@ trait IRStatements {
 
   case class IRExceptionHandlerHeader (exceptionType: JType, name: String)
 
-  case class IRActivateStatement(expression: IRExpression) extends IRStatement {
-    override def modifyEnv(env: Environment): Environment = env
+  case class IRActivateStatement (expression: IRExpression) extends IRStatement {
+    override def modifyEnv(env: Environment): Environment = expression.staticType match {
+      case context: JObjectType => env.activates(List(IRContextRef(context)))
+      case otherwise => throw InvalidASTException("the argument of activate statement has invalid type")
+    }
   }
 
   case class IRThrowStatement(expression: IRExpression) extends IRStatement {
